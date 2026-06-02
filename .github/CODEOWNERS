@@ -1,0 +1,3 @@
+# High-stakes logic — changes require maintainer review
+packages/domain/**        @arushevich1
+packages/shared-types/**  @arushevich1
