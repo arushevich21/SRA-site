@@ -8,6 +8,14 @@
 export type NormalizedEvent = Record<string, unknown>;
 
 export type {
+  DriverRoundResult,
+  DriverRoundScore,
+  DriverSeasonResult,
+  TeamSeasonResult,
+  CountbackEntry,
+} from './points-engine.js';
+
+export {
   RaceRef,
   Ruling,
   PpEvent,
