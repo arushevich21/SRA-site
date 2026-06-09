@@ -14,6 +14,8 @@ export {
   computeTeamSeasonTotal,
   compareByCountback,
 } from './points-engine.js';
+
+export {
   emptyLedger,
   applyRuling,
   recordAttendance,

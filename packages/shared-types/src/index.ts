@@ -14,6 +14,8 @@ export type {
   TeamSeasonResult,
   CountbackEntry,
 } from './points-engine.js';
+
+export {
   RaceRef,
   Ruling,
   PpEvent,
