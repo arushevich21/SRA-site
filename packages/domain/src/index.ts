@@ -9,6 +9,11 @@ export function computeStandings(): never {
 }
 
 export {
+  computeDriverRoundScore,
+  computeDriverSeasonTotal,
+  computeTeamSeasonTotal,
+  compareByCountback,
+} from './points-engine.js';
   emptyLedger,
   applyRuling,
   recordAttendance,
