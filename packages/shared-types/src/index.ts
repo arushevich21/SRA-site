@@ -6,3 +6,17 @@
  * Placeholder — expand as the GridOS integration is defined (Phase 0 spike).
  */
 export type NormalizedEvent = Record<string, unknown>;
+
+export type {
+  RaceRef,
+  Ruling,
+  PpEvent,
+  RaceWarning,
+  QualWarning,
+  PendingBan,
+  SeasonAdministration,
+  SeasonBanState,
+  DriverLedgerState,
+  RulingEffect,
+  EligibilityStatus,
+} from './penalty-ledger.js';
