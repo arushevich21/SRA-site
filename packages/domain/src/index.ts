@@ -10,3 +10,10 @@
 export function computeStandings(): never {
   throw new Error('not implemented');
 }
+
+export {
+  computeDriverRoundScore,
+  computeDriverSeasonTotal,
+  computeTeamSeasonTotal,
+  compareByCountback,
+} from './points-engine.js';

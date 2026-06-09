@@ -6,3 +6,11 @@
  * Placeholder — expand as the GridOS integration is defined (Phase 0 spike).
  */
 export type NormalizedEvent = Record<string, unknown>;
+
+export type {
+  DriverRoundResult,
+  DriverRoundScore,
+  DriverSeasonResult,
+  TeamSeasonResult,
+  CountbackEntry,
+} from './points-engine.js';
