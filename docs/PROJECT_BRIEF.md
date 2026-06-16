@@ -1,7 +1,5 @@
 # SRA Control Center — Repo Kickoff Brief
 
-> Hand this file to Claude Code as the scaffolding spec. It encodes the architecture, conventions, and the seeded domain spec. Read it top to bottom before creating anything.
-
 ## What we're building
 
 A **thin, read-only operational layer over the SimGrid GridOS API** for running the Sim Racing Alliance ACC league. GridOS is the racing platform (series, events, entries, teams, drivers, results — REST/JSON, **read access only**). Our app is the race director's cockpit: it aggregates that data, applies **league-owned business logic** (points, penalties, eligibility) that SimGrid does not provide, snapshots results for audit, and publishes to the frontend and Discord.
@@ -112,6 +110,8 @@ Known rules to encode:
 - **PP lifespan:** 8-race rolling window, carrying across seasons.
 - **Consecutive-race accrual:** 2 pp infractions in the same or consecutive races → +1 additional pp.
 - **Thresholds, each administered once per season:** 4pp = qualifying ban, 6pp = pit-lane start, 8pp = race ban, 10pp = season ban. PP are NOT cleared after a penalty is served.
+- **Threshold cascade (ratified):** if a single pp update crosses multiple thresholds at once (e.g. 5pp -> 9pp crosses both 6pp and 8pp), enqueue the corresponding penalties highest-severity-first: race ban, then pit-lane start, served back to back. The driver serves strictly one penalty at a time, in descending severity order, each under the normal "active 2 races" serving rule.
+- **New penalty during an active cascade (ratified):** a new penalty issued while an earlier queued penalty is still being served is appended to the BACK of the queue, regardless of its own severity. It never preempts what's currently being served. FIFO at the queue level; severity ordering only applies within a single multi-threshold crossing.
 - **Serving:** a future-race penalty stays active for 2 races; cleared if the driver skips 2 races; does not roll into the next season; must be served *in attendance* (skipping a race ≠ serving). Stacked bans are served across multiple races.
 - **Lap-1 incidents:** escalate the penalty one tier; classified `L1AUTO`.
 - **Returning position:** downgrades the time penalty, retains any pp, removes the extra warning.
