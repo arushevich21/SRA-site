@@ -23,3 +23,9 @@ Thumbs.db
 
 # pnpm
 .pnpm-store/
+
+# Spike / investigation scripts — never production code
+scratch/
+
+# Raw API fixtures — may contain sensitive league data; regenerate from the spike
+fixtures/gridos/

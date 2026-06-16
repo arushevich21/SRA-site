@@ -42,6 +42,10 @@ export function computeDriverSeasonTotal(
   if (roundScores.length === 0) {
     return { driverId, roundScores, droppedRoundIndex: -1, seasonTotal: 0 };
   }
+  if (roundScores.length === 1) {
+    // With a single round there is nothing to drop — keep the result.
+    return { driverId, roundScores, droppedRoundIndex: -1, seasonTotal: roundScores[0].total };
+  }
 
   // Sort ascending by total; tie-break: higher roundIndex first (that one gets dropped).
   const sorted = [...roundScores].sort((a, b) =>

@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { VERSION } from './index.js';
+import { GridOSClient } from './index.js';
 
-describe('simgrid-client placeholder', () => {
-  it('exports VERSION', () => {
-    expect(VERSION).toBe('0.0.0');
+describe('simgrid-client', () => {
+  it('GridOSClient is a constructor', () => {
+    expect(GridOSClient).toBeTypeOf('function');
+    const client = new GridOSClient('https://example.com/api/v1', 'test-key');
+    expect(client).toBeInstanceOf(GridOSClient);
   });
 });
