@@ -8,6 +8,6 @@ export default tseslint.config(
   tseslint.configs.recommended,
   eslintConfigPrettier,
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/*.js', 'vitest.config.ts'],
+    ignores: ['**/dist/**', '**/node_modules/**', '**/.next/**', '**/*.js', 'vitest.config.ts', '**/next-env.d.ts'],
   }
 );
