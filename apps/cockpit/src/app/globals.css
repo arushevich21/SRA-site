@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── palette — matches reference design ─────────────────────────── */
+  --color-carbon:     #0a0b0e;
+  --color-carbon-2:   #0e1014;
+  --color-panel:      #13161c;
+  --color-panel-2:    #171b22;
+  --color-line:       #23272f;
+  --color-line-2:     #2e333d;
+  --color-txt:        #e9ebef;
+  --color-txt-2:      #9aa1ad;
+  --color-txt-3:      #646b78;
+  --color-gold:       #e6b53d;
+  --color-gold-deep:  #c8941f;
+  --color-gold-soft:  #f2cf73;
+  --color-live:       #36e0c8;
+
+  /* ── typography ─────────────────────────────────────────────────── */
+  --font-sans:    var(--font-hanken),    system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-saira),     'Saira Condensed', sans-serif;
+  --font-mono:    var(--font-jetbrains), ui-monospace, 'Cascadia Code', monospace;
+}
+
+/* ── resets ────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── atmospheric background ────────────────────────────────────────── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(1100px 600px at 78%  -8%, rgba(230, 181, 61, .10), transparent 60%),
+    radial-gradient(900px  700px at  8%  12%, rgba(54, 224, 200, .045), transparent 55%),
+    linear-gradient(180deg, #0a0b0e 0%, #0b0d11 100%);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .5;
+  background-image:
+    linear-gradient(to right,  rgba(255, 255, 255, .022) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, .022) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at 50% 30%, #000 0%, transparent 78%);
+}
+
+/* ── selection ─────────────────────────────────────────────────────── */
+::selection {
+  background: var(--color-gold);
+  color: #101010;
+}
+
+/* ── scrollbar ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar         { width: 11px; }
+::-webkit-scrollbar-track   { background: var(--color-carbon); }
+::-webkit-scrollbar-thumb   { background: var(--color-line-2); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-gold-deep); }
+
+/* ── nav: CSS-hover dropdowns ──────────────────────────────────────── */
+.nav-has .nav-drop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 222px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  padding: 7px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity .22s, visibility .22s, transform .22s;
+  box-shadow: 0 26px 60px rgba(0, 0, 0, .6);
+  z-index: 200;
+}
+
+.nav-has:hover .nav-drop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.nav-drop a {
+  display: block;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-txt-2);
+  border-left: 2px solid transparent;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+.nav-drop a:hover {
+  background: var(--color-panel-2);
+  border-left-color: var(--color-gold);
+  color: var(--color-gold);
+}
+
+/* ── Sign In CTA ───────────────────────────────────────────────────── */
+.nav-signin {
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  background: var(--color-gold);
+  color: #0a0a0a;
+  padding: 11px 20px;
+  transform: skewX(-9deg);
+  transition: background .2s, box-shadow .2s;
+  margin-left: 8px;
+  display: inline-block;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.nav-signin:hover {
+  background: var(--color-gold-soft);
+  box-shadow: 0 0 26px rgba(230, 181, 61, .4);
+}
+
+/* ── live dot ──────────────────────────────────────────────────────── */
+@keyframes live-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(54, 224, 200, .55); }
+  70%  { box-shadow: 0 0 0 9px rgba(54, 224, 200, 0); }
+  100% { box-shadow: 0 0 0 0   rgba(54, 224, 200, 0); }
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-live);
+  animation: live-pulse 1.8s infinite;
+}

@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sim Racing Alliance — ACC League</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700;800;900&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --carbon:#0a0b0e;
+    --carbon-2:#0e1014;
+    --panel:#13161c;
+    --panel-2:#171b22;
+    --line:#23272f;
+    --line-2:#2e333d;
+    --txt:#e9ebef;
+    --txt-2:#9aa1ad;
+    --txt-3:#646b78;
+    --gold:#e6b53d;
+    --gold-deep:#c8941f;
+    --gold-soft:#f2cf73;
+    --live:#36e0c8;
+    --live-2:#2ad4ff;
+    --red:#ff4d4d;
+    --maxw:1280px;
+    --display:"Saira Condensed",sans-serif;
+    --body:"Hanken Grotesk",sans-serif;
+    --mono:"JetBrains Mono",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--carbon);
+    color:var(--txt);
+    font-family:var(--body);
+    line-height:1.5;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* atmospheric background layers */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-2;
+    background:
+      radial-gradient(1100px 600px at 78% -8%, rgba(230,181,61,.10), transparent 60%),
+      radial-gradient(900px 700px at 8% 12%, rgba(54,224,200,.045), transparent 55%),
+      linear-gradient(180deg,#0a0b0e 0%,#0b0d11 100%);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,.022) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.022) 1px, transparent 1px);
+    background-size:64px 64px;
+    mask-image:radial-gradient(circle at 50% 30%, #000 0%, transparent 78%);
+  }
+  ::selection{background:var(--gold);color:#101010}
+  ::-webkit-scrollbar{width:11px}
+  ::-webkit-scrollbar-track{background:var(--carbon)}
+  ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:0}
+  ::-webkit-scrollbar-thumb:hover{background:var(--gold-deep)}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+
+  /* ---------- kicker / mono labels ---------- */
+  .kick{
+    font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.32em;
+    text-transform:uppercase;color:var(--gold);display:inline-flex;align-items:center;gap:10px;
+  }
+  .kick::before{content:"";width:26px;height:1px;background:var(--gold);opacity:.7}
+  .idx{font-family:var(--mono);color:var(--txt-3);font-size:12px;letter-spacing:.2em}
+
+  /* ---------- NAV ---------- */
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:100;
+    transition:background .35s ease, border-color .35s ease, backdrop-filter .35s;
+    border-bottom:1px solid transparent;
+  }
+  header.scrolled{
+    background:rgba(9,10,13,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
+  }
+  .nav{display:flex;align-items:center;justify-content:space-between;height:76px}
+  .brand{display:flex;align-items:center;gap:13px}
+  .mono-mark{
+    width:42px;height:42px;position:relative;flex:none;
+    border:1.5px solid var(--gold);
+    display:grid;place-items:center;
+    background:linear-gradient(140deg,rgba(230,181,61,.18),transparent);
+    transform:skewX(-9deg);
+  }
+  .mono-mark span{
+    transform:skewX(9deg);font-family:var(--display);font-weight:900;font-size:19px;
+    letter-spacing:-1px;color:var(--gold);line-height:1;
+  }
+  .brand-txt b{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:.5px;display:block;line-height:1}
+  .brand-txt small{font-family:var(--mono);font-size:9px;letter-spacing:.35em;color:var(--txt-3);text-transform:uppercase}
+  nav.menu{display:flex;align-items:center;gap:4px}
+  .menu a, .menu .navitem{
+    font-size:12.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--txt-2);padding:10px 13px;position:relative;cursor:pointer;transition:color .2s;white-space:nowrap;
+  }
+  .menu a:hover,.menu .navitem:hover{color:var(--txt)}
+  .navitem.has::after{content:"▾";font-size:9px;margin-left:5px;opacity:.5}
+  .navitem .drop{
+    position:absolute;top:calc(100% + 8px);left:0;min-width:222px;
+    background:var(--panel);border:1px solid var(--line);
+    opacity:0;visibility:hidden;transform:translateY(-6px);transition:.22s;padding:7px;
+    box-shadow:0 26px 60px rgba(0,0,0,.6);
+  }
+  .navitem:hover .drop{opacity:1;visibility:visible;transform:translateY(0)}
+  .drop a{display:block;padding:9px 12px;letter-spacing:.08em;border-left:2px solid transparent}
+  .drop a:hover{background:var(--panel-2);border-left-color:var(--gold);color:var(--gold)}
+  .nav-cta{
+    font-family:var(--body);font-weight:700;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;
+    background:var(--gold);color:#0a0a0a;padding:11px 20px;transform:skewX(-9deg);transition:.2s;
+    margin-left:8px;
+  }
+  .nav-cta span{display:inline-block;transform:skewX(9deg)}
+  .nav-cta:hover{background:var(--gold-soft);box-shadow:0 0 26px rgba(230,181,61,.4)}
+  .burger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:6px}
+  .burger i{width:24px;height:2px;background:var(--txt);display:block}
+
+  /* ---------- HERO ---------- */
+  .hero{position:relative;padding:170px 0 70px;overflow:hidden}
+  .hero-stripe{
+    position:absolute;top:0;right:-10%;width:46%;height:100%;z-index:0;
+    background:linear-gradient(115deg,transparent 0%,rgba(230,181,61,.07) 45%,rgba(230,181,61,.13) 50%,transparent 51%);
+    transform:skewX(-12deg);
+  }
+  .sweep{
+    position:absolute;top:0;bottom:0;width:2px;background:linear-gradient(180deg,transparent,var(--gold),transparent);
+    opacity:.0;animation:sweep 7s ease-in-out infinite;z-index:0;
+  }
+  @keyframes sweep{0%{left:-5%;opacity:0}10%{opacity:.55}50%{opacity:.2}90%{opacity:0}100%{left:105%;opacity:0}}
+  .hero-grid{position:relative;z-index:2;display:grid;grid-template-columns:1.45fr .9fr;gap:48px;align-items:center}
+  .hero h1{
+    font-family:var(--display);font-weight:900;text-transform:uppercase;
+    font-size:clamp(52px,7.4vw,108px);line-height:.9;letter-spacing:-1px;margin:22px 0 0;
+  }
+  .hero h1 .o{color:transparent;-webkit-text-stroke:1.5px var(--gold);}
+  .hero h1 em{font-style:normal;color:var(--gold);position:relative;display:inline-block}
+  .hero p.lead{color:var(--txt-2);font-size:17px;max-width:480px;margin-top:24px;line-height:1.65}
+  .hero-cta{display:flex;gap:14px;margin-top:34px;flex-wrap:wrap}
+  .btn{
+    font-family:var(--body);font-weight:700;font-size:13.5px;letter-spacing:.09em;text-transform:uppercase;
+    padding:15px 28px;transform:skewX(-9deg);transition:.2s;cursor:pointer;display:inline-flex;align-items:center;gap:9px;border:none;
+  }
+  .btn span{transform:skewX(9deg);display:inline-flex;align-items:center;gap:9px}
+  .btn.gold{background:var(--gold);color:#0a0a0a}
+  .btn.gold:hover{background:var(--gold-soft);box-shadow:0 0 30px rgba(230,181,61,.45);transform:skewX(-9deg) translateY(-2px)}
+  .btn.ghost{background:transparent;color:var(--txt);border:1.5px solid var(--line-2)}
+  .btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
+
+  /* next event card */
+  .event-card{
+    background:linear-gradient(160deg,var(--panel),var(--carbon-2));
+    border:1px solid var(--line);position:relative;
+    clip-path:polygon(0 0,100% 0,100% 88%,94% 100%,0 100%);
+  }
+  .event-card .ec-top{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .live-dot{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--live);text-transform:uppercase}
+  .live-dot i{width:8px;height:8px;border-radius:50%;background:var(--live);box-shadow:0 0 0 0 rgba(54,224,200,.6);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(54,224,200,.55)}70%{box-shadow:0 0 0 9px rgba(54,224,200,0)}100%{box-shadow:0 0 0 0 rgba(54,224,200,0)}}
+  .ec-top .rnd{font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.15em}
+  .ec-body{padding:22px 20px}
+  .ec-series{font-family:var(--mono);font-size:11px;letter-spacing:.25em;color:var(--gold);text-transform:uppercase}
+  .ec-track{font-family:var(--display);font-weight:800;font-size:34px;text-transform:uppercase;line-height:1;margin:8px 0 4px}
+  .ec-meta{color:var(--txt-2);font-size:13.5px}
+  .countdown{display:flex;gap:10px;margin-top:20px}
+  .cd{flex:1;background:var(--carbon);border:1px solid var(--line);padding:12px 6px;text-align:center}
+  .cd b{font-family:var(--mono);font-weight:700;font-size:26px;color:var(--txt);display:block;line-height:1}
+  .cd small{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--txt-3);text-transform:uppercase}
+
+  /* ---------- TELEMETRY STATS ---------- */
+  .stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:rgba(255,255,255,.012);margin-top:64px}
+  .stats-row{display:grid;grid-template-columns:repeat(6,1fr);max-width:var(--maxw);margin:0 auto}
+  .stat{padding:30px 22px;border-right:1px solid var(--line);position:relative}
+  .stat:last-child{border-right:none}
+  .stat .num{font-family:var(--mono);font-weight:700;font-size:clamp(28px,3vw,40px);color:var(--txt);line-height:1;letter-spacing:-1px}
+  .stat .num em{font-style:normal;color:var(--gold)}
+  .stat .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--txt-3);text-transform:uppercase;margin-top:9px;display:block}
+
+  /* ---------- SECTION SHELL ---------- */
+  section.block{padding:96px 0;position:relative}
+  .shead{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:48px;flex-wrap:wrap}
+  .shead h2{font-family:var(--display);font-weight:800;text-transform:uppercase;font-size:clamp(34px,4.4vw,56px);line-height:.92;letter-spacing:-.5px}
+  .shead h2 em{font-style:normal;color:var(--gold)}
+  .shead .sub{color:var(--txt-2);max-width:420px;font-size:15px}
+  .link-arw{font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--gold);text-transform:uppercase;border-bottom:1px solid transparent;transition:.2s;white-space:nowrap}
+  .link-arw:hover{border-bottom-color:var(--gold)}
+
+  /* flagship series */
+  .flagship{
+    display:grid;grid-template-columns:1.1fr 1fr;gap:0;border:1px solid var(--line);
+    background:linear-gradient(150deg,var(--panel),var(--carbon-2));position:relative;overflow:hidden;
+  }
+  .flagship::before{content:"GT3";position:absolute;right:-20px;bottom:-50px;font-family:var(--display);font-weight:900;font-size:280px;color:rgba(255,255,255,.018);line-height:.7;pointer-events:none}
+  .fl-left{padding:46px}
+  .fl-tag{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:#0a0a0a;background:var(--gold);padding:5px 12px;text-transform:uppercase;font-weight:700}
+  .fl-left h3{font-family:var(--display);font-weight:900;text-transform:uppercase;font-size:46px;line-height:.92;margin:18px 0 6px}
+  .fl-left .season{font-family:var(--mono);color:var(--gold);letter-spacing:.2em;font-size:13px}
+  .fl-left p{color:var(--txt-2);margin:18px 0 26px;font-size:15px;max-width:430px}
+  .divs{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap}
+  .div-chip{font-family:var(--mono);font-size:12px;letter-spacing:.1em;border:1px solid var(--line-2);padding:8px 14px;color:var(--txt-2);transition:.2s}
+  .div-chip:hover{border-color:var(--gold);color:var(--gold)}
+  .fl-right{border-left:1px solid var(--line);padding:46px;display:flex;flex-direction:column;justify-content:center;gap:2px;position:relative;z-index:2}
+  .spec{display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-bottom:1px solid var(--line)}
+  .spec:last-child{border-bottom:none}
+  .spec .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--txt-3);text-transform:uppercase}
+  .spec .v{font-family:var(--body);font-weight:600;font-size:15px}
+  .spec .v em{font-style:normal;color:var(--gold)}
+
+  /* series grid */
+  .series-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:18px}
+  .scard{
+    background:var(--panel);border:1px solid var(--line);padding:26px;position:relative;
+    transition:.25s;overflow:hidden;cursor:pointer;
+  }
+  .scard::after{content:"";position:absolute;left:0;top:0;height:3px;width:0;background:var(--gold);transition:width .3s}
+  .scard:hover{transform:translateY(-4px);border-color:var(--line-2);background:var(--panel-2)}
+  .scard:hover::after{width:100%}
+  .scard .cls{display:inline-flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+  .cls b{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--gold);border:1px solid rgba(230,181,61,.35);padding:3px 8px;font-weight:500}
+  .scard h4{font-family:var(--display);font-weight:800;text-transform:uppercase;font-size:26px;line-height:.95}
+  .scard .fmt{font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.12em;margin:6px 0 14px}
+  .scard p{color:var(--txt-2);font-size:13.5px;line-height:1.6}
+  .scard .more{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;margin-top:16px;display:inline-block;opacity:0;transform:translateX(-6px);transition:.25s}
+  .scard:hover .more{opacity:1;transform:translateX(0)}
+
+  /* ---------- LEADERBOARD (broadcast timing) ---------- */
+  .lb-shell{border:1px solid var(--line);background:var(--carbon-2)}
+  .lb-tabs{display:flex;border-bottom:1px solid var(--line);overflow-x:auto}
+  .lb-tab{font-family:var(--mono);font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;padding:15px 20px;color:var(--txt-3);cursor:pointer;border-right:1px solid var(--line);white-space:nowrap;transition:.2s;position:relative}
+  .lb-tab.active{color:var(--gold);background:rgba(230,181,61,.05)}
+  .lb-tab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--gold)}
+  .lb-tab:hover{color:var(--txt)}
+  .lb-head{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--line)}
+  .lb-head .trk{display:flex;align-items:center;gap:14px}
+  .lb-head .trk b{font-family:var(--display);font-weight:800;font-size:24px;text-transform:uppercase;letter-spacing:.5px}
+  .lb-head .entries{font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.14em}
+  .row{display:grid;grid-template-columns:60px 1fr 200px 130px;align-items:center;padding:0 22px;height:58px;border-bottom:1px solid var(--line);transition:background .15s;position:relative}
+  .row:last-child{border-bottom:none}
+  .row:hover{background:rgba(255,255,255,.02)}
+  .row .pos{font-family:var(--mono);font-weight:700;font-size:18px;color:var(--txt-3)}
+  .row.p1 .pos{color:var(--gold)}
+  .row.p1{background:linear-gradient(90deg,rgba(230,181,61,.07),transparent 40%)}
+  .row.p1::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--gold)}
+  .row .drv{font-weight:600;font-size:15px;display:flex;align-items:center;gap:11px}
+  .row .car{font-family:var(--mono);font-size:11.5px;color:var(--txt-2);letter-spacing:.04em;display:flex;align-items:center;gap:9px}
+  .mfr{width:22px;height:22px;border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:10px;color:var(--gold);flex:none}
+  .row .lap{font-family:var(--mono);font-weight:700;font-size:17px;text-align:right;letter-spacing:.02em}
+  .row.p1 .lap{color:var(--gold)}
+  .row .gap{font-family:var(--mono);font-size:11px;color:var(--live);text-align:right;margin-top:2px}
+  .lb-foot{padding:14px 22px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line)}
+  .lb-foot .upd{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);letter-spacing:.12em}
+
+  /* ---------- SRATING ---------- */
+  .srat{display:grid;grid-template-columns:1fr 1.05fr;gap:54px;align-items:center}
+  .srat p{color:var(--txt-2);font-size:15.5px;line-height:1.7;margin:20px 0}
+  .gauge-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:30px}
+  .gauge{background:var(--panel);border:1px solid var(--line);padding:24px 18px;text-align:center;position:relative;overflow:hidden}
+  .gauge .ring{width:96px;height:96px;margin:0 auto 14px;position:relative}
+  .gauge .ring svg{transform:rotate(-90deg)}
+  .gauge .ring .val{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:22px;color:var(--txt)}
+  .gauge h5{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:18px;letter-spacing:.06em}
+  .gauge small{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--txt-3);text-transform:uppercase}
+  .srat-card{background:linear-gradient(160deg,var(--panel),var(--carbon-2));border:1px solid var(--line);padding:40px}
+  .srat-card .big{font-family:var(--display);font-weight:900;font-size:120px;line-height:.85;color:var(--gold);letter-spacing:-3px}
+  .srat-card .big sup{font-size:34px;color:var(--txt-2);vertical-align:super}
+
+  /* ---------- COMMUNITY ---------- */
+  .comm{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .comm-card{position:relative;padding:42px;border:1px solid var(--line);overflow:hidden;min-height:230px;display:flex;flex-direction:column;justify-content:flex-end}
+  .comm-card.discord{background:linear-gradient(150deg,rgba(88,101,242,.18),var(--carbon-2))}
+  .comm-card.stream{background:linear-gradient(150deg,rgba(145,71,255,.16),var(--carbon-2))}
+  .comm-card h3{font-family:var(--display);font-weight:800;text-transform:uppercase;font-size:34px;line-height:.95}
+  .comm-card p{color:var(--txt-2);font-size:14px;margin:10px 0 22px;max-width:340px}
+  .comm-card .big-num{position:absolute;top:30px;right:34px;font-family:var(--mono);font-weight:700;font-size:15px;color:var(--gold);letter-spacing:.1em}
+  .stream-links{display:flex;gap:10px}
+  .pill{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line-2);padding:10px 18px;transition:.2s}
+  .pill:hover{border-color:var(--gold);color:var(--gold)}
+
+  /* ---------- PARTNERS ---------- */
+  .partners{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:30px 0;overflow:hidden}
+  .marquee{display:flex;gap:60px;width:max-content;animation:scroll 32s linear infinite}
+  .partners:hover .marquee{animation-play-state:paused}
+  @keyframes scroll{to{transform:translateX(-50%)}}
+  .pname{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:22px;color:var(--txt-3);letter-spacing:.04em;transition:color .2s;white-space:nowrap}
+  .pname:hover{color:var(--gold)}
+
+  /* ---------- FOOTER ---------- */
+  footer{padding:80px 0 36px;border-top:1px solid var(--line);margin-top:0}
+  .foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px;margin-bottom:54px}
+  .foot-brand p{color:var(--txt-2);font-size:14px;max-width:330px;margin:18px 0 22px;line-height:1.6}
+  .foot-soc{display:flex;gap:10px}
+  .foot-soc a{width:40px;height:40px;border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--mono);font-size:11px;transition:.2s;color:var(--txt-2)}
+  .foot-soc a:hover{border-color:var(--gold);color:var(--gold)}
+  .fcol h6{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--txt-3);text-transform:uppercase;margin-bottom:18px}
+  .fcol a{display:block;color:var(--txt-2);font-size:14px;padding:6px 0;transition:.2s}
+  .fcol a:hover{color:var(--gold);padding-left:6px}
+  .foot-bot{display:flex;justify-content:space-between;align-items:center;padding-top:28px;border-top:1px solid var(--line);flex-wrap:wrap;gap:14px}
+  .foot-bot small{font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.1em}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+
+  /* ---------- responsive ---------- */
+  @media(max-width:980px){
+    .menu{display:none}
+    .burger{display:flex}
+    .hero-grid{grid-template-columns:1fr;gap:36px}
+    .flagship{grid-template-columns:1fr}
+    .fl-right{border-left:none;border-top:1px solid var(--line)}
+    .series-grid{grid-template-columns:1fr 1fr}
+    .srat{grid-template-columns:1fr;gap:34px}
+    .comm{grid-template-columns:1fr}
+    .stats-row{grid-template-columns:repeat(3,1fr)}
+    .stat:nth-child(3){border-right:none}
+    .foot-grid{grid-template-columns:1fr 1fr}
+    .row{grid-template-columns:46px 1fr 100px}
+    .row .car{display:none}
+  }
+  @media(max-width:560px){
+    .wrap{padding:0 18px}
+    .series-grid{grid-template-columns:1fr}
+    .stats-row{grid-template-columns:repeat(2,1fr)}
+    .stat:nth-child(3){border-right:1px solid var(--line)}
+    .stat:nth-child(2n){border-right:none}
+    .hero{padding-top:130px}
+    .srat-card .big{font-size:84px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== NAV ===== -->
+<header id="hdr">
+  <div class="wrap nav">
+    <a href="#" class="brand">
+      <div class="mono-mark"><span>SRA</span></div>
+      <div class="brand-txt"><b>SIM RACING ALLIANCE</b><small>ACC · North America</small></div>
+    </a>
+    <nav class="menu">
+      <a href="#">Calendar</a>
+      <a href="#series">Championships</a>
+      <div class="navitem has">Leaderboards
+        <div class="drop">
+          <a href="#">Hot Lap</a><a href="#">Hot Lap · Seasonal</a><a href="#">Hot Stint</a>
+          <a href="#">Hot Stint · Seasonal</a><a href="#">Hot Stint Qualifying</a><a href="#">Endurance Qualifying</a>
+        </div>
+      </div>
+      <div class="navitem has">Standings
+        <div class="drop">
+          <a href="#">GT3 Team Series</a><a href="#">Multiclass Mayhem</a><a href="#">League in a Week</a>
+        </div>
+      </div>
+      <a href="#">Results</a>
+      <div class="navitem has">About
+        <div class="drop">
+          <a href="#">League Info</a><a href="#">Rules &amp; Regs</a><a href="#srating">SRAting</a>
+          <a href="#">ACC Servers</a><a href="#">Reference Lap Times</a><a href="#">Drivers · Stats</a>
+          <a href="#">Partners</a>
+        </div>
+      </div>
+      <a href="#">Store</a>
+      <a href="#" class="nav-cta"><span>Sign In</span></a>
+    </nav>
+    <div class="burger"><i></i><i></i><i></i></div>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="hero-stripe"></div>
+  <div class="sweep"></div>
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="kick reveal">North American ACC League · Season 18</span>
+      <h1 class="reveal" style="transition-delay:.06s">Clean.<br><em>Competitive.</em><br><span class="o">Relentless.</span></h1>
+      <p class="lead reveal" style="transition-delay:.14s">We're a PC-based Assetto Corsa Competizione league built on competitive, clean GT3 racing — four divisions, real stewarding, and on-track battles for position at every level of pace.</p>
+      <div class="hero-cta reveal" style="transition-delay:.2s">
+        <a href="#" class="btn gold"><span>Get Started →</span></a>
+        <a href="#" class="btn ghost"><span>Join the Discord</span></a>
+      </div>
+    </div>
+    <div class="event-card reveal" style="transition-delay:.26s">
+      <div class="ec-top">
+        <span class="live-dot"><i></i>Next Event</span>
+        <span class="rnd">RND 04 / 08</span>
+      </div>
+      <div class="ec-body">
+        <span class="ec-series">GT3 Team Series · Div 1 &amp; 3</span>
+        <div class="ec-track">Spa-Francorchamps</div>
+        <div class="ec-meta">Tuesday · 9:00 PM ET · 10m Quali / 60m Race</div>
+        <div class="countdown" id="cd">
+          <div class="cd"><b id="cd-d">02</b><small>Days</small></div>
+          <div class="cd"><b id="cd-h">14</b><small>Hrs</small></div>
+          <div class="cd"><b id="cd-m">37</b><small>Min</small></div>
+          <div class="cd"><b id="cd-s">09</b><small>Sec</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STATS ===== -->
+<div class="stats">
+  <div class="stats-row">
+    <div class="stat"><div class="num" data-to="18">0</div><span class="lbl">Seasons</span></div>
+    <div class="stat"><div class="num" data-to="3300" data-suffix="+">0</div><span class="lbl">Members</span></div>
+    <div class="stat"><div class="num" data-to="4">0</div><span class="lbl">Divisions</span></div>
+    <div class="stat"><div class="num" data-to="38">0</div><span class="lbl">ACC Servers</span></div>
+    <div class="stat"><div class="num" data-to="93432">0</div><span class="lbl">Sessions</span></div>
+    <div class="stat"><div class="num" data-to="4508667">0</div><span class="lbl">Laps Logged</span></div>
+  </div>
+</div>
+
+<!-- ===== FLAGSHIP SERIES ===== -->
+<section class="block" id="series">
+  <div class="wrap">
+    <div class="shead reveal">
+      <div>
+        <span class="idx">01 — FLAGSHIP SERIES</span>
+        <h2 style="margin-top:14px">The <em>GT3</em><br>Team Series</h2>
+      </div>
+      <p class="sub">The reason we run ACC: competitive GT3 racing. A team &amp; drivers' series split across four divisions so every grid is a fair fight.</p>
+    </div>
+
+    <div class="flagship reveal">
+      <div class="fl-left">
+        <span class="fl-tag">Main Series</span>
+        <h3>GT3 Team Series</h3>
+        <span class="season">SEASON 18 · 8 ROUNDS</span>
+        <p>Two-driver teams, both on track at the same time, racing 60-minute features. No matter your pace, you'll find battles for position throughout your split.</p>
+        <div class="divs">
+          <span class="div-chip">DIV 1</span><span class="div-chip">DIV 2</span>
+          <span class="div-chip">DIV 3</span><span class="div-chip">DIV 4</span>
+        </div>
+        <a href="#" class="btn gold"><span>Register a Team →</span></a>
+      </div>
+      <div class="fl-right">
+        <div class="spec"><span class="k">Race Nights</span><span class="v">Tue &amp; Wed · <em>9:00 PM ET</em></span></div>
+        <div class="spec"><span class="k">Format</span><span class="v">10m Quali / 60m Race</span></div>
+        <div class="spec"><span class="k">Pit Stop</span><span class="v">Mandatory · tire change</span></div>
+        <div class="spec"><span class="k">Qualifying Req.</span><span class="v"><em>5-lap hot stint</em></span></div>
+        <div class="spec"><span class="k">Stewarding</span><span class="v">Penalty review · 24h</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== OTHER SERIES ===== -->
+<section class="block" style="padding-top:0">
+  <div class="wrap">
+    <div class="shead reveal">
+      <div><span class="idx">02 — ALL CHAMPIONSHIPS</span><h2 style="margin-top:14px">More Ways<br>to <em>Race</em></h2></div>
+      <a href="#" class="link-arw">View All Championships →</a>
+    </div>
+    <div class="series-grid">
+      <div class="scard reveal">
+        <div class="cls"><b>GT2</b><b>TCX</b><b>GTC</b></div>
+        <h4>Multiclass Mayhem</h4>
+        <div class="fmt">SEASON 13 · 8 ROUNDS · 75m</div>
+        <p>Different class cars sharing one track. Wide-open strategy, no fuel or tire requirements — run your own race.</p>
+        <span class="more">Standings →</span>
+      </div>
+      <div class="scard reveal" style="transition-delay:.05s">
+        <div class="cls"><b>GT3</b></div>
+        <h4>League in a Week</h4>
+        <div class="fmt">SEASON 16 · 4 DAYS · 8×20m</div>
+        <p>A sprint blitz: two short races a night across four nights, with drop races. Slots between GT3 Team Series seasons.</p>
+        <span class="more">Standings →</span>
+      </div>
+      <div class="scard reveal" style="transition-delay:.1s">
+        <div class="cls"><b>MULTI</b></div>
+        <h4>Manufacturers Cup</h4>
+        <div class="fmt">SEASON 1 · 5 ROUNDS · 60m</div>
+        <p>A different car for every round. Rhineland Rivalry, Ferrari Frenzy, British Battle — themed nights, one drop race.</p>
+        <span class="more">Results →</span>
+      </div>
+      <div class="scard reveal" style="transition-delay:.05s">
+        <div class="cls"><b>GT3</b></div>
+        <h4>Endurance Series</h4>
+        <div class="fmt">SEASON 2 · 6 ROUNDS · 6–8 HRS</div>
+        <p>A grueling display of consistency &amp; pace. Open / Silver / Bronze classes, 1–4 drivers per team, dynamic weather.</p>
+        <span class="more">Register →</span>
+      </div>
+      <div class="scard reveal" style="transition-delay:.1s">
+        <div class="cls"><b>GT3</b></div>
+        <h4>PRO/AM Driver Swap</h4>
+        <div class="fmt">SPECIAL EVENT · 90m</div>
+        <p>Mandatory mid-race driver swap. Teammates paired by division for a fair fight from pole to flag.</p>
+        <span class="more">Register →</span>
+      </div>
+      <div class="scard reveal" style="transition-delay:.15s">
+        <div class="cls"><b>LMU</b><b>iRacing</b></div>
+        <h4>Cross-Platform</h4>
+        <div class="fmt">ONGOING · LE MANS ULTIMATE</div>
+        <p>The Alliance is expanding beyond ACC. Multiclass nights on Le Mans Ultimate and a growing iRacing presence.</p>
+        <span class="more">Learn More →</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== LEADERBOARD ===== -->
+<section class="block" style="padding-top:0">
+  <div class="wrap">
+    <div class="shead reveal">
+      <div><span class="idx">03 — LIVE TIMING</span><h2 style="margin-top:14px">Hot Lap<br><em>Leaderboards</em></h2></div>
+      <p class="sub">38 servers online 24/7 across every ACC track. Set your time whenever — then chase your division rivals.</p>
+    </div>
+
+    <div class="lb-shell reveal">
+      <div class="lb-tabs">
+        <div class="lb-tab active">Hot Lap</div>
+        <div class="lb-tab">Hot Lap · Seasonal</div>
+        <div class="lb-tab">Hot Stint</div>
+        <div class="lb-tab">Stint Qualifying</div>
+        <div class="lb-tab">Endurance Quali</div>
+      </div>
+      <div class="lb-head">
+        <div class="trk">
+          <span class="live-dot"><i></i>Live</span>
+          <b>Spa-Francorchamps</b>
+        </div>
+        <span class="entries">2,672 ENTRIES</span>
+      </div>
+
+      <div class="row p1">
+        <div class="pos">P1</div>
+        <div class="drv">Corbin Behnke</div>
+        <div class="car"><span class="mfr">M</span>McLaren 720S GT3 Evo</div>
+        <div><div class="lap">2:15.690</div></div>
+      </div>
+      <div class="row">
+        <div class="pos">P2</div>
+        <div class="drv">Mr Sir</div>
+        <div class="car"><span class="mfr">M</span>McLaren 720S GT3 Evo</div>
+        <div><div class="lap">2:15.735</div><div class="gap">+0.045</div></div>
+      </div>
+      <div class="row">
+        <div class="pos">P3</div>
+        <div class="drv">Oscar Hoole</div>
+        <div class="car"><span class="mfr">M</span>McLaren 720S GT3 Evo</div>
+        <div><div class="lap">2:15.757</div><div class="gap">+0.067</div></div>
+      </div>
+      <div class="row">
+        <div class="pos">P4</div>
+        <div class="drv">Timothy Flammger</div>
+        <div class="car"><span class="mfr">F</span>Ferrari 296 GT3</div>
+        <div><div class="lap">2:15.812</div><div class="gap">+0.122</div></div>
+      </div>
+      <div class="row">
+        <div class="pos">P5</div>
+        <div class="drv">Eric Marecki</div>
+        <div class="car"><span class="mfr">A</span>AMR V8 Vantage GT3</div>
+        <div><div class="lap">2:15.904</div><div class="gap">+0.214</div></div>
+      </div>
+      <div class="lb-foot">
+        <span class="upd">UPDATED · LIVE FEED</span>
+        <a href="#" class="link-arw">All Tracks &amp; Times →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SRATING ===== -->
+<section class="block" id="srating" style="border-top:1px solid var(--line);background:rgba(255,255,255,.01)">
+  <div class="wrap">
+    <div class="srat">
+      <div class="reveal">
+        <span class="idx">04 — DRIVER RATING</span>
+        <h2 style="font-family:var(--display);font-weight:800;text-transform:uppercase;font-size:clamp(34px,4.4vw,56px);line-height:.92;margin-top:14px">The <em style="font-style:normal;color:var(--gold)">SRAting</em><br>System</h2>
+        <p>A proprietary, data-driven driver rating — a weighted blend of three metrics that quantifies each member's racing potential and keeps divisions fair and competitive.</p>
+        <div class="gauge-wrap">
+          <div class="gauge">
+            <div class="ring">
+              <svg width="96" height="96"><circle cx="48" cy="48" r="40" stroke="#23272f" stroke-width="7" fill="none"/><circle cx="48" cy="48" r="40" stroke="var(--gold)" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="50"/></svg>
+              <span class="val">80</span>
+            </div>
+            <h5>Pace</h5><small>Raw Speed</small>
+          </div>
+          <div class="gauge">
+            <div class="ring">
+              <svg width="96" height="96"><circle cx="48" cy="48" r="40" stroke="#23272f" stroke-width="7" fill="none"/><circle cx="48" cy="48" r="40" stroke="var(--gold)" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="38"/></svg>
+              <span class="val">85</span>
+            </div>
+            <h5>Perf.</h5><small>Race Result</small>
+          </div>
+          <div class="gauge">
+            <div class="ring">
+              <svg width="96" height="96"><circle cx="48" cy="48" r="40" stroke="#23272f" stroke-width="7" fill="none"/><circle cx="48" cy="48" r="40" stroke="var(--live)" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="28"/></svg>
+              <span class="val">89</span>
+            </div>
+            <h5>Safety</h5><small>Clean Racing</small>
+          </div>
+        </div>
+      </div>
+      <div class="srat-card reveal" style="transition-delay:.1s">
+        <span class="ec-series" style="color:var(--gold)">YOUR COMPOSITE RATING</span>
+        <div class="big">84<sup>.6</sup></div>
+        <div class="spec" style="margin-top:18px"><span class="k">Division Placement</span><span class="v"><em>Division 2 · Gold</em></span></div>
+        <div class="spec"><span class="k">Trend (last 5)</span><span class="v" style="color:var(--live)">▲ +2.3</span></div>
+        <div class="spec"><span class="k">League Percentile</span><span class="v">Top 18%</span></div>
+        <a href="#" class="btn ghost" style="margin-top:24px"><span>View Full Breakdown</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== COMMUNITY ===== -->
+<section class="block">
+  <div class="wrap">
+    <div class="shead reveal">
+      <div><span class="idx">05 — THE COMMUNITY</span><h2 style="margin-top:14px">Plug <em>In</em></h2></div>
+      <p class="sub">Setup tips, livery help, race clips, live polls and 3,300+ members who love this stuff as much as you do.</p>
+    </div>
+    <div class="comm">
+      <div class="comm-card discord reveal">
+        <span class="big-num">3,300+ MEMBERS</span>
+        <h3>Discord</h3>
+        <p>An active, supportive community. Dial in your setups, share liveries and rigs, post real-life rides, and chat with your division.</p>
+        <div><a href="#" class="btn gold"><span>Join the Discord →</span></a></div>
+      </div>
+      <div class="comm-card stream reveal" style="transition-delay:.08s">
+        <span class="live-dot" style="position:absolute;top:34px;right:34px"><i></i>Live Stream</span>
+        <h3>Watch Live</h3>
+        <p>Every main event streamed to Twitch &amp; YouTube — live chat, driver-focus requests and live polls. Catch the next race or rewatch any.</p>
+        <div class="stream-links">
+          <a href="#" class="pill">Twitch</a>
+          <a href="#" class="pill">YouTube</a>
+          <a href="#" class="pill">Pitwall Live</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PARTNERS ===== -->
+<div class="partners">
+  <div class="marquee">
+    <span class="pname">Armamentario</span><span class="pname">GO Setups</span><span class="pname">Trak Racer</span>
+    <span class="pname">Documize</span><span class="pname">RetroSaga</span><span class="pname">AT3D Sim Shop</span>
+    <span class="pname">Castle Cauldron</span><span class="pname">KP Concepts</span>
+    <span class="pname">Armamentario</span><span class="pname">GO Setups</span><span class="pname">Trak Racer</span>
+    <span class="pname">Documize</span><span class="pname">RetroSaga</span><span class="pname">AT3D Sim Shop</span>
+    <span class="pname">Castle Cauldron</span><span class="pname">KP Concepts</span>
+  </div>
+</div>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="#" class="brand"><div class="mono-mark"><span>SRA</span></div><div class="brand-txt"><b>SIM RACING ALLIANCE</b><small>ACC · North America</small></div></a>
+        <p>A league for all ages and skill levels. We strive to provide a competitive and clean racing environment — on track and off.</p>
+        <div class="foot-soc"><a href="#">DC</a><a href="#">YT</a><a href="#">TW</a><a href="#">X</a></div>
+      </div>
+      <div class="fcol"><h6>Compete</h6><a href="#">Calendar</a><a href="#">Championships</a><a href="#">Leaderboards</a><a href="#">Standings</a><a href="#">Results</a></div>
+      <div class="fcol"><h6>League</h6><a href="#">League Info</a><a href="#">Rules &amp; Regs</a><a href="#">SRAting</a><a href="#">ACC Servers</a><a href="#">Custom BoP</a></div>
+      <div class="fcol"><h6>More</h6><a href="#">Store</a><a href="#">Partners</a><a href="#">Sponsor</a><a href="#">Donate</a><a href="#">Profile</a></div>
+    </div>
+    <div class="foot-bot">
+      <small>© 2021–2026 SIM RACING ALLIANCE · ALL RIGHTS RESERVED</small>
+      <small style="display:flex;gap:22px"><a href="#" style="color:var(--txt-3)">TERMS OF USE</a><a href="#" style="color:var(--txt-3)">PRIVACY POLICY</a></small>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // nav scroll state
+  const hdr=document.getElementById('hdr');
+  addEventListener('scroll',()=>hdr.classList.toggle('scrolled',scrollY>30));
+
+  // reveal on scroll
+  const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  // count-up stats
+  const fmt=n=>n.toLocaleString('en-US');
+  const animate=(el)=>{
+    const to=+el.dataset.to, suf=el.dataset.suffix||'', dur=1500, t0=performance.now();
+    const step=(t)=>{
+      let p=Math.min((t-t0)/dur,1); p=1-Math.pow(1-p,3);
+      el.textContent=fmt(Math.floor(to*p))+suf;
+      if(p<1)requestAnimationFrame(step); else el.textContent=fmt(to)+suf;
+    };
+    requestAnimationFrame(step);
+  };
+  const sio=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting){animate(e.target);sio.unobserve(e.target)}}),{threshold:.5});
+  document.querySelectorAll('.num[data-to]').forEach(el=>sio.observe(el));
+
+  // live countdown (rolls seconds for effect)
+  const dD=document.getElementById('cd-d'),dH=document.getElementById('cd-h'),dM=document.getElementById('cd-m'),dS=document.getElementById('cd-s');
+  let target=new Date(); target.setDate(target.getDate()+2); target.setHours(target.getHours()+14,target.getMinutes()+37,target.getSeconds()+9);
+  setInterval(()=>{
+    let d=Math.max(0,(target-new Date())/1000);
+    const pad=n=>String(Math.floor(n)).padStart(2,'0');
+    dD.textContent=pad(d/86400); dH.textContent=pad((d%86400)/3600); dM.textContent=pad((d%3600)/60); dS.textContent=pad(d%60);
+  },1000);
+
+  // leaderboard tab toggle (visual)
+  document.querySelectorAll('.lb-tab').forEach(t=>t.addEventListener('click',()=>{
+    document.querySelector('.lb-tab.active')?.classList.remove('active'); t.classList.add('active');
+  }));
+</script>
+</body>
+</html>

@@ -29,3 +29,4 @@ scratch/
 
 # Raw API fixtures — may contain sensitive league data; regenerate from the spike
 fixtures/gridos/
+.next/

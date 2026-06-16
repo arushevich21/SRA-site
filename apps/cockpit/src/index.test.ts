@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { VERSION } from './index.js';
+import { currentChampionship } from './lib/current-championship.js';
 
-describe('cockpit placeholder', () => {
-  it('exports VERSION', () => {
-    expect(VERSION).toBe('0.0.0');
+describe('current-championship', () => {
+  it('exports an object with name and game as non-empty strings', () => {
+    expect(typeof currentChampionship.name).toBe('string');
+    expect(typeof currentChampionship.game).toBe('string');
+    expect(currentChampionship.name.length).toBeGreaterThan(0);
+    expect(currentChampionship.game.length).toBeGreaterThan(0);
   });
 });
