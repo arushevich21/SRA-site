@@ -1,5 +1,13 @@
+import { GridOSClient } from '@sra/simgrid-client';
+import { GridOSError } from '@sra/shared-types';
+import type { SimGridChampionship, SimGridStandingsEntry } from '@sra/shared-types';
 import pastSeasonsData from '../../content/seasons_clean.json';
 import { DivisionGroup } from './division-group';
+import { readStandings } from '../../lib/standings-store';
+import type { StandingsExport, ExportedClassGroup } from '../../lib/standings-types';
+
+// ── DIAGNOSTIC FLAG — set to null to revert to placeholder data ──────────────
+const TEST_CHAMPIONSHIP_ID: number | null = null;
 
 type PastSeason = {
   championshipType: string;
@@ -298,10 +306,275 @@ function ChampionshipBlock({ c }: { c: Championship }) {
   );
 }
 
+// ── live SimGrid diagnostic block ─────────────────────────────────────────────
+
+type LiveFetchResult =
+  | { ok: true; champ: SimGridChampionship; standings: SimGridStandingsEntry[] }
+  | { ok: false; error: string };
+
+async function fetchTestChampionship(id: number): Promise<LiveFetchResult> {
+  const baseUrl = process.env.GRIDOS_BASE_URL ?? 'https://www.thesimgrid.com/api/v1';
+  const apiKey = process.env.GRIDOS_API_KEY ?? '';
+  if (!apiKey) return { ok: false, error: 'GRIDOS_API_KEY not set in environment' };
+
+  const client = new GridOSClient(baseUrl, apiKey);
+  try {
+    const [champ, standings] = await Promise.all([
+      client.getChampionship(id),
+      client.getChampionshipStandings(id),
+    ]);
+    return { ok: true, champ, standings };
+  } catch (err) {
+    if (err instanceof GridOSError) {
+      return { ok: false, error: `GridOSError ${err.status} on ${err.endpoint}: ${err.message}` };
+    }
+    throw err;
+  }
+}
+
+function raceStatus(race: SimGridChampionship['races'][number]): {
+  label: string;
+  color: string;
+} {
+  if (race.ended && race.resultsAvailable) return { label: 'Results', color: 'text-gold' };
+  if (race.ended) return { label: 'Ended — no results', color: 'text-txt-3' };
+  if (new Date(race.startsAt) > new Date()) return { label: 'Upcoming', color: 'text-live' };
+  return { label: 'In Progress', color: 'text-live' };
+}
+
+function LiveChampionshipBlock({
+  champ,
+  standings,
+  localStandings,
+}: {
+  champ: SimGridChampionship;
+  standings: SimGridStandingsEntry[];
+  localStandings: StandingsExport | null;
+}) {
+  return (
+    <article className="border border-line bg-panel p-8">
+      {/* Source tag */}
+      <div className="mb-5 flex items-center gap-3">
+        <CategoryTag label="SimGrid Live" />
+        <span className="font-mono text-[9px] tracking-[.2em] uppercase text-txt-3">
+          ID {champ.id}
+        </span>
+      </div>
+
+      {/* Title area */}
+      <div className="flex gap-7 flex-col sm:flex-row">
+        <LogoPlaceholder />
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display font-black text-[clamp(28px,4vw,40px)] uppercase leading-none tracking-[-0.5px] text-txt">
+            {champ.name}
+          </h2>
+          <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-2 mt-3">
+            {champ.races.length} Rounds
+            <span className="text-txt-3"> · </span>
+            {champ.capacity} capacity ({champ.spotsTaken} taken)
+            <span className="text-txt-3"> · </span>
+            Teams {champ.teamsEnabled ? 'On' : 'Off'}
+          </p>
+          <p className="font-sans text-sm text-txt-2 mt-3 leading-relaxed">
+            {champ.startDate
+              ? `Started ${new Date(champ.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+              : '—'}
+            {champ.endDate
+              ? ` · Ends ${new Date(champ.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+              : ' · No end date set'}
+          </p>
+
+          {/* Editorial fields — not available from API */}
+          <p className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3/50 mt-4">
+            Category / Rules / Discord — not available from SimGrid API
+          </p>
+        </div>
+      </div>
+
+      {/* Race schedule with status */}
+      <div className="mt-7 border-t border-line pt-5">
+        <p className="font-mono text-[10px] tracking-[.35em] uppercase text-txt-3 mb-3">
+          Rounds
+        </p>
+        <div className="flex flex-col">
+          {champ.races.map((race, i) => {
+            const st = raceStatus(race);
+            return (
+              <div
+                key={race.id}
+                className={[
+                  'flex items-center gap-5 py-[9px]',
+                  i < champ.races.length - 1 ? 'border-b border-line/50' : '',
+                ].join(' ')}
+              >
+                <span className="font-mono text-[11px] tracking-[.2em] uppercase text-gold w-10 shrink-0">
+                  R{i + 1}
+                </span>
+                <span className="font-display font-bold text-[16px] uppercase leading-none text-txt-2 flex-1 min-w-0 truncate">
+                  {race.track.name}
+                </span>
+                <span className="font-mono text-[10px] tracking-[.15em] uppercase text-txt-3 shrink-0 w-20 text-right">
+                  {new Date(race.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+                <span className={`font-mono text-[9px] tracking-[.2em] uppercase ${st.color} shrink-0 w-36 text-right`}>
+                  {st.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Standings */}
+      <div className="mt-7 border-t border-line pt-5">
+        <p className="font-mono text-[10px] tracking-[.35em] uppercase text-txt-3 mb-3">
+          Standings
+          {localStandings && (
+            <span className="text-live ml-3">from uploaded export</span>
+          )}
+        </p>
+
+        {localStandings ? (
+          <div className="flex flex-col gap-6">
+            {localStandings.map((group) => (
+              <ClassGroupTable key={group.carClass} group={group} />
+            ))}
+          </div>
+        ) : standings.length === 0 ? (
+          <p className="font-sans text-sm text-txt-3 italic">
+            No standings entries returned by SimGrid for this championship.
+          </p>
+        ) : (
+          <>
+            <div className="border border-gold-deep/30 bg-gold-deep/5 px-4 py-3 mb-4">
+              <p className="font-mono text-[10px] tracking-[.15em] uppercase text-gold-deep">
+                No points data available from SimGrid for this championship
+              </p>
+              <p className="font-sans text-[12px] text-txt-3 mt-1">
+                The standings API returned {standings.length} entries with driver ID + display
+                name only. Upload standings via /admin/standings to see full points data.
+              </p>
+            </div>
+            <div className="flex flex-col">
+              {standings.map((entry, i) => (
+                <div
+                  key={entry.id}
+                  className={[
+                    'flex items-center gap-4 py-2',
+                    i < standings.length - 1 ? 'border-b border-line/30' : '',
+                  ].join(' ')}
+                >
+                  <span className="font-mono text-[11px] text-txt-3 w-6 shrink-0 text-right">
+                    {entry.id}
+                  </span>
+                  <span className="font-display font-bold text-[14px] uppercase text-txt truncate">
+                    {entry.displayName}
+                  </span>
+                  <span className="font-mono text-[9px] tracking-[.15em] uppercase text-txt-3/50 ml-auto shrink-0">
+                    — pts
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Bottom bar — link to SimGrid */}
+      <div className="mt-7 pt-5 border-t border-line flex items-center justify-between gap-4">
+        <span className="font-mono text-[9px] tracking-[.2em] uppercase text-txt-3/50">
+          Diagnostic · data fetched server-side at render time
+        </span>
+        <a
+          href={champ.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-[11px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors flex items-center gap-2 shrink-0"
+        >
+          View on SimGrid →
+        </a>
+      </div>
+    </article>
+  );
+}
+
+// ── standings table (rendered from uploaded export) ──────────────────────────
+
+function ClassGroupTable({ group }: { group: ExportedClassGroup }) {
+  const raceCount = group.standings[0]?.races.length ?? 0;
+
+  return (
+    <div>
+      <p className="font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 mb-2">
+        {group.carClass}
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="border-b border-line">
+              <th className="font-mono text-[9px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3 w-8">P</th>
+              <th className="font-mono text-[9px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3">Driver</th>
+              <th className="font-mono text-[9px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3 w-10">#</th>
+              <th className="font-mono text-[9px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3 hidden lg:table-cell">Car</th>
+              <th className="font-mono text-[9px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3 w-16 text-right">Pts</th>
+              {Array.from({ length: raceCount }, (_, i) => (
+                <th key={i} className="font-mono text-[9px] tracking-[.2em] uppercase text-txt-3 py-2 w-10 text-center hidden sm:table-cell">
+                  R{i + 1}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {group.standings.map((entry) => (
+              <tr key={entry.id} className="border-b border-line/30">
+                <td className={`font-mono text-[11px] py-2 pr-3 ${entry.position <= 3 ? 'text-gold' : 'text-txt-2'}`}>
+                  {entry.position}
+                </td>
+                <td className="font-display font-bold text-[13px] uppercase text-txt py-2 pr-3 truncate max-w-[180px]">
+                  {entry.id}
+                </td>
+                <td className="font-mono text-[11px] text-txt-3 py-2 pr-3">
+                  {entry.carNum}
+                </td>
+                <td className="font-sans text-[12px] text-txt-3 py-2 pr-3 truncate max-w-[200px] hidden lg:table-cell">
+                  {entry.car}
+                </td>
+                <td className="font-mono text-[11px] text-gold-soft py-2 pr-3 text-right">
+                  {entry.championshipPoints}
+                </td>
+                {entry.races.map((race, ri) => (
+                  <td
+                    key={ri}
+                    className={[
+                      'font-mono text-[10px] py-2 w-10 text-center hidden sm:table-cell',
+                      race.dnf ? 'text-gold-deep' : race.dns ? 'text-txt-3/40' : race.pointsTotal == null ? 'text-txt-3/30' : 'text-txt-2',
+                    ].join(' ')}
+                  >
+                    {race.pointsTotal == null ? '—' : race.dnf ? `${race.pointsTotal}*` : race.pointsTotal}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── page ──────────────────────────────────────────────────────────────────────
 
-export default function ChampionshipsPage() {
+export default async function ChampionshipsPage() {
   const active = CHAMPIONSHIPS.filter((c) => c.status === 'active');
+
+  const [liveResult, localStandings] = await Promise.all([
+    TEST_CHAMPIONSHIP_ID
+      ? fetchTestChampionship(TEST_CHAMPIONSHIP_ID)
+      : Promise.resolve(null),
+    TEST_CHAMPIONSHIP_ID
+      ? readStandings(TEST_CHAMPIONSHIP_ID)
+      : Promise.resolve(null),
+  ]);
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
@@ -314,7 +587,24 @@ export default function ChampionshipsPage() {
         Championships
       </h1>
 
-      {/* Active */}
+      {/* Live diagnostic block (when TEST_CHAMPIONSHIP_ID is set) */}
+      {liveResult && (
+        <div className="mb-20">
+          <SectionLabel>SimGrid Live Test</SectionLabel>
+          {liveResult.ok ? (
+            <LiveChampionshipBlock champ={liveResult.champ} standings={liveResult.standings} localStandings={localStandings} />
+          ) : (
+            <div className="border border-line/50 bg-carbon-2 p-8">
+              <p className="font-mono text-[11px] tracking-[.2em] uppercase text-gold-deep">
+                Failed to fetch championship {TEST_CHAMPIONSHIP_ID}
+              </p>
+              <p className="font-sans text-sm text-txt-3 mt-2">{liveResult.error}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Active (placeholder data) */}
       {active.length > 0 && (
         <div className="mb-20">
           <SectionLabel>Active Championships</SectionLabel>
