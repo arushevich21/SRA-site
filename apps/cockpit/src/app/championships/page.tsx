@@ -1,4 +1,5 @@
 import pastSeasonsData from '../../content/seasons_clean.json';
+import { DivisionGroup } from './division-group';
 
 type PastSeason = {
   championshipType: string;
@@ -297,29 +298,6 @@ function ChampionshipBlock({ c }: { c: Championship }) {
   );
 }
 
-function PastSeasonEntry({ s }: { s: PastSeason }) {
-  return (
-    <div className="border border-line/30 bg-carbon-2 px-4 py-3">
-      <div className="flex items-baseline justify-between mb-1">
-        <span className="font-mono text-[11px] tracking-[.2em] text-gold">
-          S{s.season}
-        </span>
-        <span className="font-mono text-[11px] tracking-[.1em] text-gold-soft">
-          {s.championPoints} pts
-        </span>
-      </div>
-      <p className="font-display font-bold text-[14px] uppercase leading-tight text-txt truncate">
-        {s.championDriver}
-      </p>
-      {s.championTeam && (
-        <p className="font-sans text-[12px] text-txt-3 truncate mt-0.5">
-          {s.championTeam}
-        </p>
-      )}
-    </div>
-  );
-}
-
 // ── page ──────────────────────────────────────────────────────────────────────
 
 export default function ChampionshipsPage() {
@@ -361,17 +339,7 @@ export default function ChampionshipsPage() {
       <div>
         <SectionLabel muted>Completed Championships</SectionLabel>
         {divisionGroups.map(([division, seasons]) => (
-          <div key={division} className="mb-8">
-            <p className="font-mono text-[10px] tracking-[.35em] uppercase text-txt-3 mb-3 flex items-center gap-3">
-              <span className="h-px w-4 bg-line" />
-              Division {division}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-              {seasons.map((s) => (
-                <PastSeasonEntry key={`d${s.division}-s${s.season}`} s={s} />
-              ))}
-            </div>
-          </div>
+          <DivisionGroup key={division} division={division} seasons={seasons} />
         ))}
       </div>
 
