@@ -1,0 +1,1615 @@
+[
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 1,
+    "roundCount": 1,
+    "tracks": [
+      "Zolder"
+    ],
+    "championDriver": "Matthew Schwartz",
+    "championCar": "McLaren 720S GT3 (Special)",
+    "championTeam": null,
+    "championPoints": "111"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 2,
+    "roundCount": 8,
+    "tracks": [
+      "Silverstone",
+      "Paul Ricard",
+      "Misano",
+      "Imola",
+      "Kyalami",
+      "Donington",
+      "Snetterton",
+      "Barcelona"
+    ],
+    "championDriver": "Douglas Mitchell",
+    "championCar": "BMW M4 GT3",
+    "championTeam": "Sith Racing Alliance",
+    "championPoints": "554"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 3,
+    "roundCount": 8,
+    "tracks": [
+      "Zolder",
+      "Zandvoort",
+      "Donington",
+      "Silverstone",
+      "Laguna Seca",
+      "Paul Ricard",
+      "Hungaroring",
+      "Mount Panorama"
+    ],
+    "championDriver": "Matt Leeman",
+    "championCar": "McLaren 720S GT3 (Special)",
+    "championTeam": "M&A",
+    "championPoints": "712"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 4,
+    "roundCount": 8,
+    "tracks": [
+      "SPA",
+      "Zandvoort",
+      "Monza",
+      "Kyalami",
+      "Hungaroring",
+      "Watkins Glen",
+      "Suzuka",
+      "Cota"
+    ],
+    "championDriver": "Diego Paul Fimbres Casas",
+    "championCar": "Porsche 911 II GT3 R (2019)",
+    "championTeam": "Pillars Racing",
+    "championPoints": "682"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 5,
+    "roundCount": 8,
+    "tracks": [
+      "Suzuka",
+      "Nurburgring",
+      "Indianapolis",
+      "Misano",
+      "Snetterton",
+      "Barcelona",
+      "Laguna Seca",
+      "Kyalami"
+    ],
+    "championDriver": "Ryan Yee",
+    "championCar": "Honda NSX Evo (2019)",
+    "championTeam": "Madhaus Racing",
+    "championPoints": "765"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 6,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Misano",
+      "Brands Hatch",
+      "Imola",
+      "Zolder",
+      "Oulton Park",
+      "Mount Panorama",
+      "Silverstone"
+    ],
+    "championDriver": "Ryan Yee",
+    "championCar": "Honda NSX Evo (2019)",
+    "championTeam": "Madhaus Racing | beans",
+    "championPoints": "686"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 7,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "SPA",
+      "Watkins Glen",
+      "Imola",
+      "Monza",
+      "Donington",
+      "Silverstone",
+      "Valencia"
+    ],
+    "championDriver": "Matt Leeman",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Champion Motorsports - McLemons",
+    "championPoints": "678"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 8,
+    "roundCount": 8,
+    "tracks": [
+      "Zandvoort",
+      "Cota",
+      "Donington",
+      "Nurburgring",
+      "Misano",
+      "Oulton Park",
+      "Indianapolis",
+      "Watkins Glen"
+    ],
+    "championDriver": "Ed Kerstetter",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Four Lights Racing",
+    "championPoints": "631"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 9,
+    "roundCount": 8,
+    "tracks": [
+      "Hungaroring",
+      "Oulton Park",
+      "Suzuka",
+      "Valencia",
+      "Brands Hatch",
+      "Zolder",
+      "Laguna Seca",
+      "Mount Panorama"
+    ],
+    "championDriver": "Travis Nordstrom",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "Comic Racing - Sharks",
+    "championPoints": "705"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 10,
+    "roundCount": 8,
+    "tracks": [
+      "Kyalami",
+      "Snetterton",
+      "Paul Ricard",
+      "Indianapolis",
+      "Valencia",
+      "SPA",
+      "RED Bull Ring",
+      "Silverstone"
+    ],
+    "championDriver": "Michael Moening",
+    "championCar": "BMW M4 GT3",
+    "championTeam": "Madhaus X CM | Max Schnell",
+    "championPoints": "781"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 11,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Imola",
+      "Suzuka",
+      "SPA",
+      "Donington",
+      "Nurburgring 24H",
+      "Cota",
+      "Watkins Glen"
+    ],
+    "championDriver": "Mia Rose",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "MHR | We're A Barbie Team",
+    "championPoints": "701"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 12,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Laguna Seca",
+      "Silverstone",
+      "Monza",
+      "RED Bull Ring",
+      "Zandvoort",
+      "Brands Hatch",
+      "Kyalami"
+    ],
+    "championDriver": "Michael Moening",
+    "championCar": "Bentley Continental GT3 (2018)",
+    "championTeam": "uh",
+    "championPoints": "112"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 14,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Cota",
+      "Snetterton",
+      "SPA",
+      "Hungaroring",
+      "RED Bull Ring",
+      "Barcelona",
+      "Imola"
+    ],
+    "championDriver": "Jeff Spangler",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Madhaus Racing | Samurai Bros",
+    "championPoints": "656"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 15,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Nurburgring",
+      "Barcelona",
+      "Donington",
+      "Hungaroring",
+      "Laguna Seca",
+      "Kyalami",
+      "Monza"
+    ],
+    "championDriver": "Jeremy Mercer",
+    "championCar": "Ferrari 488 GT3 Evo 2020",
+    "championTeam": "TSE",
+    "championPoints": "660"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 16,
+    "roundCount": 8,
+    "tracks": [
+      "Silverstone",
+      "Cota",
+      "Valencia",
+      "Zandvoort",
+      "Mount Panorama",
+      "Suzuka",
+      "Brands Hatch",
+      "Misano"
+    ],
+    "championDriver": "Ryan Yee\u2122",
+    "championCar": "Mercedes-AMG GT3 2020",
+    "championTeam": "five guys but it's actually two",
+    "championPoints": "674"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 1,
+    "season": 17,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Watkins Glen",
+      "Barcelona",
+      "Zolder",
+      "Imola",
+      "Snetterton",
+      "Kyalami",
+      "RED Bull Ring"
+    ],
+    "championDriver": "Anton Rushevich",
+    "championCar": "Ferrari 488 GT3 Evo 2020",
+    "championTeam": "Italian Brainrot [OBDA]",
+    "championPoints": "738"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 2,
+    "roundCount": 8,
+    "tracks": [
+      "Silverstone",
+      "Paul Ricard",
+      "Misano",
+      "Imola",
+      "Kyalami",
+      "Donington",
+      "Snetterton",
+      "Barcelona"
+    ],
+    "championDriver": "Joshua Arnold",
+    "championCar": "Audi R8 LMS GT3 evo II",
+    "championTeam": "The Flying Aces",
+    "championPoints": "657"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 3,
+    "roundCount": 8,
+    "tracks": [
+      "Zolder",
+      "Zandvoort",
+      "Donington",
+      "Silverstone",
+      "Laguna Seca",
+      "Paul Ricard",
+      "Hungaroring",
+      "Mount Panorama"
+    ],
+    "championDriver": "Josh Damiani",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "RedBull Racing SpeedHunters",
+    "championPoints": "629"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 4,
+    "roundCount": 8,
+    "tracks": [
+      "SPA",
+      "Zandvoort",
+      "Monza",
+      "Kyalami",
+      "Hungaroring",
+      "Watkins Glen",
+      "Suzuka",
+      "Cota"
+    ],
+    "championDriver": "Nate Specht",
+    "championCar": "McLaren 720S GT3 (Special)",
+    "championTeam": "Team McLaren - ISMC",
+    "championPoints": "684"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 5,
+    "roundCount": 8,
+    "tracks": [
+      "Suzuka",
+      "Nurburgring",
+      "Indianapolis",
+      "Misano",
+      "Snetterton",
+      "Barcelona",
+      "Laguna Seca",
+      "Kyalami"
+    ],
+    "championDriver": "Michael Jeffries",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "Badmins AMR",
+    "championPoints": "604"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 6,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Misano",
+      "Brands Hatch",
+      "Imola",
+      "Zolder",
+      "Oulton Park",
+      "Mount Panorama",
+      "Silverstone"
+    ],
+    "championDriver": "Alex Chilcutt",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "Champion Motorsports - Aperture",
+    "championPoints": "692"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 7,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "SPA",
+      "Watkins Glen",
+      "Imola",
+      "Monza",
+      "Donington",
+      "Silverstone",
+      "Valencia"
+    ],
+    "championDriver": "JD Daniel",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "TSE | VroomyMcVroomFace",
+    "championPoints": "635"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 8,
+    "roundCount": 8,
+    "tracks": [
+      "Zandvoort",
+      "Cota",
+      "Donington",
+      "Nurburgring",
+      "Misano",
+      "Oulton Park",
+      "Indianapolis",
+      "Watkins Glen"
+    ],
+    "championDriver": "Jo\u00e3o Semedo",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Champion Motorsports - The Boys Are Macca in Town",
+    "championPoints": "620"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 9,
+    "roundCount": 8,
+    "tracks": [
+      "Hungaroring",
+      "Oulton Park",
+      "Suzuka",
+      "Valencia",
+      "Brands Hatch",
+      "Zolder",
+      "Laguna Seca",
+      "Mount Panorama"
+    ],
+    "championDriver": "Kelvin Lau",
+    "championCar": "Honda NSX Evo (2019)",
+    "championTeam": "Madhaus Racing | Redwood Dinkas",
+    "championPoints": "654"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 10,
+    "roundCount": 8,
+    "tracks": [
+      "Kyalami",
+      "Snetterton",
+      "Paul Ricard",
+      "Indianapolis",
+      "Valencia",
+      "SPA",
+      "RED Bull Ring",
+      "Silverstone"
+    ],
+    "championDriver": "Victor Diaz",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Hoonigans D2",
+    "championPoints": "635"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 11,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Imola",
+      "Suzuka",
+      "SPA",
+      "Donington",
+      "Nurburgring 24H",
+      "Cota",
+      "Watkins Glen"
+    ],
+    "championDriver": "Jared Troxclair",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Neon Blade Runners",
+    "championPoints": "594"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 12,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Laguna Seca",
+      "Silverstone",
+      "Monza",
+      "RED Bull Ring",
+      "Zandvoort",
+      "Brands Hatch",
+      "Kyalami"
+    ],
+    "championDriver": "Evan Kim",
+    "championCar": "Lexus RC F GT3",
+    "championTeam": "The Badmins",
+    "championPoints": "112"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 14,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Cota",
+      "Snetterton",
+      "SPA",
+      "Hungaroring",
+      "RED Bull Ring",
+      "Barcelona",
+      "Imola"
+    ],
+    "championDriver": "nan Arct",
+    "championCar": "BMW M4 GT3",
+    "championTeam": "Champion Motorsports - Unsuspecting Duo",
+    "championPoints": "687"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 15,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Nurburgring",
+      "Barcelona",
+      "Donington",
+      "Hungaroring",
+      "Laguna Seca",
+      "Kyalami",
+      "Monza"
+    ],
+    "championDriver": "Jacob Hall",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Dude Where's my Beemer? - MHR",
+    "championPoints": "678"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 16,
+    "roundCount": 8,
+    "tracks": [
+      "Silverstone",
+      "Cota",
+      "Valencia",
+      "Zandvoort",
+      "Mount Panorama",
+      "Suzuka",
+      "Brands Hatch",
+      "Misano"
+    ],
+    "championDriver": "Bryan Anderson",
+    "championCar": "Lamborghini Huracan Evo2",
+    "championTeam": "CMxMH | Rorschach Road Rage",
+    "championPoints": "657"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 2,
+    "season": 17,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Watkins Glen",
+      "Barcelona",
+      "Zolder",
+      "Imola",
+      "Snetterton",
+      "Kyalami",
+      "RED Bull Ring"
+    ],
+    "championDriver": "Bailey Kish",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "Badmins",
+    "championPoints": "679"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 3,
+    "roundCount": 8,
+    "tracks": [
+      "Zolder",
+      "Zandvoort",
+      "Donington",
+      "Silverstone",
+      "Laguna Seca",
+      "Paul Ricard",
+      "Hungaroring",
+      "Mount Panorama"
+    ],
+    "championDriver": "Austin Sawyer",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "THICCCBOIS",
+    "championPoints": "704"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 4,
+    "roundCount": 8,
+    "tracks": [
+      "SPA",
+      "Zandvoort",
+      "Monza",
+      "Kyalami",
+      "Hungaroring",
+      "Watkins Glen",
+      "Suzuka",
+      "Cota"
+    ],
+    "championDriver": "Daniel Gutierrez",
+    "championCar": "Honda NSX Evo (2019)",
+    "championTeam": "Tyler's Toes",
+    "championPoints": "723"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 5,
+    "roundCount": 8,
+    "tracks": [
+      "Suzuka",
+      "Nurburgring",
+      "Indianapolis",
+      "Misano",
+      "Snetterton",
+      "Barcelona",
+      "Laguna Seca",
+      "Kyalami"
+    ],
+    "championDriver": "Jarrod Seccombe",
+    "championCar": "BMW M4 GT3",
+    "championTeam": "World Infamous Racing",
+    "championPoints": "698"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 6,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Misano",
+      "Brands Hatch",
+      "Imola",
+      "Zolder",
+      "Oulton Park",
+      "Mount Panorama",
+      "Silverstone"
+    ],
+    "championDriver": "Zack Dupuis",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "Start Your Systems - 2 Naked Cowboys",
+    "championPoints": "713"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 7,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "SPA",
+      "Watkins Glen",
+      "Imola",
+      "Monza",
+      "Donington",
+      "Silverstone",
+      "Valencia"
+    ],
+    "championDriver": "Max Simons",
+    "championCar": "Mercedes-AMG GT3 2020",
+    "championTeam": "Shuttle Riders Racing",
+    "championPoints": "663"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 8,
+    "roundCount": 8,
+    "tracks": [
+      "Zandvoort",
+      "Cota",
+      "Donington",
+      "Nurburgring",
+      "Misano",
+      "Oulton Park",
+      "Indianapolis",
+      "Watkins Glen"
+    ],
+    "championDriver": "Eric Larin",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Madhaus Racing | 720s Evo Racing Syndicate",
+    "championPoints": "694"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 9,
+    "roundCount": 8,
+    "tracks": [
+      "Hungaroring",
+      "Oulton Park",
+      "Suzuka",
+      "Valencia",
+      "Brands Hatch",
+      "Zolder",
+      "Laguna Seca",
+      "Mount Panorama"
+    ],
+    "championDriver": "Nick Wagner",
+    "championCar": "Mercedes-AMG GT3 2020",
+    "championTeam": "THR Salty",
+    "championPoints": "645"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 10,
+    "roundCount": 8,
+    "tracks": [
+      "Kyalami",
+      "Snetterton",
+      "Paul Ricard",
+      "Indianapolis",
+      "Valencia",
+      "SPA",
+      "RED Bull Ring",
+      "Silverstone"
+    ],
+    "championDriver": "Phillipe Enis M\u00fcller",
+    "championCar": "Ferrari 296 GT3",
+    "championTeam": "Griffen (on the) Door",
+    "championPoints": "587"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 11,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Imola",
+      "Suzuka",
+      "SPA",
+      "Donington",
+      "Nurburgring 24H",
+      "Cota",
+      "Watkins Glen"
+    ],
+    "championDriver": "David Funk",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "Sith Lords",
+    "championPoints": "630"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 12,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Laguna Seca",
+      "Silverstone",
+      "Monza",
+      "RED Bull Ring",
+      "Zandvoort",
+      "Brands Hatch",
+      "Kyalami"
+    ],
+    "championDriver": "Rodrigo Fernandez",
+    "championCar": "Ferrari 296 GT3",
+    "championTeam": "Monster Phoenix Racing Team",
+    "championPoints": "110"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 14,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Cota",
+      "Snetterton",
+      "SPA",
+      "Hungaroring",
+      "RED Bull Ring",
+      "Barcelona",
+      "Imola"
+    ],
+    "championDriver": "Seth Rocha",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "NO SIGNAL | SCR",
+    "championPoints": "710"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 15,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Nurburgring",
+      "Barcelona",
+      "Donington",
+      "Hungaroring",
+      "Laguna Seca",
+      "Kyalami",
+      "Monza"
+    ],
+    "championDriver": "Michael McWeezerson",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Poutine & Patriotism | Vanquish Racing Team",
+    "championPoints": "705"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 16,
+    "roundCount": 8,
+    "tracks": [
+      "Silverstone",
+      "Cota",
+      "Valencia",
+      "Zandvoort",
+      "Mount Panorama",
+      "Suzuka",
+      "Brands Hatch",
+      "Misano"
+    ],
+    "championDriver": "Ren Aoki",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "Maximum Effort, Maximum Effort 2.0",
+    "championPoints": "664"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 3,
+    "season": 17,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Watkins Glen",
+      "Barcelona",
+      "Zolder",
+      "Imola",
+      "Snetterton",
+      "Kyalami",
+      "RED Bull Ring"
+    ],
+    "championDriver": "Big Daddy",
+    "championCar": "Bentley Continental GT3 (2018)",
+    "championTeam": "TrackOut Motorsports - Kintsugi [OBDA]",
+    "championPoints": "747"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 4,
+    "roundCount": 8,
+    "tracks": [
+      "SPA",
+      "Zandvoort",
+      "Monza",
+      "Kyalami",
+      "Hungaroring",
+      "Watkins Glen",
+      "Suzuka",
+      "Cota"
+    ],
+    "championDriver": "Ryan Passage",
+    "championCar": "Ferrari 488 GT3 Evo 2020",
+    "championTeam": "Ronin Racing",
+    "championPoints": "725"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 5,
+    "roundCount": 8,
+    "tracks": [
+      "Suzuka",
+      "Nurburgring",
+      "Indianapolis",
+      "Misano",
+      "Snetterton",
+      "Barcelona",
+      "Laguna Seca",
+      "Kyalami"
+    ],
+    "championDriver": "Matt Anastasi",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "Paranoid Racing",
+    "championPoints": "638"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 6,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Misano",
+      "Brands Hatch",
+      "Imola",
+      "Zolder",
+      "Oulton Park",
+      "Mount Panorama",
+      "Silverstone"
+    ],
+    "championDriver": "Jacob Zitko",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "Comfy Competition",
+    "championPoints": "615"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 7,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "SPA",
+      "Watkins Glen",
+      "Imola",
+      "Monza",
+      "Donington",
+      "Silverstone",
+      "Valencia"
+    ],
+    "championDriver": "Max Diggs",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "Lunar-Lonestar Motorsport",
+    "championPoints": "635"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 8,
+    "roundCount": 8,
+    "tracks": [
+      "Zandvoort",
+      "Cota",
+      "Donington",
+      "Nurburgring",
+      "Misano",
+      "Oulton Park",
+      "Indianapolis",
+      "Watkins Glen"
+    ],
+    "championDriver": "Dudley Do Right",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Scuderia British Petroleum",
+    "championPoints": "622"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 9,
+    "roundCount": 8,
+    "tracks": [
+      "Hungaroring",
+      "Oulton Park",
+      "Suzuka",
+      "Valencia",
+      "Brands Hatch",
+      "Zolder",
+      "Laguna Seca",
+      "Mount Panorama"
+    ],
+    "championDriver": "Mike Geno",
+    "championCar": "Mercedes-AMG GT3 2020",
+    "championTeam": "Ghost Rider Racing - Merc-enaries",
+    "championPoints": "616"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 10,
+    "roundCount": 8,
+    "tracks": [
+      "Kyalami",
+      "Snetterton",
+      "Paul Ricard",
+      "Indianapolis",
+      "Valencia",
+      "SPA",
+      "RED Bull Ring",
+      "Silverstone"
+    ],
+    "championDriver": "Harold MacDonald",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "GRR - MacMaccas",
+    "championPoints": "659"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 11,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Imola",
+      "Suzuka",
+      "SPA",
+      "Donington",
+      "Nurburgring 24H",
+      "Cota",
+      "Watkins Glen"
+    ],
+    "championDriver": "Quinton Schattner",
+    "championCar": "Ford Mustang GT3",
+    "championTeam": "GRR | Running from Greyhounds",
+    "championPoints": "543"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 12,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Laguna Seca",
+      "Silverstone",
+      "Monza",
+      "RED Bull Ring",
+      "Zandvoort",
+      "Brands Hatch",
+      "Kyalami"
+    ],
+    "championDriver": "Ren Aoki",
+    "championCar": "Nissan GT R Nismo GT3 (2018)",
+    "championTeam": "Top Gear - Bottom Text",
+    "championPoints": "112"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 14,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Cota",
+      "Snetterton",
+      "SPA",
+      "Hungaroring",
+      "RED Bull Ring",
+      "Barcelona",
+      "Imola"
+    ],
+    "championDriver": "Michael Mcweezerson",
+    "championCar": "Ferrari 296 GT3",
+    "championTeam": "Madhaus & Vanquish Racing | smh my head, smh my head",
+    "championPoints": "682"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 15,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Nurburgring",
+      "Barcelona",
+      "Donington",
+      "Hungaroring",
+      "Laguna Seca",
+      "Kyalami",
+      "Monza"
+    ],
+    "championDriver": "Kevin Johnston",
+    "championCar": "Lexus RC F GT3",
+    "championTeam": "Marlboro Maybes",
+    "championPoints": "702"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 16,
+    "roundCount": 8,
+    "tracks": [
+      "Silverstone",
+      "Cota",
+      "Valencia",
+      "Zandvoort",
+      "Mount Panorama",
+      "Suzuka",
+      "Brands Hatch",
+      "Misano"
+    ],
+    "championDriver": "Mike Hiesener",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "Kovals Heros",
+    "championPoints": "571"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 4,
+    "season": 17,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Watkins Glen",
+      "Barcelona",
+      "Zolder",
+      "Imola",
+      "Snetterton",
+      "Kyalami",
+      "RED Bull Ring"
+    ],
+    "championDriver": "Tyler Egeli",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Asphalt Monkeys",
+    "championPoints": "713"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 5,
+    "roundCount": 8,
+    "tracks": [
+      "Suzuka",
+      "Nurburgring",
+      "Indianapolis",
+      "Misano",
+      "Snetterton",
+      "Barcelona",
+      "Laguna Seca",
+      "Kyalami"
+    ],
+    "championDriver": "Jacob Zitko",
+    "championCar": "AMR V8 Vantage (2019)",
+    "championTeam": "The Lightning Sharks",
+    "championPoints": "578"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 6,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Misano",
+      "Brands Hatch",
+      "Imola",
+      "Zolder",
+      "Oulton Park",
+      "Mount Panorama",
+      "Silverstone"
+    ],
+    "championDriver": "Shaun Daniels",
+    "championCar": "Porsche 911 II GT3 R (2019)",
+    "championTeam": "Ghost Rider Racing - Cheaper Than Therapy",
+    "championPoints": "586"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 7,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "SPA",
+      "Watkins Glen",
+      "Imola",
+      "Monza",
+      "Donington",
+      "Silverstone",
+      "Valencia"
+    ],
+    "championDriver": "Martin Riggs",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Ghost Rider Racing - Macca Attaca",
+    "championPoints": "623"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 8,
+    "roundCount": 8,
+    "tracks": [
+      "Zandvoort",
+      "Cota",
+      "Donington",
+      "Nurburgring",
+      "Misano",
+      "Oulton Park",
+      "Indianapolis",
+      "Watkins Glen"
+    ],
+    "championDriver": "Dakota Taylor",
+    "championCar": "Lamborghini Huracan Evo2",
+    "championTeam": "LamBEEghini (OBDA)",
+    "championPoints": "665"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 9,
+    "roundCount": 8,
+    "tracks": [
+      "Hungaroring",
+      "Oulton Park",
+      "Suzuka",
+      "Valencia",
+      "Brands Hatch",
+      "Zolder",
+      "Laguna Seca",
+      "Mount Panorama"
+    ],
+    "championDriver": "Justin MacKechnie",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "GRR - 50 Shades Of Justin",
+    "championPoints": "650"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 10,
+    "roundCount": 8,
+    "tracks": [
+      "Kyalami",
+      "Snetterton",
+      "Paul Ricard",
+      "Indianapolis",
+      "Valencia",
+      "SPA",
+      "RED Bull Ring",
+      "Silverstone"
+    ],
+    "championDriver": "Austin Redd",
+    "championCar": "Lamborghini Huracan Evo2",
+    "championTeam": "T-Wrecks",
+    "championPoints": "601"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 11,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Imola",
+      "Suzuka",
+      "SPA",
+      "Donington",
+      "Nurburgring 24H",
+      "Cota",
+      "Watkins Glen"
+    ],
+    "championDriver": "Alexander Bermudez Garc\u00eda",
+    "championCar": "BMW M4 GT3",
+    "championTeam": "TC8 Racing Team AA",
+    "championPoints": "650"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 14,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Cota",
+      "Snetterton",
+      "SPA",
+      "Hungaroring",
+      "RED Bull Ring",
+      "Barcelona",
+      "Imola"
+    ],
+    "championDriver": "Roger Rodriguez",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Champion Motorsports - Hurricane Maple Racing",
+    "championPoints": "553"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 15,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Nurburgring",
+      "Barcelona",
+      "Donington",
+      "Hungaroring",
+      "Laguna Seca",
+      "Kyalami",
+      "Monza"
+    ],
+    "championDriver": "Sig SVG",
+    "championCar": "McLaren 720S GT3 Evo 2023",
+    "championTeam": "Yellow Subs racing",
+    "championPoints": "607"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 16,
+    "roundCount": 8,
+    "tracks": [
+      "Silverstone",
+      "Cota",
+      "Valencia",
+      "Zandvoort",
+      "Mount Panorama",
+      "Suzuka",
+      "Brands Hatch",
+      "Misano"
+    ],
+    "championDriver": "Mark Allen",
+    "championCar": "Porsche 911 II GT3 R (2019)",
+    "championTeam": "Lonestar Motorsport | Plan-E Racing",
+    "championPoints": "656"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 5,
+    "season": 17,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Watkins Glen",
+      "Barcelona",
+      "Zolder",
+      "Imola",
+      "Snetterton",
+      "Kyalami",
+      "RED Bull Ring"
+    ],
+    "championDriver": "Joey Vanwinkle",
+    "championCar": "BMW M4 GT3",
+    "championTeam": "617 Racing",
+    "championPoints": "606"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 6,
+    "season": 5,
+    "roundCount": 8,
+    "tracks": [
+      "Suzuka",
+      "Nurburgring",
+      "Indianapolis",
+      "Misano",
+      "Snetterton",
+      "Barcelona",
+      "Laguna Seca",
+      "Kyalami"
+    ],
+    "championDriver": "Fari Henry",
+    "championCar": "McLaren 720S GT3 (Special)",
+    "championTeam": "Badmins - Intergalactic",
+    "championPoints": "623"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 6,
+    "season": 6,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Misano",
+      "Brands Hatch",
+      "Imola",
+      "Zolder",
+      "Oulton Park",
+      "Mount Panorama",
+      "Silverstone"
+    ],
+    "championDriver": "Curtis Adams",
+    "championCar": "Porsche 911 II GT3 R (2019)",
+    "championTeam": "Baseline Racing - Bougie Beetles",
+    "championPoints": "657"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 6,
+    "season": 7,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "SPA",
+      "Watkins Glen",
+      "Imola",
+      "Monza",
+      "Donington",
+      "Silverstone",
+      "Valencia"
+    ],
+    "championDriver": "Durban Legacy",
+    "championCar": "Ferrari 296 GT3",
+    "championTeam": "Mechanical Rhythmists",
+    "championPoints": "632"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 6,
+    "season": 8,
+    "roundCount": 8,
+    "tracks": [
+      "Zandvoort",
+      "Cota",
+      "Donington",
+      "Nurburgring",
+      "Misano",
+      "Oulton Park",
+      "Indianapolis",
+      "Watkins Glen"
+    ],
+    "championDriver": "Jeremy Yaron",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "Neature Calls [OBDA]",
+    "championPoints": "724"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 6,
+    "season": 9,
+    "roundCount": 8,
+    "tracks": [
+      "Hungaroring",
+      "Oulton Park",
+      "Suzuka",
+      "Valencia",
+      "Brands Hatch",
+      "Zolder",
+      "Laguna Seca",
+      "Mount Panorama"
+    ],
+    "championDriver": "Roy Keay",
+    "championCar": "Ferrari 296 GT3",
+    "championTeam": "Plan E Soda Jerks",
+    "championPoints": "713"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 6,
+    "season": 10,
+    "roundCount": 8,
+    "tracks": [
+      "Kyalami",
+      "Snetterton",
+      "Paul Ricard",
+      "Indianapolis",
+      "Valencia",
+      "SPA",
+      "RED Bull Ring",
+      "Silverstone"
+    ],
+    "championDriver": "KC Rich",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "The Lost Drivers of Ixalan",
+    "championPoints": "628"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 6,
+    "season": 11,
+    "roundCount": 8,
+    "tracks": [
+      "Barcelona",
+      "Imola",
+      "Suzuka",
+      "SPA",
+      "Donington",
+      "Nurburgring 24H",
+      "Cota",
+      "Watkins Glen"
+    ],
+    "championDriver": "Matt Kirkland",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "PigeonX Racing",
+    "championPoints": "625"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 6,
+    "season": 14,
+    "roundCount": 8,
+    "tracks": [
+      "Indianapolis",
+      "Cota",
+      "Snetterton",
+      "SPA",
+      "Hungaroring",
+      "RED Bull Ring",
+      "Barcelona",
+      "Imola"
+    ],
+    "championDriver": "Mark DC",
+    "championCar": "Bentley Continental GT3 (2018)",
+    "championTeam": "Boatley Busters Racing",
+    "championPoints": "687"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 6,
+    "season": 15,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "Nurburgring",
+      "Barcelona",
+      "Donington",
+      "Hungaroring",
+      "Laguna Seca",
+      "Kyalami",
+      "Monza"
+    ],
+    "championDriver": "Sean Paul",
+    "championCar": "Lexus RC F GT3",
+    "championTeam": "Shake \u2018n Bake",
+    "championPoints": "584"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 7,
+    "season": 7,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "SPA",
+      "Watkins Glen",
+      "Imola",
+      "Monza",
+      "Donington",
+      "Silverstone",
+      "Valencia"
+    ],
+    "championDriver": "Matt Anderson",
+    "championCar": "BMW M4 GT3",
+    "championTeam": "Cannonball Motorsport",
+    "championPoints": "613"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 7,
+    "season": 9,
+    "roundCount": 8,
+    "tracks": [
+      "Hungaroring",
+      "Oulton Park",
+      "Suzuka",
+      "Valencia",
+      "Brands Hatch",
+      "Zolder",
+      "Laguna Seca",
+      "Mount Panorama"
+    ],
+    "championDriver": "Tyler Thompson",
+    "championCar": "Lamborghini Huracan Evo2",
+    "championTeam": "HurryWorks Racing",
+    "championPoints": "701"
+  },
+  {
+    "championshipType": "GT3 Team Championship",
+    "division": 8,
+    "season": 7,
+    "roundCount": 8,
+    "tracks": [
+      "Paul Ricard",
+      "SPA",
+      "Watkins Glen",
+      "Imola",
+      "Monza",
+      "Donington",
+      "Silverstone",
+      "Valencia"
+    ],
+    "championDriver": "Jeremy Yaron",
+    "championCar": "Porsche 992 GT3 R",
+    "championTeam": "Dark Helmet Motorsports [OBDA]",
+    "championPoints": "606"
+  }
+]

@@ -13,7 +13,8 @@
     "next": "^15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@sra/shared-types": "workspace:*"
+    "@sra/shared-types": "workspace:*",
+    "@sra/simgrid-client": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
