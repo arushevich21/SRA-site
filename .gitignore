@@ -27,9 +27,6 @@ Thumbs.db
 # Spike / investigation scripts — never production code
 scratch/
 
-# Temporary standings uploads — filesystem-only, do not commit
-apps/cockpit/src/content/standings/*.json
-
 # Raw API fixtures — may contain sensitive league data; regenerate from the spike
 fixtures/gridos/
 .next/
