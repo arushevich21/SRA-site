@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { readStandings } from '../../../lib/standings-store';
 import { ClassStandingsTabs } from '../../../components/ClassStandingsTabs';
+export const dynamic = 'force-dynamic';
 
 const STANDINGS_KEY = '22872';
 

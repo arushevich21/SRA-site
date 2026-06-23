@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { readStandings } from '../../../lib/standings-store';
 import { EnduranceStandings } from '../../../components/EnduranceStandings';
+export const dynamic = 'force-dynamic';
 
 const STANDINGS_KEY = 'endurance-s3';
 

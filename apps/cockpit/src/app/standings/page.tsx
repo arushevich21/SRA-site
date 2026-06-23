@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { readStandings } from '../../lib/standings-store';
 import { GT3TeamStandings } from '../../components/GT3TeamStandings';
+export const dynamic = 'force-dynamic';
 
 const DIVISIONS = [1, 2, 3, 4] as const;
 
