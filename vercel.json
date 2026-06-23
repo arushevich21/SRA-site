@@ -1,7 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter cockpit... build",
-  "installCommand": "pnpm install",
-  "outputDirectory": "apps/cockpit/.next",
-  "framework": "nextjs"
+  "buildCommand": "cd ../.. && pnpm --filter cockpit... build"
 }
