@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import Image from 'next/image';
 import { readStandings } from '../../lib/standings-store';
 import { GT3TeamStandings } from '../../components/GT3TeamStandings';
