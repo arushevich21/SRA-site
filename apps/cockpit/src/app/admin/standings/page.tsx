@@ -82,13 +82,12 @@ export default async function AdminStandingsPage({ searchParams }: PageProps) {
 
       <form action={uploadStandingsAction} className="flex flex-col gap-5">
         <label className="font-mono text-[10px] tracking-[.3em] uppercase text-txt-3">
-          SimGrid Championship ID
+          Standings Key
           <input
-            type="number"
+            type="text"
             name="championshipId"
             required
-            min={1}
-            placeholder="e.g. 25492"
+            placeholder="e.g. 22872 or endurance-s3"
             className="mt-2 block w-full bg-carbon-2 border border-line text-txt font-mono text-sm px-3 py-2 focus:border-gold focus:outline-none"
           />
         </label>

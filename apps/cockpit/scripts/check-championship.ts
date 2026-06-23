@@ -10,7 +10,7 @@ if (!API_KEY) {
 }
 
 const client = new GridOSClient(BASE_URL, API_KEY);
-const CHAMPIONSHIP_ID = 22872;
+const CHAMPIONSHIP_ID = 25580;
 
 async function main() {
   // 1. getChampionship
