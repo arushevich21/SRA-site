@@ -14,7 +14,7 @@ import {
   SESSION_MAX_AGE,
 } from '../../../lib/admin-auth';
 import { validateStandingsExport } from '../../../lib/standings-types';
-import { writeStandings } from '../../../lib/standings-store';
+import { writeStandings, isValidStandingsKey } from '../../../lib/standings-store';
 
 function redirectWithResult(result: string, msg: string): never {
   redirect(`/admin/standings?result=${result}&msg=${encodeURIComponent(msg)}`);
@@ -53,10 +53,9 @@ export async function uploadStandingsAction(formData: FormData): Promise<never> 
     redirectWithResult('error', 'Not authenticated');
   }
 
-  const rawId = formData.get('championshipId');
-  const championshipId = Number(rawId);
-  if (!Number.isInteger(championshipId) || championshipId <= 0) {
-    redirectWithResult('error', 'Championship ID must be a positive integer');
+  const championshipId = (formData.get('championshipId') as string)?.trim().toLowerCase();
+  if (!championshipId || !isValidStandingsKey(championshipId)) {
+    redirectWithResult('error', 'Key must be lowercase alphanumeric with hyphens (e.g. 22872 or endurance-s3)');
   }
 
   let jsonText = formData.get('jsonText') as string | null;
