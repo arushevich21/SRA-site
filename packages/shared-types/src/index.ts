@@ -3,14 +3,15 @@
  * Decouples all packages from the raw GridOS API payload shape.
  * See docs/adr/0001-normalized-view-models.md
  */
-export {
+export type {
   SimGridChampionshipSummary,
   SimGridChampionship,
   SimGridRace,
   SimGridTrack,
   SimGridStandingsEntry,
-  GridOSError,
 } from './simgrid.js';
+
+export { GridOSError } from './simgrid.js';
 
 export type {
   DriverRoundResult,
@@ -20,7 +21,7 @@ export type {
   CountbackEntry,
 } from './points-engine.js';
 
-export {
+export type {
   RaceRef,
   Ruling,
   PpEvent,

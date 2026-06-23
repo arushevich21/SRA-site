@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@sra/shared-types', '@sra/simgrid-client', '@sra/domain'],
   images: {
     remotePatterns: [
       {
