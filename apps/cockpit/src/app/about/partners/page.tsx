@@ -21,7 +21,7 @@ export default function PartnersPage() {
       logo: "https://static.simracingalliance.com/assets/images/partners/go-setups/GO_Setups_dark.png",
       href: "https://gosetups.gg/product/acc-setups/?ref=5879",
       quote:
-        "I have been a long time customer of another setup maker...",
+        "Premium ACC setups built for competitive racing — used and trusted by SRA drivers.",
     },
   ];
 
