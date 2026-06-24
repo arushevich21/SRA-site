@@ -43,7 +43,7 @@ export default function HomePage() {
             alt="Sim Racing Alliance"
             width={480}
             height={120}
-            className="mx-auto mb-10 w-[120px] h-auto"
+            className="mx-auto mb-10 w-[180px] h-auto"
             priority
           />
 
@@ -78,8 +78,8 @@ export default function HomePage() {
                 {i > 0 && (
                   <span className="text-gold/30 hidden sm:block select-none">·</span>
                 )}
-                <span className="font-mono text-[12px] tracking-[.2em] uppercase text-txt-3">
-                  <span className="text-gold">{stat.value}</span> {stat.label}
+                <span className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-2">
+                  <span className="text-gold font-bold">{stat.value}</span> {stat.label}
                 </span>
               </Fragment>
             ))}

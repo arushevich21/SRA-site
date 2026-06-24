@@ -6,6 +6,7 @@ import {
   HOT_STINT_MULTIPLIERS,
   type LapTimeEntry,
 } from '@/content/reference-lap-times';
+import { Collapsible } from '@/components/Collapsible';
 
 const DIVISIONS = [
   { key: 'div1' as const, logo: '/badges/Division 1.png', alt: 'Division 1' },
@@ -77,13 +78,17 @@ export default function ReferenceLapTimesPage() {
         Reference Lap Times
       </h1>
 
-      <h2 className="font-display font-bold text-[28px] uppercase text-txt mt-16 mb-6">Hot Lap</h2>
-      <MultiplierNote multipliers={HOT_LAP_MULTIPLIERS} />
-      <LapTimeTable data={HOT_LAP_TIMES} />
+      <Collapsible title="ACC — GT3" defaultOpen>
+        <Collapsible title="Hot Lap" defaultOpen>
+          <MultiplierNote multipliers={HOT_LAP_MULTIPLIERS} />
+          <LapTimeTable data={HOT_LAP_TIMES} />
+        </Collapsible>
 
-      <h2 className="font-display font-bold text-[28px] uppercase text-txt mt-16 mb-6">Hot Stint</h2>
-      <MultiplierNote multipliers={HOT_STINT_MULTIPLIERS} />
-      <LapTimeTable data={HOT_STINT_TIMES} />
+        <Collapsible title="Hot Stint">
+          <MultiplierNote multipliers={HOT_STINT_MULTIPLIERS} />
+          <LapTimeTable data={HOT_STINT_TIMES} />
+        </Collapsible>
+      </Collapsible>
 
       <p className="font-mono text-[15px] text-txt-3 mt-10">
         Data sourced from GT3 vehicles under optimal dry conditions at approximately 21°C ambient temperature.
