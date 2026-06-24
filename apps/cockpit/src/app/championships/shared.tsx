@@ -10,7 +10,7 @@ export function SectionLabel({
   return (
     <p
       className={[
-        'font-mono text-[11px] tracking-[.35em] uppercase mb-6',
+        'font-mono text-[12px] tracking-[.35em] uppercase mb-6',
         muted ? 'text-txt-3' : 'text-gold',
       ].join(' ')}
     >
@@ -29,8 +29,8 @@ export function CategoryTag({
   return (
     <span
       className={[
-        'inline-block font-mono text-[10px] tracking-[.35em] uppercase px-2 py-[3px] border',
-        muted ? 'text-txt-3 border-txt-3/30' : 'text-gold border-gold/40',
+        'inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border',
+        muted ? 'text-gold/50 border-gold/20' : 'text-gold border-gold/40',
       ].join(' ')}
     >
       {label}

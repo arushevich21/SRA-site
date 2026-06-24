@@ -13,14 +13,14 @@ export function StatsLeaderboard({
 
   return (
     <div>
-      <div className="flex gap-1 border-b border-line mb-4 overflow-x-auto">
+      <div className="flex flex-wrap justify-center gap-1 border-b border-line mb-4">
         {categories.map((cat, i) => (
           <button
             key={cat.key}
             type="button"
             onClick={() => setActiveTab(i)}
             className={[
-              'font-mono text-[10px] tracking-[.25em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors cursor-pointer whitespace-nowrap',
+              'font-mono text-[11px] tracking-[.25em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors cursor-pointer whitespace-nowrap',
               i === activeTab
                 ? 'text-gold border-gold'
                 : 'text-txt-3 border-transparent hover:text-txt-2',
@@ -35,13 +35,13 @@ export function StatsLeaderboard({
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-line">
-              <th className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 px-6 py-4 w-16">
+              <th className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 px-6 py-4 w-16">
                 Rank
               </th>
-              <th className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
+              <th className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
                 Driver
               </th>
-              <th className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 px-6 py-4 text-right">
+              <th className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 px-6 py-4 text-right">
                 {active.valueLabel}
               </th>
             </tr>

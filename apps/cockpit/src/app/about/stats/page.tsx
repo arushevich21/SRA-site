@@ -4,7 +4,7 @@ import { StatsLeaderboard } from '../../../components/StatsLeaderboard';
 export default function StatsPage() {
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
@@ -15,7 +15,7 @@ export default function StatsPage() {
       <h2 className="font-display font-bold text-[28px] uppercase text-txt mt-16 mb-6">
         Platform Metrics
       </h2>
-      <p className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mb-6">
+      <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mb-6">
         Since December 27, 2021
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -29,7 +29,7 @@ export default function StatsPage() {
             <span className="font-display text-[48px] text-gold leading-none">
               {stat.value}
             </span>
-            <span className="block font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mt-2">
+            <span className="block font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mt-2">
               {stat.label}
             </span>
           </div>
@@ -48,7 +48,7 @@ export default function StatsPage() {
 
       {/* Footer Note */}
       <div className="border border-line bg-panel p-6">
-        <span className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mb-2 block">
+        <span className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mb-2 block">
           Data Note
         </span>
         <p className="font-sans text-sm text-txt-2 leading-relaxed">

@@ -21,21 +21,21 @@ function BopTable({
   data: (number | null)[][];
 }) {
   return (
-    <>
-      <h2 className="font-display font-bold text-[28px] uppercase text-txt mt-16 mb-6">
+    <div>
+      <h2 className="font-display font-bold text-[22px] uppercase text-txt mb-4">
         {title}
       </h2>
       <div className="overflow-x-auto">
-        <table className="border-collapse text-left">
+        <table className="border-collapse w-full text-left" style={{ fontSize: '11px' }}>
           <thead>
             <tr>
-              <th className="font-mono text-[9px] tracking-[.2em] uppercase text-txt-3 py-2 px-3 sticky left-0 bg-carbon z-10">
+              <th className="font-mono tracking-[.15em] uppercase text-txt-3 py-1 px-1 sticky left-0 bg-carbon z-10 min-w-[160px]">
                 Car
               </th>
               {BOP_DATA.tracks.map((track) => (
                 <th
                   key={track}
-                  className="font-mono text-[9px] tracking-[.2em] uppercase text-txt-3 py-2 px-2 whitespace-nowrap"
+                  className="font-mono tracking-[.15em] uppercase text-txt-3 py-2 px-2 text-center whitespace-nowrap border-l border-line"
                 >
                   {track}
                 </th>
@@ -44,16 +44,17 @@ function BopTable({
           </thead>
           <tbody>
             {BOP_DATA.cars.map((car, carIdx) => (
-              <tr key={car} className="border-b border-line/30">
-                <td className="font-sans text-[12px] text-txt sticky left-0 bg-carbon z-10 px-3 py-2 whitespace-nowrap">
-                  <span className="inline-flex items-center gap-2">
+              <tr key={car} className="border-b border-line/20">
+                <td className="font-sans text-[12px] text-txt sticky left-0 bg-carbon z-10 px-1 py-[3px] whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1">
                     {MANUFACTURER_LOGOS[car] && (
                       <Image
                         src={MANUFACTURER_LOGOS[car]}
                         alt=""
-                        width={24}
-                        height={24}
+                        width={18}
+                        height={18}
                         className="inline-block object-contain"
+                        unoptimized
                       />
                     )}
                     {car}
@@ -62,7 +63,7 @@ function BopTable({
                 {data[carIdx].map((value, trackIdx) => (
                   <td
                     key={BOP_DATA.tracks[trackIdx]}
-                    className={`font-mono text-[11px] text-center py-2 px-2 ${cellColor(value)}`}
+                    className={`font-mono text-center py-[3px] px-1 border-l border-line ${cellColor(value)}`}
                   >
                     {formatCell(value)}
                   </td>
@@ -72,14 +73,14 @@ function BopTable({
           </tbody>
         </table>
       </div>
-    </>
+    </div>
   );
 }
 
 export default function CustomBopPage() {
   return (
-    <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+    <section className="max-w-full mx-auto px-7 py-24">
+      <span className="block font-mono text-[13px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
@@ -87,6 +88,16 @@ export default function CustomBopPage() {
       </h1>
 
       <BopTable title="Ballast (Kg)" data={BOP_DATA.ballast} />
+
+      {/* Divider */}
+      <div className="flex items-center gap-4 my-10">
+        <div className="flex-1 h-px bg-line" />
+        <span className="font-mono text-[11px] tracking-[.4em] uppercase text-txt-3 shrink-0">
+          ···
+        </span>
+        <div className="flex-1 h-px bg-line" />
+      </div>
+
       <BopTable title="Restrictor (%)" data={BOP_DATA.restrictor} />
     </section>
   );

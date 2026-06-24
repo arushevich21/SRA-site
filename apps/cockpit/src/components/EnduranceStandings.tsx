@@ -40,7 +40,7 @@ export function EnduranceStandings({
             type="button"
             onClick={() => setFilter(f.key)}
             className={[
-              'font-mono text-[9px] tracking-[.2em] uppercase px-3 py-1.5 border transition-colors cursor-pointer flex items-center gap-2',
+              'font-mono text-[11px] tracking-[.2em] uppercase px-3 py-1.5 border transition-colors cursor-pointer flex items-center gap-2',
               f.key === filter
                 ? 'text-gold border-gold bg-gold/5'
                 : 'text-txt-3 border-line hover:text-txt-2',
@@ -59,7 +59,7 @@ export function EnduranceStandings({
       {/* Standings */}
       {standings.length === 0 ? (
         <div className="border border-gold-deep/30 bg-gold-deep/5 px-5 py-4">
-          <p className="font-mono text-[10px] tracking-[.15em] uppercase text-gold-deep">
+          <p className="font-mono text-[11px] tracking-[.15em] uppercase text-gold-deep">
             No standings data yet
           </p>
           <p className="font-sans text-[12px] text-txt-3 mt-1">
@@ -80,7 +80,7 @@ export function EnduranceStandings({
         <ClassGroupTable group={bronzeGroup} />
       ) : (
         <div className="border border-gold-deep/30 bg-gold-deep/5 px-5 py-4">
-          <p className="font-mono text-[10px] tracking-[.15em] uppercase text-gold-deep">
+          <p className="font-mono text-[11px] tracking-[.15em] uppercase text-gold-deep">
             No data for this class
           </p>
         </div>

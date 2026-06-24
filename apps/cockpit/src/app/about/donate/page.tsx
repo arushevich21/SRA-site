@@ -16,7 +16,7 @@ export default function DonatePage() {
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
@@ -44,7 +44,7 @@ export default function DonatePage() {
             <span className="font-display font-bold text-[20px] uppercase text-txt mb-2">
               {method.name}
             </span>
-            <span className="font-mono text-[10px] tracking-[.2em] uppercase text-gold">
+            <span className="font-mono text-[15px] tracking-[.2em] uppercase text-gold">
               Donate Now
             </span>
           </a>
@@ -64,7 +64,7 @@ export default function DonatePage() {
         </p>
         <a
           href="/about/sponsor"
-          className="text-gold hover:text-gold-soft transition-colors font-mono text-[11px] tracking-[.2em] uppercase"
+          className="text-gold hover:text-gold-soft transition-colors font-mono text-[15px] tracking-[.2em] uppercase"
         >
           View Patreon Tiers →
         </a>

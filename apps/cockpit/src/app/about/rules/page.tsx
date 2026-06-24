@@ -11,13 +11,13 @@ const TOC = [
 export default function RulesPage() {
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-4">
         Rules &amp; Regulations
       </h1>
-      <p className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mb-16">
+      <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mb-16">
         Last updated: January 10, 2026
       </p>
 
@@ -25,7 +25,7 @@ export default function RulesPage() {
         {/* Table of Contents — sticky sidebar */}
         <nav className="hidden lg:block w-[220px] shrink-0">
           <div className="sticky top-[100px]">
-            <p className="font-mono text-[9px] tracking-[.35em] uppercase text-txt-3 mb-4">
+            <p className="font-mono text-[15px] tracking-[.35em] uppercase text-txt-3 mb-4">
               Contents
             </p>
             <ul className="space-y-2 border-l border-line pl-4">
@@ -33,7 +33,7 @@ export default function RulesPage() {
                 <li key={item.id}>
                   <a
                     href={`#${item.id}`}
-                    className="font-mono text-[10px] tracking-[.1em] text-txt-3 hover:text-gold transition-colors leading-tight block py-0.5"
+                    className="font-mono text-[15px] tracking-[.1em] text-txt-3 hover:text-gold transition-colors leading-tight block py-0.5"
                   >
                     {item.label}
                   </a>

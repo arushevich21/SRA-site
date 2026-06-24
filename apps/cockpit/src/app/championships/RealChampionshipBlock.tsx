@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import type { ChampionshipContent } from '../../content/championships';
+import { SIMS } from '@/content/sims';
 import { CategoryTag } from './shared';
 
 export function RealChampionshipBlock({
@@ -8,27 +9,57 @@ export function RealChampionshipBlock({
   content: ChampionshipContent;
 }) {
   const isComingSoon = content.schedule.length === 0;
+  const simAccent = SIMS.find((s) => s.game === content.game)?.accentColor;
 
   return (
     <article
       className={[
-        'border p-8',
-        isComingSoon ? 'border-line/50 bg-carbon-2' : 'border-line bg-panel',
+        'relative border p-8',
+        isComingSoon ? 'border-line bg-panel/60' : 'border-line bg-panel',
       ].join(' ')}
     >
-      {/* Tags row */}
-      <div className="mb-5 flex items-center gap-3">
-        <CategoryTag label={content.classTag} muted={isComingSoon} />
+      {/* Status badge */}
+      <div className="absolute top-5 right-6 flex items-center gap-2">
         <span
           className={[
-            'font-mono text-[9px] tracking-[.25em] uppercase px-2 py-[2px] border',
-            isComingSoon
-              ? 'text-txt-3/60 border-txt-3/20'
-              : 'text-txt-3 border-line',
+            'inline-block w-[7px] h-[7px] rounded-full',
+            isComingSoon ? 'bg-txt-3/40' : 'bg-live',
           ].join(' ')}
+          style={!isComingSoon ? { animation: 'live-pulse 1.8s infinite' } : undefined}
+        />
+        <span
+          className={[
+            'font-mono text-[11px] tracking-[.25em] uppercase',
+            isComingSoon ? 'text-txt-3/50' : 'text-live',
+          ].join(' ')}
+        >
+          {isComingSoon ? 'Upcoming' : 'Active'}
+        </span>
+      </div>
+
+      {/* Tags row */}
+      <div className="mb-5 flex items-center gap-3">
+        <span
+          className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border"
+          style={{
+            color: simAccent ?? undefined,
+            borderColor: simAccent ? `${simAccent}40` : undefined,
+            opacity: isComingSoon ? 0.6 : 1,
+          }}
         >
           {content.game}
         </span>
+        <CategoryTag label={content.classTag} muted={isComingSoon} />
+        {content.formatTag && (
+          <span
+            className={[
+              'font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border',
+              isComingSoon ? 'text-txt-3/60 border-txt-3/20' : 'text-txt-3 border-line',
+            ].join(' ')}
+          >
+            {content.formatTag}
+          </span>
+        )}
       </div>
 
       {/* Logo + info */}
@@ -37,9 +68,9 @@ export function RealChampionshipBlock({
           <Image
             src={content.logo}
             alt={content.title}
-            width={148}
-            height={148}
-            className="w-[120px] h-[120px] shrink-0 object-contain self-start"
+            width={200}
+            height={200}
+            className="w-[160px] h-[160px] shrink-0 object-contain self-start"
           />
         )}
 
@@ -47,13 +78,13 @@ export function RealChampionshipBlock({
           <h2
             className={[
               'font-display font-black text-[clamp(28px,4vw,40px)] uppercase leading-none tracking-[-0.5px]',
-              isComingSoon ? 'text-txt-2' : 'text-txt',
+              isComingSoon ? 'text-txt/70' : 'text-txt',
             ].join(' ')}
           >
             {content.title}
           </h2>
 
-          <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-2 mt-3">
+          <p className="font-mono text-[12px] tracking-[.3em] uppercase text-txt-2 mt-3">
             {content.schedule.length > 0 && (
               <>
                 {content.schedule.length} Rounds
@@ -65,7 +96,7 @@ export function RealChampionshipBlock({
 
           {isComingSoon && (
             <div className="mt-5 border border-line/50 px-4 py-3">
-              <p className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3">
+              <p className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3">
                 Coming Soon
               </p>
             </div>
@@ -97,7 +128,7 @@ export function RealChampionshipBlock({
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 hover:text-gold transition-colors"
+                className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 hover:text-gold transition-colors"
               >
                 {link.label}
               </a>
@@ -108,7 +139,7 @@ export function RealChampionshipBlock({
               href={content.resultsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-[11px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors flex items-center gap-2 shrink-0"
+              className="font-mono text-[12px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors flex items-center gap-2 shrink-0"
             >
               View on SimGrid →
             </a>

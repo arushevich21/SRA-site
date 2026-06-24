@@ -24,16 +24,16 @@ export function DivisionGroup({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="font-mono text-[10px] tracking-[.35em] uppercase text-txt-3 mb-3 flex items-center gap-3 cursor-pointer group w-full text-left"
+        className="font-mono text-[11px] tracking-[.35em] uppercase text-txt-3 mb-3 flex items-center gap-3 cursor-pointer group w-full text-left"
       >
         <span className="h-px w-4 bg-line" />
         Division {division}
-        <span className="text-txt-3/50 text-[9px] ml-1">
+        <span className="text-txt-3/50 text-[11px] ml-1">
           {seasons.length} seasons
         </span>
         <span
           className={[
-            'ml-auto text-[9px] text-txt-3/50 transition-transform duration-200 group-hover:text-gold',
+            'ml-auto text-[11px] text-txt-3/50 transition-transform duration-200 group-hover:text-gold',
             open ? 'rotate-90' : '',
           ].join(' ')}
         >
@@ -49,10 +49,10 @@ export function DivisionGroup({
               className="border border-line/30 bg-carbon-2 px-4 py-3"
             >
               <div className="flex items-baseline justify-between mb-1">
-                <span className="font-mono text-[11px] tracking-[.2em] text-gold">
+                <span className="font-mono text-[12px] tracking-[.2em] text-gold">
                   S{s.season}
                 </span>
-                <span className="font-mono text-[11px] tracking-[.1em] text-gold-soft">
+                <span className="font-mono text-[12px] tracking-[.1em] text-gold-soft">
                   {s.championPoints} pts
                 </span>
               </div>

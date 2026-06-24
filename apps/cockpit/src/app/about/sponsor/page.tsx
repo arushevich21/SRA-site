@@ -36,7 +36,7 @@ export default function SponsorPage() {
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
@@ -53,7 +53,7 @@ export default function SponsorPage() {
             key={tier.name}
             className="border border-line bg-panel p-6 flex flex-col"
           >
-            <span className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mb-3">
+            <span className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mb-3">
               {tier.name}
             </span>
             <div className="mb-6">
@@ -78,7 +78,7 @@ export default function SponsorPage() {
               href={tier.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="block text-center border border-gold text-gold hover:text-gold-soft hover:border-gold-soft transition-colors font-mono text-[11px] tracking-[.2em] uppercase px-6 py-3"
+              className="block text-center border border-gold text-gold hover:text-gold-soft hover:border-gold-soft transition-colors font-mono text-[15px] tracking-[.2em] uppercase px-6 py-3"
             >
               Subscribe
             </a>

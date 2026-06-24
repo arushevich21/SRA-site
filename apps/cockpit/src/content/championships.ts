@@ -10,6 +10,8 @@ export type ChampionshipContent = {
   standingsKey?: string;
   game: 'ACC' | 'LMU' | 'AC Evo' | (string & {});
   classTag: string;
+  formatTag?: string;
+  classes: string[];
   title: string;
   logo?: string;
   raceFormat: string;
@@ -46,6 +48,8 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     simgridId: null,
     game: 'ACC',
     classTag: 'GT3',
+    formatTag: 'Sprint',
+    classes: ['GT3'],
     title: 'GT3 Team Series — Season 19',
     logo: '/badges/gt3_team_series_logo.png',
     raceFormat:
@@ -69,7 +73,9 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     simgridId: null,
     standingsKey: 'endurance-s3',
     game: 'ACC',
-    classTag: 'GT3 Endurance',
+    classTag: 'GT3',
+    formatTag: 'Endurance',
+    classes: ['GT3'],
     title: 'SRA GT3 Endurance Series — Season 3',
     logo: '/badges/endurance-series_logo.png',
     raceFormat:
@@ -105,6 +111,8 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     simgridId: 22872,
     game: 'LMU',
     classTag: 'LMP2 / LMGT3',
+    formatTag: 'Multiclass',
+    classes: ['LMP2', 'LMGT3'],
     title: 'SRA Multiclass Mayhem - LMU - Season 3 Split 1',
     logo: '/badges/multiclass_mayhem_logo.png',
     raceFormat:
@@ -132,8 +140,11 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
   {
     simgridId: 25580,
     game: 'AC Evo',
-    classTag: 'MX-5 Cup',
+    classTag: 'MX-5',
+    formatTag: 'Cup',
+    classes: ['MX-5'],
     title: 'SRA MX5 Cup',
+    logo: '/badges/SRA_450.png',
     raceFormat: 'AC Evo — details TBA',
     rulesBullets: [],
     discordLinks: [],

@@ -4,7 +4,7 @@ import { CHAMPIONSHIPS, formatScheduleDate } from '../../content/championships';
 export default function CalendarPage() {
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[12px] tracking-[.3em] uppercase text-gold mb-5">
         — Calendar
       </span>
       <h1 className="font-display font-black text-[clamp(52px,7vw,96px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-16">
@@ -24,10 +24,10 @@ export default function CalendarPage() {
               />
             )}
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="inline-block font-mono text-[10px] tracking-[.35em] uppercase px-2 py-[3px] border text-gold border-gold/40">
+              <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-gold border-gold/40">
                 {champ.classTag}
               </span>
-              <span className="font-mono text-[9px] tracking-[.25em] uppercase px-2 py-[2px] border text-txt-3 border-line">
+              <span className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border text-txt-3 border-line">
                 {champ.game}
               </span>
               <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt">
@@ -36,7 +36,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <p className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mb-5">
+          <p className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 mb-5">
             {champ.raceFormat}
           </p>
 
@@ -51,16 +51,16 @@ export default function CalendarPage() {
                     : '',
                 ].join(' ')}
               >
-                <span className="font-mono text-[11px] tracking-[.2em] uppercase text-gold w-10 shrink-0">
+                <span className="font-mono text-[12px] tracking-[.2em] uppercase text-gold w-10 shrink-0">
                   R{round.round}
                 </span>
                 <span className="font-display font-bold text-[16px] uppercase leading-none text-txt-2 flex-1 min-w-0 truncate">
                   {round.track}
                 </span>
-                <span className="font-mono text-[10px] tracking-[.15em] text-txt-3 shrink-0 text-right">
+                <span className="font-mono text-[11px] tracking-[.15em] text-txt-3 shrink-0 text-right">
                   {formatScheduleDate(round.date)}
                 </span>
-                <span className="font-mono text-[9px] tracking-[.2em] uppercase text-txt-3 shrink-0 w-16 text-right">
+                <span className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 shrink-0 w-16 text-right">
                   {round.raceLength}
                 </span>
               </div>

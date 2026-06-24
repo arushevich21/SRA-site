@@ -9,12 +9,17 @@
   --color-line:       #23272f;
   --color-line-2:     #2e333d;
   --color-txt:        #e9ebef;
-  --color-txt-2:      #9aa1ad;
-  --color-txt-3:      #646b78;
+  --color-txt-2:      #b0b8c4;
+  --color-txt-3:      #8a92a0;
   --color-gold:       #e6b53d;
   --color-gold-deep:  #c8941f;
   --color-gold-soft:  #f2cf73;
   --color-live:       #36e0c8;
+
+  /* ── semantic heading hierarchy ─────────────────────────────────── */
+  --color-heading-title:      #e6b53d;
+  --color-heading-subtitle:   #f0f2f5;
+  --color-heading-subsection: #b0b8c4;
 
   /* ── typography ─────────────────────────────────────────────────── */
   --font-sans:    var(--font-hanken),    system-ui, -apple-system, sans-serif;
@@ -100,7 +105,8 @@ body::after {
 }
 
 .nav-drop a {
-  display: block;
+  display: flex;
+  align-items: center;
   padding: 9px 12px;
   font-size: 12.5px;
   font-weight: 600;

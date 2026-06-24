@@ -1,7 +1,7 @@
 export default function DriversPage() {
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
@@ -17,7 +17,7 @@ export default function DriversPage() {
           <span className="font-display text-[48px] text-gold leading-none">
             655
           </span>
-          <span className="block font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mt-2">
+          <span className="block font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mt-2">
             Active Drivers
           </span>
         </div>
@@ -25,7 +25,7 @@ export default function DriversPage() {
           <span className="font-display text-[48px] text-gold leading-none">
             999
           </span>
-          <span className="block font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mt-2">
+          <span className="block font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mt-2">
             Available Numbers
           </span>
         </div>
@@ -33,7 +33,7 @@ export default function DriversPage() {
           <span className="font-display text-[48px] text-gold leading-none">
             66%
           </span>
-          <span className="block font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mt-2">
+          <span className="block font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mt-2">
             Number Utilization
           </span>
         </div>
@@ -57,7 +57,7 @@ export default function DriversPage() {
             <span className="font-display text-[28px] text-gold leading-none">
               {g.count}
             </span>
-            <span className="block font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mt-2">
+            <span className="block font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mt-2">
               {g.country}
             </span>
             <span className="block font-sans text-sm text-txt-2 mt-1">
@@ -66,7 +66,7 @@ export default function DriversPage() {
           </div>
         ))}
         <div className="border border-line bg-panel p-6 flex items-center justify-center">
-          <span className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 text-center">
+          <span className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 text-center">
             + 52 other countries
           </span>
         </div>
@@ -82,16 +82,16 @@ export default function DriversPage() {
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-line">
-              <th className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
+              <th className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
                 Division
               </th>
-              <th className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
+              <th className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
                 Total
               </th>
-              <th className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
+              <th className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
                 Gold
               </th>
-              <th className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
+              <th className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
                 Silver
               </th>
             </tr>
@@ -126,7 +126,7 @@ export default function DriversPage() {
 
       {/* SRAlien Note */}
       <div className="border border-line bg-panel p-6">
-        <span className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mb-2 block">
+        <span className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mb-2 block">
           Classification Note
         </span>
         <p className="font-sans text-sm text-txt-2 leading-relaxed">

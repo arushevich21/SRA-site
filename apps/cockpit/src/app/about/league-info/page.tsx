@@ -1,7 +1,7 @@
 export default function LeagueInfoPage() {
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
@@ -92,25 +92,25 @@ export default function LeagueInfoPage() {
       <div className="bg-panel border border-line rounded-lg p-6 mb-8">
         <ul className="space-y-3">
           <li className="font-sans text-sm text-txt-2 leading-relaxed">
-            <span className="font-mono text-[11px] tracking-[.15em] uppercase text-gold">
+            <span className="font-mono text-[15px] tracking-[.15em] uppercase text-gold">
               Tuesdays
             </span>{" "}
             — GT3 Team Series Divisions 1 &amp; 3 &middot; 9:00 PM EDT
           </li>
           <li className="font-sans text-sm text-txt-2 leading-relaxed">
-            <span className="font-mono text-[11px] tracking-[.15em] uppercase text-gold">
+            <span className="font-mono text-[15px] tracking-[.15em] uppercase text-gold">
               Wednesdays
             </span>{" "}
             — GT3 Team Series Divisions 2 &amp; 4 &middot; 9:00 PM EDT
           </li>
           <li className="font-sans text-sm text-txt-2 leading-relaxed">
-            <span className="font-mono text-[11px] tracking-[.15em] uppercase text-gold">
+            <span className="font-mono text-[15px] tracking-[.15em] uppercase text-gold">
               Thursdays
             </span>{" "}
             — Multiclass on Le Mans Ultimate &middot; 9:00 PM EDT
           </li>
           <li className="font-sans text-sm text-txt-2 leading-relaxed">
-            <span className="font-mono text-[11px] tracking-[.15em] uppercase text-gold">
+            <span className="font-mono text-[15px] tracking-[.15em] uppercase text-gold">
               Saturdays
             </span>{" "}
             — Endurance Series &middot; EDT

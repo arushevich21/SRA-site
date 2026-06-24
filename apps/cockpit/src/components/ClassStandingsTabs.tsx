@@ -24,7 +24,7 @@ export function ClassStandingsTabs({
             type="button"
             onClick={() => setActiveTab(i)}
             className={[
-              'font-mono text-[10px] tracking-[.25em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors cursor-pointer',
+              'font-mono text-[11px] tracking-[.25em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors cursor-pointer',
               i === activeTab
                 ? 'text-gold border-gold'
                 : 'text-txt-3 border-transparent hover:text-txt-2',

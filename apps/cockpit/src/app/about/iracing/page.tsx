@@ -10,7 +10,7 @@ export default function IRacingPage() {
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
@@ -30,25 +30,25 @@ export default function IRacingPage() {
         </h2>
         <ul className="space-y-3">
           <li className="font-sans text-sm text-txt-2 leading-relaxed">
-            <span className="font-mono text-[11px] tracking-[.15em] uppercase text-gold">
+            <span className="font-mono text-[15px] tracking-[.15em] uppercase text-gold">
               Vehicle
             </span>{' '}
             — Radical SR8
           </li>
           <li className="font-sans text-sm text-txt-2 leading-relaxed">
-            <span className="font-mono text-[11px] tracking-[.15em] uppercase text-gold">
+            <span className="font-mono text-[15px] tracking-[.15em] uppercase text-gold">
               Practice
             </span>{' '}
             — 20 minutes (includes briefing)
           </li>
           <li className="font-sans text-sm text-txt-2 leading-relaxed">
-            <span className="font-mono text-[11px] tracking-[.15em] uppercase text-gold">
+            <span className="font-mono text-[15px] tracking-[.15em] uppercase text-gold">
               Qualifying
             </span>{' '}
             — 10 minutes (2 laps)
           </li>
           <li className="font-sans text-sm text-txt-2 leading-relaxed">
-            <span className="font-mono text-[11px] tracking-[.15em] uppercase text-gold">
+            <span className="font-mono text-[15px] tracking-[.15em] uppercase text-gold">
               Races
             </span>{' '}
             — Two 30-minute sprint races
@@ -60,7 +60,7 @@ export default function IRacingPage() {
       <h2 className="font-display font-bold text-[28px] uppercase text-txt mt-16 mb-6">
         Season 3 Schedule
       </h2>
-      <p className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 mb-5">
+      <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mb-5">
         6 Rounds &middot; Radical SR8 &middot; Thursdays 9:00 PM EDT
       </p>
 
@@ -73,13 +73,13 @@ export default function IRacingPage() {
               i < schedule.length - 1 ? 'border-b border-line/50' : '',
             ].join(' ')}
           >
-            <span className="font-mono text-[11px] tracking-[.2em] uppercase text-gold w-10 shrink-0">
+            <span className="font-mono text-[15px] tracking-[.2em] uppercase text-gold w-10 shrink-0">
               R{round.round}
             </span>
             <span className="font-display font-bold text-[16px] uppercase leading-none text-txt-2 flex-1 min-w-0 truncate">
               {round.track}
             </span>
-            <span className="font-mono text-[10px] tracking-[.15em] text-txt-3 shrink-0 text-right">
+            <span className="font-mono text-[15px] tracking-[.15em] text-txt-3 shrink-0 text-right">
               {round.date}
             </span>
           </div>

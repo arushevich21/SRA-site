@@ -125,7 +125,7 @@ export default function AccoladesPage() {
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
       {/* Header */}
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
@@ -137,7 +137,7 @@ export default function AccoladesPage() {
       {/* ============================================================ */}
       <div className="flex items-center gap-4 my-16">
         <div className="flex-1 h-px bg-line" />
-        <span className="font-mono text-[9px] tracking-[.4em] uppercase text-txt-3">
+        <span className="font-mono text-[15px] tracking-[.4em] uppercase text-txt-3">
           Seasons 10–17
         </span>
         <div className="flex-1 h-px bg-line" />
@@ -154,16 +154,16 @@ export default function AccoladesPage() {
                 key={`${s.season}-${s.division}-${s.championshipType}`}
                 className="border border-gold/30 bg-carbon-2 p-5"
               >
-                <p className="font-mono text-[9px] tracking-[.35em] uppercase text-gold mb-2">
+                <p className="font-mono text-[15px] tracking-[.35em] uppercase text-gold mb-2">
                   Season {s.season} — Division {s.division} Champion
                 </p>
                 <p className="font-display font-black text-[22px] uppercase leading-tight text-txt">
                   {s.championDriver}
                 </p>
                 {s.championTeam && (
-                  <p className="font-sans text-[13px] text-txt-2 mt-1">{s.championTeam}</p>
+                  <p className="font-sans text-[15px] text-txt-2 mt-1">{s.championTeam}</p>
                 )}
-                <p className="font-mono text-[11px] text-txt-3 mt-2">
+                <p className="font-mono text-[15px] text-txt-3 mt-2">
                   {s.championPoints ? `${s.championPoints} pts` : ''}{s.championPoints && s.championCar ? ' · ' : ''}{s.championCar}
                 </p>
               </div>
@@ -177,7 +177,7 @@ export default function AccoladesPage() {
       {/* ============================================================ */}
       <div className="flex items-center gap-4 my-16">
         <div className="flex-1 h-px bg-line" />
-        <span className="font-mono text-[9px] tracking-[.4em] uppercase text-txt-3">
+        <span className="font-mono text-[15px] tracking-[.4em] uppercase text-txt-3">
           Seasons 0–9
         </span>
         <div className="flex-1 h-px bg-line" />
@@ -192,7 +192,7 @@ export default function AccoladesPage() {
           {/* Drivers Champions */}
           {s.divisions.length > 0 && (
             <>
-              <h3 className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-2 mb-4">
+              <h3 className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-2 mb-4">
                 Drivers Champions
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
@@ -229,7 +229,7 @@ export default function AccoladesPage() {
           {/* Team Champions */}
           {s.divisions.length > 0 && (
             <>
-              <h3 className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-2 mb-4">
+              <h3 className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-2 mb-4">
                 Team Champions
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
