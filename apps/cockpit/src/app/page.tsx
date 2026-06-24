@@ -72,16 +72,11 @@ export default function HomePage() {
           </div>
 
           {/* Stats bar */}
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-12">
-            {STATS.map((stat, i) => (
-              <Fragment key={stat.label}>
-                {i > 0 && (
-                  <span className="text-gold/30 hidden sm:block select-none">·</span>
-                )}
-                <span className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-2">
-                  <span className="text-gold font-bold">{stat.value}</span> {stat.label}
-                </span>
-              </Fragment>
+          <div className="grid grid-cols-3 gap-x-8 gap-y-3 mt-12 justify-items-center">
+            {STATS.map((stat) => (
+              <span key={stat.label} className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-2">
+                <span className="text-gold font-bold">{stat.value}</span> {stat.label}
+              </span>
             ))}
           </div>
         </div>
