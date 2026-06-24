@@ -38,7 +38,7 @@ export default function ChampionshipsPage() {
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
       {/* Page header */}
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[12px] tracking-[.3em] uppercase text-gold mb-5">
         — Championships
       </span>
       <h1 className="font-display font-black text-[clamp(52px,7vw,96px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-16">
@@ -46,11 +46,23 @@ export default function ChampionshipsPage() {
       </h1>
 
       {/* Active championships */}
-      {CHAMPIONSHIPS.length > 0 && (
+      {CHAMPIONSHIPS.filter((c) => c.schedule.length > 0).length > 0 && (
         <div className="mb-20">
           <SectionLabel>Active Championships</SectionLabel>
           <div className="flex flex-col gap-6">
-            {CHAMPIONSHIPS.map((content) => (
+            {CHAMPIONSHIPS.filter((c) => c.schedule.length > 0).map((content) => (
+              <RealChampionshipBlock key={content.standingsKey ?? content.simgridId ?? content.title} content={content} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming championships */}
+      {CHAMPIONSHIPS.filter((c) => c.schedule.length === 0).length > 0 && (
+        <div className="mb-20">
+          <SectionLabel muted>Upcoming Championships</SectionLabel>
+          <div className="flex flex-col gap-6">
+            {CHAMPIONSHIPS.filter((c) => c.schedule.length === 0).map((content) => (
               <RealChampionshipBlock key={content.standingsKey ?? content.simgridId ?? content.title} content={content} />
             ))}
           </div>
@@ -60,7 +72,7 @@ export default function ChampionshipsPage() {
       {/* Divider */}
       <div className="flex items-center gap-4 mb-16">
         <div className="flex-1 h-px bg-line" />
-        <span className="font-mono text-[9px] tracking-[.4em] uppercase text-txt-3 shrink-0">
+        <span className="font-mono text-[11px] tracking-[.4em] uppercase text-txt-3 shrink-0">
           Past Seasons
         </span>
         <div className="flex-1 h-px bg-line" />

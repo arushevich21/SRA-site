@@ -41,7 +41,7 @@ export default async function AdminStandingsPage({ searchParams }: PageProps) {
         </h2>
         {result === 'error' && msg && <Banner type="error">{msg}</Banner>}
         <form action={loginAction} className="flex flex-col gap-4 max-w-sm">
-          <label className="font-mono text-[10px] tracking-[.3em] uppercase text-txt-3">
+          <label className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3">
             Admin Password
             <input
               type="password"
@@ -52,7 +52,7 @@ export default async function AdminStandingsPage({ searchParams }: PageProps) {
           </label>
           <button
             type="submit"
-            className="bg-gold text-carbon font-mono text-[11px] tracking-[.2em] uppercase font-bold px-5 py-2.5 hover:bg-gold-soft transition-colors cursor-pointer"
+            className="bg-gold text-carbon font-mono text-[12px] tracking-[.2em] uppercase font-bold px-5 py-2.5 hover:bg-gold-soft transition-colors cursor-pointer"
           >
             Sign In
           </button>
@@ -70,7 +70,7 @@ export default async function AdminStandingsPage({ searchParams }: PageProps) {
         <form action={logoutAction}>
           <button
             type="submit"
-            className="font-mono text-[10px] tracking-[.2em] uppercase text-txt-3 hover:text-gold transition-colors cursor-pointer"
+            className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 hover:text-gold transition-colors cursor-pointer"
           >
             Sign Out
           </button>
@@ -81,7 +81,7 @@ export default async function AdminStandingsPage({ searchParams }: PageProps) {
       {result === 'error' && msg && <Banner type="error">{msg}</Banner>}
 
       <form action={uploadStandingsAction} className="flex flex-col gap-5">
-        <label className="font-mono text-[10px] tracking-[.3em] uppercase text-txt-3">
+        <label className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3">
           Standings Key
           <input
             type="text"
@@ -92,7 +92,7 @@ export default async function AdminStandingsPage({ searchParams }: PageProps) {
           />
         </label>
 
-        <label className="font-mono text-[10px] tracking-[.3em] uppercase text-txt-3">
+        <label className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3">
           Paste Standings JSON
           <textarea
             name="jsonText"
@@ -103,7 +103,7 @@ export default async function AdminStandingsPage({ searchParams }: PageProps) {
         </label>
 
         <div className="flex items-center gap-3">
-          <span className="font-mono text-[9px] tracking-[.3em] uppercase text-txt-3">
+          <span className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3">
             Or attach file
           </span>
           <input
@@ -116,14 +116,14 @@ export default async function AdminStandingsPage({ searchParams }: PageProps) {
 
         <button
           type="submit"
-          className="bg-gold text-carbon font-mono text-[11px] tracking-[.2em] uppercase font-bold px-5 py-2.5 hover:bg-gold-soft transition-colors cursor-pointer self-start"
+          className="bg-gold text-carbon font-mono text-[12px] tracking-[.2em] uppercase font-bold px-5 py-2.5 hover:bg-gold-soft transition-colors cursor-pointer self-start"
         >
           Upload Standings
         </button>
       </form>
 
       <div className="mt-10 pt-6 border-t border-line">
-        <p className="font-mono text-[9px] tracking-[.3em] uppercase text-txt-3/50">
+        <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3/50">
           Files saved to src/content/standings/&#123;id&#125;.json — does not
           persist across deploys on hosted platforms (Vercel, etc.)
         </p>
@@ -135,7 +135,7 @@ export default async function AdminStandingsPage({ searchParams }: PageProps) {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <section className="max-w-[720px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[12px] tracking-[.3em] uppercase text-gold mb-5">
         — Admin
       </span>
       <h1 className="font-display font-black text-[clamp(36px,5vw,56px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
@@ -158,7 +158,7 @@ function Banner({
       ? 'border-live/30 bg-live/5 text-live'
       : 'border-gold-deep/30 bg-gold-deep/5 text-gold-deep';
   return (
-    <div className={`border ${styles} px-4 py-3 mb-6 font-mono text-[11px] tracking-[.1em]`}>
+    <div className={`border ${styles} px-4 py-3 mb-6 font-mono text-[12px] tracking-[.1em]`}>
       {children}
     </div>
   );

@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { SIMS } from '@/content/sims';
 
 const STATS = [
   { value: '18', label: 'Seasons' },
@@ -9,53 +10,6 @@ const STATS = [
   { value: '38', label: 'ACC Servers' },
   { value: '94,327', label: 'Sessions' },
   { value: '4,540,616', label: 'Laps' },
-];
-
-const FEATURES: {
-  heading: string;
-  body: string;
-  image: string;
-  imageRight: boolean;
-  ctas: { label: string; href: string; external?: boolean }[];
-}[] = [
-  {
-    heading: 'GT3 Team Series',
-    body: 'The reason we play sim racing — competitive GT3 racing. This is our main series featuring 60 minute races split into 4 divisions. This is a team and drivers\' series; teams are made up of two drivers both racing on track at the same time. No matter your pace, you will find on-track battles for position throughout your respective split!',
-    image: 'https://static.simracingalliance.com/assets/images/gt3_team_series_clip_1.gif',
-    imageRight: true,
-    ctas: [{ label: 'View All Championships', href: '/championships' }],
-  },
-  {
-    heading: 'Leaderboards',
-    body: 'All time and seasonal hot lap / hot stint leaderboards to track all of your laps! We have 38 ACC servers online 24/7 for every ACC track available, allowing you to set your best lap times whenever you like. You can also compare lap times with your friends and division rivals!',
-    image: 'https://static.simracingalliance.com/assets/images/leaderboards_clip_1.gif',
-    imageRight: false,
-    ctas: [{ label: 'View All Leaderboards', href: '/leaderboards' }],
-  },
-  {
-    heading: 'SRAting Driver Rating',
-    body: 'SRAting is a weighted combination of three separate metrics: pace, performance, and safety. It is a data-driven approach to quantifying the overall strength of each member as a racing driver. It is a tool to quantify each driver\'s racing potential to help delineate divisions for our GT3 Team Series.',
-    image: 'https://static.simracingalliance.com/assets/images/SRAting_clip_1.gif',
-    imageRight: true,
-    ctas: [{ label: 'View SRAting', href: '/about/srating' }],
-  },
-  {
-    heading: 'Live Streaming',
-    body: 'We live stream our main events to Twitch and YouTube for our entire community to enjoy! Live chat with your fellow community members, request driver focus on stream or participate in live polls. Check out our live stream for our next event or watch any of our past events anytime!',
-    image: 'https://static.simracingalliance.com/assets/images/live_streaming_clip_1.gif',
-    imageRight: false,
-    ctas: [
-      { label: 'SRA Twitch', href: 'https://www.twitch.tv/sim_racing_alliance', external: true },
-      { label: 'SRA YouTube', href: 'https://youtube.com/channel/UCiDAEhPJIO6Zj1jP0cPFJqA', external: true },
-    ],
-  },
-  {
-    heading: 'Discord Community',
-    body: 'We have an active and supportive community of 3,400+ members where you can get help with your sim racing experience. Discuss car setup tips, get help with car liveries or PC/simrig hardware, view race clips & highlights, check out member live streams or just have fun chatting with your fellow SRA members.',
-    image: 'https://static.simracingalliance.com/assets/images/Discord_slide_1.png',
-    imageRight: true,
-    ctas: [{ label: 'Join Our Discord', href: 'https://discord.gg/SimRacingAlliance', external: true }],
-  },
 ];
 
 const PARTNERS = [
@@ -75,7 +29,6 @@ export default function HomePage() {
     <>
       {/* ── HERO ──────────────────────────────────────────────────────── */}
       <section className="relative min-h-screen flex flex-col items-center justify-center px-7 pt-[76px] pb-16 overflow-hidden">
-        {/* Decorative stripe */}
         <div
           className="absolute top-0 right-[-10%] w-[46%] h-full z-0"
           style={{
@@ -88,8 +41,8 @@ export default function HomePage() {
           <Image
             src="/sra_logo.png"
             alt="Sim Racing Alliance"
-            width={160}
-            height={160}
+            width={480}
+            height={120}
             className="mx-auto mb-10 w-[120px] h-auto"
             priority
           />
@@ -125,7 +78,7 @@ export default function HomePage() {
                 {i > 0 && (
                   <span className="text-gold/30 hidden sm:block select-none">·</span>
                 )}
-                <span className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3">
+                <span className="font-mono text-[12px] tracking-[.2em] uppercase text-txt-3">
                   <span className="text-gold">{stat.value}</span> {stat.label}
                 </span>
               </Fragment>
@@ -134,70 +87,61 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── FEATURE SECTIONS ──────────────────────────────────────────── */}
-      {FEATURES.map((feat, i) => (
-        <section key={feat.heading} className="relative border-t border-line">
-          <div className="max-w-[1280px] mx-auto px-7 py-24">
-            <div
-              className={[
-                'flex gap-12 items-center flex-col',
-                feat.imageRight ? 'lg:flex-row' : 'lg:flex-row-reverse',
-              ].join(' ')}
-            >
-              {/* Text */}
-              <div className="flex-1 min-w-0">
-                <span className="font-mono text-[10px] tracking-[.35em] uppercase text-txt-3 mb-4 block">
-                  0{i + 1}
-                </span>
-                <h2 className="font-display font-black text-[clamp(32px,4.4vw,56px)] uppercase leading-[.92] tracking-[-0.5px] text-txt mb-5">
-                  {feat.heading}
-                </h2>
-                <p className="font-sans text-[15px] text-txt-2 leading-relaxed max-w-[500px]">
-                  {feat.body}
-                </p>
-                <div className="flex gap-3 mt-8 flex-wrap">
-                  {feat.ctas.map((cta) =>
-                    cta.external ? (
-                      <a
-                        key={cta.label}
-                        href={cta.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono text-[11px] tracking-[.15em] uppercase text-gold border border-line-2 px-5 py-3 hover:border-gold hover:text-gold-soft transition-colors"
-                      >
-                        {cta.label} →
-                      </a>
-                    ) : (
-                      <Link
-                        key={cta.label}
-                        href={cta.href}
-                        className="font-mono text-[11px] tracking-[.15em] uppercase text-gold border border-line-2 px-5 py-3 hover:border-gold hover:text-gold-soft transition-colors"
-                      >
-                        {cta.label} →
-                      </Link>
-                    ),
-                  )}
-                </div>
-              </div>
+      {/* ── WHO WE ARE ────────────────────────────────────────────────── */}
+      <section className="border-t border-line">
+        <div className="max-w-[1280px] mx-auto px-7 py-20 text-center">
+          <span className="block font-mono text-[11px] tracking-[.35em] uppercase text-gold mb-5">
+            Who We Are
+          </span>
+          <p className="font-sans text-[17px] text-txt-2 leading-relaxed max-w-[640px] mx-auto">
+            Sim Racing Alliance is a competitive multi-sim racing league
+            featuring organized championships across multiple platforms.
+            Whether you race GT3s in ACC, prototypes in Le Mans Ultimate,
+            or MX-5s in AC Evo — there&apos;s a grid with your name on it.
+          </p>
+        </div>
+      </section>
 
-              {/* Image */}
-              <div className="lg:w-[520px] shrink-0">
-                <div className="border border-line overflow-hidden">
-                  <Image
-                    src={feat.image}
-                    alt={feat.heading}
-                    width={520}
-                    height={293}
-                    className="w-full h-auto"
-                    priority={i === 0}
-                    unoptimized
-                  />
+      {/* ── SIM SELECTOR ──────────────────────────────────────────────── */}
+      <section className="border-t border-line">
+        <div className="max-w-[1280px] mx-auto px-7 py-20">
+          <span className="block font-mono text-[11px] tracking-[.35em] uppercase text-gold mb-3 text-center">
+            Choose Your Sim
+          </span>
+          <h2 className="font-display font-black text-[clamp(28px,4vw,48px)] uppercase leading-[.92] tracking-[-0.5px] text-txt text-center mb-12">
+            Start Racing
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {SIMS.map((sim) => (
+              <Link
+                key={sim.slug}
+                href={`/${sim.slug}`}
+                className="group relative border border-line bg-panel hover:bg-panel-2 transition-all overflow-hidden"
+              >
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-[3px]"
+                  style={{ backgroundColor: sim.accentColor }}
+                />
+                <div className="px-6 py-8">
+                  <span
+                    className="block font-display font-black text-[22px] uppercase leading-none tracking-[-0.3px] mb-2 transition-colors"
+                    style={{ color: sim.accentColor }}
+                  >
+                    {sim.game}
+                  </span>
+                  <span className="block font-sans text-[13px] text-txt-3 group-hover:text-txt-2 transition-colors">
+                    {sim.displayName}
+                  </span>
                 </div>
-              </div>
-            </div>
+                <div className="absolute right-5 top-1/2 -translate-y-1/2 font-mono text-[14px] text-txt-3/30 group-hover:text-txt-3/60 transition-colors">
+                  →
+                </div>
+              </Link>
+            ))}
           </div>
-        </section>
-      ))}
+        </div>
+      </section>
 
       {/* ── PARTNERS STRIP ────────────────────────────────────────────── */}
       <section className="border-t border-b border-line py-10 overflow-hidden">

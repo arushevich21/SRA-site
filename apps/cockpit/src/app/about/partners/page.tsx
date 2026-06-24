@@ -36,7 +36,7 @@ export default function PartnersPage() {
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">

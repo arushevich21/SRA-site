@@ -20,7 +20,7 @@ export default async function StandingsPage() {
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[11px] tracking-[.3em] uppercase text-gold mb-5">
+      <span className="block font-mono text-[12px] tracking-[.3em] uppercase text-gold mb-5">
         — Standings
       </span>
       <div className="flex items-center gap-5 mb-10">
@@ -35,7 +35,7 @@ export default async function StandingsPage() {
           <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt">
             GT3 Team Series
           </h1>
-          <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-2 mt-3">
+          <p className="font-mono text-[12px] tracking-[.3em] uppercase text-txt-2 mt-3">
             ACC · Season 19
           </p>
         </div>

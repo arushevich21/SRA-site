@@ -61,7 +61,7 @@ export function GT3TeamStandings({
               type="button"
               onClick={() => setDivision(d)}
               className={[
-                'font-mono text-[11px] tracking-[.2em] uppercase px-4 py-2 border transition-colors cursor-pointer',
+                'font-mono text-[12px] tracking-[.2em] uppercase px-4 py-2 border transition-colors cursor-pointer',
                 d === division
                   ? 'text-gold border-gold bg-gold/5'
                   : 'text-txt-3 border-line hover:text-txt-2 hover:border-line-2',
@@ -81,7 +81,7 @@ export function GT3TeamStandings({
             type="button"
             onClick={() => setChampType(type)}
             className={[
-              'font-mono text-[10px] tracking-[.25em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors cursor-pointer',
+              'font-mono text-[11px] tracking-[.25em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors cursor-pointer',
               type === champType
                 ? 'text-gold border-gold'
                 : 'text-txt-3 border-transparent hover:text-txt-2',
@@ -104,7 +104,7 @@ export function GT3TeamStandings({
                   type="button"
                   onClick={() => setDriverView(view)}
                   className={[
-                    'font-mono text-[9px] tracking-[.2em] uppercase px-3 py-1.5 border transition-colors cursor-pointer',
+                    'font-mono text-[11px] tracking-[.2em] uppercase px-3 py-1.5 border transition-colors cursor-pointer',
                     view === driverView
                       ? 'text-gold border-gold bg-gold/5'
                       : 'text-txt-3 border-line hover:text-txt-2',
@@ -144,7 +144,7 @@ export function GT3TeamStandings({
 function NoData() {
   return (
     <div className="border border-gold-deep/30 bg-gold-deep/5 px-5 py-4">
-      <p className="font-mono text-[10px] tracking-[.15em] uppercase text-gold-deep">
+      <p className="font-mono text-[11px] tracking-[.15em] uppercase text-gold-deep">
         No standings data yet
       </p>
       <p className="font-sans text-[12px] text-txt-3 mt-1">
