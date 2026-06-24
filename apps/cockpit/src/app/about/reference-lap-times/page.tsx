@@ -15,13 +15,6 @@ const DIVISIONS = [
   { key: 'div4' as const, logo: '/badges/Division 4.png', alt: 'Division 4' },
 ];
 
-const DIVISIONS = [
-  { key: 'div1' as const, logo: '/badges/Division 1.png', alt: 'Division 1' },
-  { key: 'div2' as const, logo: '/badges/Division 2.png', alt: 'Division 2' },
-  { key: 'div3' as const, logo: '/badges/Division 3.png', alt: 'Division 3' },
-  { key: 'div4' as const, logo: '/badges/Division 4.png', alt: 'Division 4' },
-];
-
 function MultiplierNote({ multipliers }: { multipliers: { div1: number; div2: number; div3: number; div4: number } }) {
   return (
     <p className="font-mono text-[15px] text-txt-3 mb-4">
