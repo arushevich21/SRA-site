@@ -34,3 +34,11 @@ export type {
   RulingEffect,
   EligibilityStatus,
 } from './penalty-ledger.js';
+
+export type {
+  AcEvoSessionType,
+  AcEvoDriverResult,
+  AcEvoSessionResult,
+  EmperorResultListEntry,
+  EmperorResultListPage,
+} from './ac-evo.js';
