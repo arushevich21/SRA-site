@@ -125,10 +125,16 @@ export function parseAcEvoSession(raw: unknown): AcEvoSessionResult {
     const carKey = driverToCar.get(k);
     const meta = carKey ? carMeta.get(carKey) : undefined;
 
-    const driverName =
-      d?.nickname ||
-      [d?.first_name, d?.last_name].filter(Boolean).join(' ') ||
-      'Unknown';
+    // Emperor's own UI (leaderboards, standings) displays drivers by real name
+    // (first + last), not nickname — e.g. a driver with nickname "AAA" shows as
+    // "El Arct" everywhere in Emperor. Match that convention; nickname is only a
+    // fallback when no real name is on file. first_name/last_name sometimes carry
+    // stray internal whitespace, so trim each part before joining.
+    const fullName = [d?.first_name, d?.last_name]
+      .map((s) => s?.trim())
+      .filter(Boolean)
+      .join(' ');
+    const driverName = fullName || d?.nickname || 'Unknown';
 
     const entry: AcEvoDriverResult = {
       position: pos,
