@@ -28,8 +28,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// Throttling is tested in isolation below — default test clients to no delay
+// so the rest of the suite isn't waiting on it.
 function makeClient() {
-  return new EmperorClient(BASE_URL);
+  return new EmperorClient(BASE_URL, { minRequestIntervalMs: 0 });
 }
 
 // ── getResultsList pagination ───────────────────────────────────────────────
@@ -142,5 +144,55 @@ describe('getAllResultsList', () => {
     expect(all.map((e) => e.track)).toEqual(['A', 'B', 'C']);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock.mock.calls[2][0]).toContain('page=2');
+  });
+});
+
+// ── request throttling ───────────────────────────────────────────────────────
+//
+// Emperor's documented limit is ~2 req/min. Nothing in this client enforced
+// that before — every consumer (including the validation script) had to
+// hand-roll its own sleep(). This pins the client's own spacing so that
+// becomes true for every consumer automatically.
+
+describe('request throttling', () => {
+  it('does not delay the first request on a fresh client', async () => {
+    vi.useFakeTimers();
+    const fetchMock = stubFetch({ status: 200, body: { num_pages: 1, current_page: 0, results: [] } });
+    const client = new EmperorClient(BASE_URL, { minRequestIntervalMs: 31_000 });
+    await client.getResultsList(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('delays a second request until minRequestIntervalMs has elapsed', async () => {
+    vi.useFakeTimers();
+    const fetchMock = stubFetch({ status: 200, body: { num_pages: 1, current_page: 0, results: [] } });
+    const client = new EmperorClient(BASE_URL, { minRequestIntervalMs: 31_000 });
+
+    await client.getResultsList(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const second = client.getResultsList(0);
+    await vi.advanceTimersByTimeAsync(30_999);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // not yet — still inside the window
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2); // window elapsed — fires now
+
+    await second;
+    vi.useRealTimers();
+  });
+
+  it('does not add a delay once the interval has already elapsed naturally', async () => {
+    vi.useFakeTimers();
+    const fetchMock = stubFetch({ status: 200, body: { num_pages: 1, current_page: 0, results: [] } });
+    const client = new EmperorClient(BASE_URL, { minRequestIntervalMs: 1_000 });
+
+    await client.getResultsList(0);
+    await vi.advanceTimersByTimeAsync(5_000); // well past the interval
+    await client.getResultsList(0);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 });

@@ -41,4 +41,8 @@ export type {
   AcEvoSessionResult,
   EmperorResultListEntry,
   EmperorResultListPage,
+  EmperorDriverStanding,
+  EmperorTeamStanding,
+  EmperorChampionshipStandings,
+  HotLapEntry,
 } from './ac-evo.js';

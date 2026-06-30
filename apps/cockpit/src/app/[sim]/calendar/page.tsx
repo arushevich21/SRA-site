@@ -36,9 +36,9 @@ export default async function SimCalendarPage({
                 <Image
                   src={champ.logo}
                   alt={champ.title}
-                  width={56}
-                  height={56}
-                  className="w-[48px] h-[48px] shrink-0 object-contain"
+                  width={96}
+                  height={96}
+                  className="w-[80px] h-[80px] shrink-0 object-contain"
                 />
               )}
               <div className="flex items-center gap-3 flex-wrap">

@@ -63,6 +63,12 @@ importers:
 
   apps/cockpit:
     dependencies:
+      '@sra/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@sra/emperor-client':
+        specifier: workspace:*
+        version: link:../../packages/emperor-client
       '@sra/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

@@ -2,6 +2,7 @@ import type {
   AcEvoSessionType,
   AcEvoDriverResult,
   AcEvoSessionResult,
+  HotLapEntry,
 } from '@sra/shared-types';
 
 // ── raw API shapes — private, never exported ────────────────────────────────
@@ -69,6 +70,18 @@ export function msToLaptime(ms: number | null | undefined): string | null {
   return `${minutes}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
 }
 
+// Confirmed empirically against Emperor's own leaderboard ground truth: 776/776
+// laps across 10 real sessions (qualify/practice/race) matched this rule with
+// zero contradictions. Bit 0 alone marks a lap invalid (off-track/cut/etc.),
+// independent of every other bit. See scripts/validate-ac-evo-lap-flags.ts.
+//
+// This is the single source of truth for lap validity — every consumer (the
+// parser's own bestLapMs below, and the hot-lap leaderboard aggregator) must
+// go through this function rather than re-deriving the rule.
+export function isValidLap(flags: number): boolean {
+  return (flags & 1) === 0;
+}
+
 // ── parser ───────────────────────────────────────────────────────────────────
 
 export function parseAcEvoSession(raw: unknown): AcEvoSessionResult {
@@ -117,8 +130,12 @@ export function parseAcEvoSession(raw: unknown): AcEvoSessionResult {
     const d = drivers.get(k);
     const driverLaps = lapsByDriver.get(k) ?? [];
 
-    const lapTimes = driverLaps.map((l) => l.time).filter((t) => t > 0);
-    const bestLapMs = lapTimes.length > 0 ? Math.min(...lapTimes) : null;
+    const validLaps = driverLaps.filter((l) => isValidLap(l.flags ?? 0) && l.time > 0);
+    const bestLap = validLaps.reduce<RawLap | null>(
+      (best, l) => (best == null || l.time < best.time ? l : best),
+      null,
+    );
+    const bestLapMs = bestLap?.time ?? null;
 
     const rawTime = idx < times.length ? times[idx] : null;
 
@@ -150,6 +167,7 @@ export function parseAcEvoSession(raw: unknown): AcEvoSessionResult {
       noLaps: driverLaps.length === 0,
       bestLapMs,
       bestLap: msToLaptime(bestLapMs),
+      sectorsMs: bestLap?.split ?? null,
     };
 
     if (sessionType === 'Race') {
@@ -175,4 +193,38 @@ export function parseAcEvoSession(raw: unknown): AcEvoSessionResult {
     serverStartTime: s.server_manager?.server_start_time ?? null,
     results,
   };
+}
+
+// ── hot-lap leaderboard ─────────────────────────────────────────────────────
+
+// Each AcEvoDriverResult.bestLapMs is already the fastest *valid* lap within
+// that one session (filtered via isValidLap above). Taking the min across
+// sessions per driver is equivalent to taking the min across every valid lap
+// globally — min is associative over set union — so this never needs to look
+// at `flags` itself; it only ever consumes the parser's already-validated
+// output. That's what keeps isValidLap a single source of truth in practice,
+// not just by convention.
+export function aggregateHotLapLeaderboard(sessions: AcEvoSessionResult[]): HotLapEntry[] {
+  const bestBySteamId = new Map<string, Omit<HotLapEntry, 'rank'>>();
+
+  for (const session of sessions) {
+    for (const r of session.results) {
+      if (r.bestLapMs == null || !r.steamId) continue;
+      const existing = bestBySteamId.get(r.steamId);
+      if (!existing || r.bestLapMs < existing.bestLapMs) {
+        bestBySteamId.set(r.steamId, {
+          steamId: r.steamId,
+          driverName: r.driverName,
+          carModel: r.carModel,
+          bestLapMs: r.bestLapMs,
+          bestLap: msToLaptime(r.bestLapMs)!,
+          sectorsMs: r.sectorsMs,
+        });
+      }
+    }
+  }
+
+  return [...bestBySteamId.values()]
+    .sort((a, b) => a.bestLapMs - b.bestLapMs)
+    .map((entry, i) => ({ ...entry, rank: i + 1 }));
 }

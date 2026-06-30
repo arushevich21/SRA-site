@@ -68,9 +68,9 @@ export function RealChampionshipBlock({
           <Image
             src={content.logo}
             alt={content.title}
-            width={200}
-            height={200}
-            className="w-[160px] h-[160px] shrink-0 object-contain self-start"
+            width={280}
+            height={280}
+            className="w-[220px] h-[220px] shrink-0 object-contain self-start"
           />
         )}
 
@@ -141,7 +141,7 @@ export function RealChampionshipBlock({
               rel="noopener noreferrer"
               className="font-mono text-[12px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors flex items-center gap-2 shrink-0"
             >
-              View on SimGrid →
+              {content.resultsLabel ?? 'View on SimGrid'} →
             </a>
           )}
         </div>

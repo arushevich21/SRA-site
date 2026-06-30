@@ -15,6 +15,7 @@
   --color-gold-deep:  #c8941f;
   --color-gold-soft:  #f2cf73;
   --color-live:       #36e0c8;
+  --color-purple:     #b14eff; /* fastest-sector highlight — sim-racing "purple sector" convention */
 
   /* ── semantic heading hierarchy ─────────────────────────────────── */
   --color-heading-title:      #e6b53d;

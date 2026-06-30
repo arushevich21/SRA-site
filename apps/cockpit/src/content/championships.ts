@@ -3,10 +3,13 @@ export type ScheduleRound = {
   track: string;
   date: string | null; // ISO datetime in local time (EDT), null = TBA
   raceLength: string;
+  emperorTrack?: string; // exact "TrackName,Layout" string for Emperor's leaderboard ?track= param
+  emperorRawTrackName?: string; // raw Emperor track_name for hot-lap cache lookups, e.g. "Road Atlanta"
 };
 
 export type ChampionshipContent = {
   simgridId: number | null;
+  emperorChampionshipId?: string;
   standingsKey?: string;
   game: 'ACC' | 'LMU' | 'AC Evo' | (string & {});
   classTag: string;
@@ -18,6 +21,7 @@ export type ChampionshipContent = {
   rulesBullets: string[];
   discordLinks: { label: string; url: string }[];
   resultsUrl: string | null;
+  resultsLabel?: string; // defaults to "View on SimGrid" — override when resultsUrl points elsewhere
   schedule: ScheduleRound[];
 };
 
@@ -139,21 +143,27 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
   },
   {
     simgridId: 25580,
+    emperorChampionshipId: '3a2e4266-ff5f-4c5c-b575-2a268c75f7e7',
     game: 'AC Evo',
     classTag: 'MX-5',
     formatTag: 'Cup',
     classes: ['MX-5'],
     title: 'SRA MX5 Cup',
-    logo: '/badges/SRA_450.png',
-    raceFormat: 'AC Evo — details TBA',
-    rulesBullets: [],
+    logo: '/badges/SRA_MX5_Cup_logo_transparent.png',
+    raceFormat:
+      '20 min practice · 10 min qualifying · 30 min race · Daily at 9:00 PM EDT',
+    rulesBullets: [
+      'Points for pole position: 5 · Points for fastest lap: 5',
+      'Practice server is live — search "SRA" in the AC Evo server browser: #SRAgg | Sim Racing Alliance | Main Server #1 | #SRAM1',
+    ],
     discordLinks: [],
-    resultsUrl: 'https://www.thesimgrid.com/championships/25580/standings',
+    resultsUrl: 'https://discord.com/channels/915686674833498203/915693003866275900/1520602621076045904',
+    resultsLabel: 'View on Discord',
     schedule: [
-      { round: 1, track: 'Road Atlanta GP', date: null, raceLength: 'TBA' },
-      { round: 2, track: 'Sebring International Raceway GP', date: null, raceLength: 'TBA' },
-      { round: 3, track: 'Laguna Seca GP', date: null, raceLength: 'TBA' },
-      { round: 4, track: 'Circuit of the Americas National', date: null, raceLength: 'TBA' },
+      { round: 1, track: 'Road Atlanta GP', date: '2026-06-29T21:00:00', raceLength: '30 min', emperorTrack: 'Road Atlanta,GP', emperorRawTrackName: 'Road Atlanta' },
+      { round: 2, track: 'Sebring International Raceway GP', date: '2026-07-06T21:00:00', raceLength: '30 min', emperorTrack: 'Sebring International Raceway,GP', emperorRawTrackName: 'Sebring International Raceway' },
+      { round: 3, track: 'Laguna Seca GP', date: '2026-07-13T21:00:00', raceLength: '30 min' },
+      { round: 4, track: 'Circuit of the Americas National', date: '2026-07-20T21:00:00', raceLength: '30 min' },
     ],
   },
 ];
