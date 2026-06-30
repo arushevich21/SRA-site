@@ -7,7 +7,7 @@ export function Collapsible({
   defaultOpen = false,
   children,
 }: {
-  title: string;
+  title: React.ReactNode;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
@@ -20,9 +20,13 @@ export function Collapsible({
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-6 py-4 bg-panel hover:bg-panel-2 transition-colors cursor-pointer"
       >
-        <span className="font-display font-bold text-[20px] uppercase text-txt">
-          {title}
-        </span>
+        {typeof title === 'string' ? (
+          <span className="font-display font-bold text-[20px] uppercase text-txt">
+            {title}
+          </span>
+        ) : (
+          title
+        )}
         <span
           className={[
             'text-[12px] text-txt-3 transition-transform duration-200',
@@ -32,7 +36,16 @@ export function Collapsible({
           ▶
         </span>
       </button>
-      {open && <div className="px-6 py-6 border-t border-line">{children}</div>}
+      <div
+        className={[
+          'grid transition-[grid-template-rows] duration-300 ease-in-out',
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+        ].join(' ')}
+      >
+        <div className="overflow-hidden">
+          <div className="px-6 py-6 border-t border-line">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }

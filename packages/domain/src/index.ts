@@ -24,4 +24,18 @@ export {
   getEligibility,
 } from './penalty-ledger.js';
 
-export { parseAcEvoSession, msToLaptime } from './ac-evo-parser.js';
+export {
+  parseAcEvoSession,
+  msToLaptime,
+  isValidLap,
+  aggregateHotLapLeaderboard,
+} from './ac-evo-parser.js';
+
+export {
+  computeRacePositionPoints,
+  computePoleSteamId,
+  totalRoundPoints,
+  ACEVO_POSITION_POINTS,
+  ACEVO_FASTEST_LAP_BONUS,
+  ACEVO_POLE_BONUS,
+} from './ac-evo-points.js';

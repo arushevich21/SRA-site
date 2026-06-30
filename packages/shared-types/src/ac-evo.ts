@@ -14,6 +14,7 @@ export type AcEvoDriverResult = {
   noLaps: boolean;
   bestLapMs: number | null;
   bestLap: string | null;
+  sectorsMs: number[] | null; // sector splits, in ms, for the bestLapMs lap
   totalTimeMs?: number;
   qualifyingBestMs?: number | null;
   qualifyingBest?: string | null;
@@ -44,4 +45,36 @@ export type EmperorResultListPage = {
   entries: EmperorResultListEntry[];
   currentPage: number;
   numPages: number;
+};
+
+export type EmperorDriverStanding = {
+  position: number;
+  driverName: string;
+  steamId: string;
+  carModel: string | null;
+  points: number;
+  pointsPenalty: number;
+};
+
+export type EmperorTeamStanding = {
+  position: number;
+  teamName: string;
+  points: number;
+  pointsPenalty: number;
+};
+
+// Keyed by class name; single-class championships use the "" key Emperor returns.
+export type EmperorChampionshipStandings = {
+  driverStandings: Record<string, EmperorDriverStanding[]>;
+  teamStandings: Record<string, EmperorTeamStanding[]>;
+};
+
+export type HotLapEntry = {
+  rank: number;
+  steamId: string;
+  driverName: string;
+  carModel: string | null;
+  bestLapMs: number;
+  bestLap: string;
+  sectorsMs: number[] | null;
 };

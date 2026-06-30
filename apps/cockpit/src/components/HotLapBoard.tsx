@@ -1,0 +1,98 @@
+import type { HotLapEntry } from '@sra/shared-types';
+
+function formatSector(ms: number): string {
+  return (ms / 1000).toFixed(3);
+}
+
+export function HotLapBoard({ entries }: { entries: HotLapEntry[] }) {
+  if (entries.length === 0) {
+    return (
+      <div className="border border-line/50 bg-carbon-2 px-6 py-8 text-center">
+        <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3">
+          No laps recorded yet for this track
+        </p>
+      </div>
+    );
+  }
+
+  const sectorCount = Math.max(0, ...entries.map((e) => e.sectorsMs?.length ?? 0));
+  const fastestSector = Array.from({ length: sectorCount }, (_, i) =>
+    entries.reduce<number | null>((min, e) => {
+      const t = e.sectorsMs?.[i];
+      if (t == null) return min;
+      return min == null || t < min ? t : min;
+    }, null),
+  );
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-left">
+        <thead>
+          <tr className="border-b border-line">
+            <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3 w-8">
+              #
+            </th>
+            <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3">
+              Driver
+            </th>
+            <th className="font-sans text-[15px] text-txt-3 py-2 pr-3 hidden lg:table-cell">
+              Car
+            </th>
+            {Array.from({ length: sectorCount }, (_, i) => (
+              <th
+                key={i}
+                className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 py-2 pl-5 pr-3 w-24 text-right hidden sm:table-cell"
+              >
+                S{i + 1}
+              </th>
+            ))}
+            <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-5 w-28 text-right">
+              Lap Time
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((entry) => (
+            <tr key={entry.steamId} className="border-b border-line/30">
+              <td
+                className="font-mono text-[15px] py-2 pr-3"
+                style={entry.rank <= 3 ? { color: 'var(--sim-accent)' } : undefined}
+              >
+                {entry.rank}
+              </td>
+              <td className="font-display font-bold text-[16px] uppercase text-txt py-2 pr-3 truncate max-w-[220px]">
+                {entry.driverName}
+              </td>
+              <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 truncate max-w-[200px] hidden lg:table-cell">
+                {entry.carModel ?? '—'}
+              </td>
+              {Array.from({ length: sectorCount }, (_, i) => {
+                const t = entry.sectorsMs?.[i];
+                const isFastest = t != null && fastestSector[i] != null && t === fastestSector[i];
+                return (
+                  <td
+                    key={i}
+                    className={[
+                      'font-mono text-[15px] py-2 pl-5 pr-3 text-right hidden sm:table-cell',
+                      isFastest ? 'text-purple' : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    {t != null ? formatSector(t) : '—'}
+                  </td>
+                );
+              })}
+              <td
+                className="font-mono text-[15px] py-2 pl-5 text-right"
+                style={{ color: 'var(--sim-accent)' }}
+              >
+                {entry.bestLap}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
