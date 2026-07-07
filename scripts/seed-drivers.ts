@@ -165,7 +165,7 @@ type ClaimedRow = Omit<DriverRow, 'display_name'>;
 const unclaimedRows: UnclaimedRow[] = rows.filter((r) => !claimedIds.has(r.discord_id));
 const claimedRowPayloads: ClaimedRow[] = rows
   .filter((r) => claimedIds.has(r.discord_id))
-  .map(({ display_name: _dn, ...rest }) => rest);
+  .map((r) => ({ discord_id: r.discord_id, steam_id: r.steam_id, avatar_url: r.avatar_url }));
 
 // ── Upsert in batches ─────────────────────────────────────────────────────────
 
