@@ -6,6 +6,11 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { getSimBySlug, SIMS, type SimConfig } from '@/content/sims';
 
+export type NavUser = {
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
 type NavDrop = { label: string; href: string };
 type NavItem =
   | { label: string; href: string; drop?: undefined }
@@ -80,7 +85,7 @@ function HamburgerIcon({ open }: { open: boolean }) {
   );
 }
 
-export default function NavBar() {
+export default function NavBar({ user }: { user?: NavUser | null }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -217,11 +222,38 @@ export default function NavBar() {
               )
             )}
 
-            <a href="/sign-in" className="nav-signin">
-              <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
-                Sign In
-              </span>
-            </a>
+            {user ? (
+              <div className="flex items-center gap-3 ml-1">
+                {user.avatar_url && (
+                  <Image
+                    src={user.avatar_url}
+                    alt={user.display_name ?? ''}
+                    width={28}
+                    height={28}
+                    className="rounded-full shrink-0"
+                  />
+                )}
+                <Link
+                  href="/profile"
+                  className="text-[12.5px] font-semibold tracking-[.1em] uppercase text-txt hover:text-gold-soft transition-colors whitespace-nowrap"
+                >
+                  {user.display_name ?? 'Account'}
+                </Link>
+                <form action="/auth/signout" method="POST">
+                  <button type="submit" className="nav-signin">
+                    <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
+                      Sign Out
+                    </span>
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <a href="/auth/login" className="nav-signin">
+                <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
+                  Sign In
+                </span>
+              </a>
+            )}
           </nav>
 
           {/* Mobile hamburger */}
@@ -339,15 +371,45 @@ export default function NavBar() {
 
           <div className="border-t border-line mt-5 mb-5" />
 
-          <a
-            href="/sign-in"
-            className="nav-signin self-start"
-            onClick={close}
-          >
-            <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
-              Sign In
-            </span>
-          </a>
+          {user ? (
+            <div className="flex items-center gap-3">
+              {user.avatar_url && (
+                <Image
+                  src={user.avatar_url}
+                  alt={user.display_name ?? ''}
+                  width={32}
+                  height={32}
+                  className="rounded-full shrink-0"
+                />
+              )}
+              <div>
+                <Link
+                  href="/profile"
+                  className="block font-semibold text-[14px] tracking-[.06em] uppercase text-txt hover:text-gold transition-colors"
+                  onClick={close}
+                >
+                  {user.display_name ?? 'Account'}
+                </Link>
+              </div>
+              <form action="/auth/signout" method="POST" className="ml-auto">
+                <button
+                  type="submit"
+                  onClick={close}
+                  className="nav-signin self-start"
+                >
+                  <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
+                    Sign Out
+                  </span>
+                </button>
+              </form>
+            </div>
+          ) : (
+            <a href="/auth/login" className="nav-signin self-start" onClick={close}>
+              <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
+                Sign In
+              </span>
+            </a>
+          )}
         </div>
       </div>
     </>
