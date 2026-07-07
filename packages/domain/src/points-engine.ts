@@ -7,7 +7,7 @@ import type {
 } from '@sra/shared-types';
 
 // P1–P40 per the spec table; index 0 unused.
-const POSITION_POINTS: readonly number[] = [
+export const POSITION_POINTS: readonly number[] = [
   0,
   110, 100, 92, 85, 80, 76, 72, 68, 64, 60, // 1–10
   57,  54, 51, 48, 45, 43, 41, 39, 37, 35,  // 11–20
@@ -15,13 +15,16 @@ const POSITION_POINTS: readonly number[] = [
   13,  11,  9,  7,  6,  5,  4,  3,  2,  1,  // 31–40
 ];
 
+export const FASTEST_LAP_BONUS = 1;
+export const BEST_QUAL_BONUS = 1;
+
 // Maps a DriverRoundResult to a DriverRoundScore using the P1-P40 table + bonuses.
 // A null position always yields positionPoints = 0.
 export function computeDriverRoundScore(result: DriverRoundResult): DriverRoundScore {
   const positionPoints =
     result.position !== null ? (POSITION_POINTS[result.position] ?? 0) : 0;
-  const fastestLapBonus = result.setFastestLap ? 1 : 0;
-  const bestQualBonus = result.setBestQualLap ? 1 : 0;
+  const fastestLapBonus = result.setFastestLap ? FASTEST_LAP_BONUS : 0;
+  const bestQualBonus = result.setBestQualLap ? BEST_QUAL_BONUS : 0;
   return {
     driverId: result.driverId,
     roundIndex: result.roundIndex,

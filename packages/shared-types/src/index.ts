@@ -46,3 +46,10 @@ export type {
   EmperorChampionshipStandings,
   HotLapEntry,
 } from './ac-evo.js';
+
+export type {
+  AccSessionType,
+  AccDriverEntry,
+  AccDriverResult,
+  AccSessionResult,
+} from './acc.js';

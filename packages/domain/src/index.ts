@@ -39,3 +39,21 @@ export {
   ACEVO_FASTEST_LAP_BONUS,
   ACEVO_POLE_BONUS,
 } from './ac-evo-points.js';
+
+export { parseAccSession } from './acc-parser.js';
+
+export {
+  ACC_CAR_MODEL_NAMES,
+  ACC_CUP_CATEGORY_NAMES,
+  accCarModelName,
+  accCupCategoryName,
+} from './acc-constants.js';
+
+export {
+  computeAccRacePoints,
+  computeAccFastestQualifyingLapSteamId,
+  totalAccRoundPoints,
+  ACC_POSITION_POINTS,
+  ACC_FASTEST_RACE_LAP_BONUS,
+  ACC_FASTEST_QUALIFYING_LAP_BONUS,
+} from './acc-points.js';
