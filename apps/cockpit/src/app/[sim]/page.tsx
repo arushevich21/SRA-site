@@ -83,7 +83,7 @@ export default async function SimOverviewPage({
       {/* ── CHAMPIONSHIPS ──────────────────────────────────────────── */}
       {allChamps.length > 0 && (
         <section className="border-t border-line">
-          <div className="max-w-[1280px] mx-auto px-7 py-20">
+          <div className="max-w-[1280px] mx-auto px-7 py-24">
             <span
               className="block font-mono text-[11px] tracking-[.35em] uppercase mb-3"
               style={{ color: simAccent }}
@@ -160,7 +160,7 @@ export default async function SimOverviewPage({
 
       {/* ── HOW TO RACE ROADMAP ────────────────────────────────────── */}
       <section className="border-t border-line">
-        <div className="max-w-[1280px] mx-auto px-7 py-20">
+        <div className="max-w-[1280px] mx-auto px-7 py-24">
           <span
             className="block font-mono text-[11px] tracking-[.35em] uppercase mb-3"
             style={{ color: simAccent }}

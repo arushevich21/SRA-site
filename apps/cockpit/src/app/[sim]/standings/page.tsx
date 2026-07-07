@@ -19,7 +19,7 @@ export default async function SimStandingsPage({
   const champ = CHAMPIONSHIPS.find((c) => c.game === sim.game && c.emperorChampionshipId);
 
   return (
-    <section className="max-w-[1280px] mx-auto px-7 py-24">
+    <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       <span
         className="block font-mono text-[15px] tracking-[.3em] uppercase mb-5"
         style={{ color: 'var(--sim-accent)' }}

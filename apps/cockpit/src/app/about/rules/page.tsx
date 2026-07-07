@@ -10,11 +10,11 @@ const TOC = [
 
 export default function RulesPage() {
   return (
-    <section className="max-w-[1280px] mx-auto px-7 py-24">
+    <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
-      <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-4">
+      <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-4">
         Rules &amp; Regulations
       </h1>
       <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mb-16">

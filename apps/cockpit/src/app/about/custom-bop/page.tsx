@@ -73,11 +73,11 @@ function BopTable({
 
 export default function CustomBopPage() {
   return (
-    <section className="max-w-full mx-auto px-7 py-24">
-      <span className="block font-mono text-[13px] tracking-[.3em] uppercase text-gold mb-5">
+    <section className="max-w-full mx-auto px-7 pt-14 pb-24">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
-      <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
+      <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
         Custom BoP
       </h1>
 

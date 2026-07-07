@@ -3,11 +3,11 @@ import { CHAMPIONSHIPS, formatScheduleDate } from '../../content/championships';
 
 export default function CalendarPage() {
   return (
-    <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[12px] tracking-[.3em] uppercase text-gold mb-5">
+    <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — Calendar
       </span>
-      <h1 className="font-display font-black text-[clamp(52px,7vw,96px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-16">
+      <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-16">
         Race Calendar
       </h1>
 

@@ -16,9 +16,9 @@ export default async function SimChampionshipsPage({
   const champs = CHAMPIONSHIPS.filter((c) => c.game === sim.game);
 
   return (
-    <section className="max-w-[1280px] mx-auto px-7 py-24">
+    <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       <span
-        className="block font-mono text-[12px] tracking-[.3em] uppercase mb-5"
+        className="block font-mono text-[15px] tracking-[.3em] uppercase mb-5"
         style={{ color: 'var(--sim-accent)' }}
       >
         — {sim.game} Championships

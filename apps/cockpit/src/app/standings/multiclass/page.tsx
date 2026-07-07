@@ -9,8 +9,8 @@ export default async function MulticlassStandingsPage() {
   const localStandings = await readStandings(STANDINGS_KEY);
 
   return (
-    <section className="max-w-[1280px] mx-auto px-7 py-24">
-      <span className="block font-mono text-[12px] tracking-[.3em] uppercase text-gold mb-5">
+    <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — Standings
       </span>
       <div className="flex items-center gap-5">
@@ -22,7 +22,7 @@ export default async function MulticlassStandingsPage() {
           className="w-[72px] h-[72px] shrink-0 object-contain"
         />
         <div>
-          <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt">
+          <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt">
             Multiclass Mayhem
           </h1>
           <p className="font-mono text-[12px] tracking-[.3em] uppercase text-txt-2 mt-3">
