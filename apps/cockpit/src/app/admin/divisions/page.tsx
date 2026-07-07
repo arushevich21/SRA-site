@@ -8,15 +8,28 @@ export default async function AdminDivisionsPage() {
   // Defense in depth: gate at page render AND every server action
   await requireAdmin();
 
-  const [{ data: divisions, error: divError }, { data: drivers, error: drvError }] =
-    await Promise.all([
-      supabase.from('divisions').select('id, name').order('id'),
-      supabase
-        .from('drivers')
-        .select('id, display_name, discord_id, steam_id, division_id, tier')
-        .order('display_name', { nullsFirst: false })
-        .limit(10000),
-    ]);
+  const { data: divisions, error: divError } = await supabase
+    .from('divisions')
+    .select('id, name')
+    .order('id');
+
+  // Supabase's PostgREST caps responses at 1000 rows regardless of .limit().
+  // Paginate in batches until we get them all.
+  const PAGE = 1000;
+  let allDrivers: DriverRow[] = [];
+  let drvError: { message: string } | null = null;
+
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('drivers')
+      .select('id, display_name, discord_id, steam_id, division_id, tier')
+      .order('display_name', { nullsFirst: false })
+      .range(from, from + PAGE - 1);
+
+    if (error) { drvError = error; break; }
+    allDrivers = allDrivers.concat((data ?? []) as DriverRow[]);
+    if ((data?.length ?? 0) < PAGE) break;
+  }
 
   if (divError || drvError) {
     return (
@@ -31,7 +44,7 @@ export default async function AdminDivisionsPage() {
   return (
     <Shell>
       <DivisionsTable
-        initialDrivers={(drivers ?? []) as DriverRow[]}
+        initialDrivers={allDrivers}
         divisions={(divisions ?? []) as Division[]}
       />
     </Shell>
