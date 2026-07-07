@@ -13,8 +13,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { config as loadEnv } from 'dotenv';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
 import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Load from cockpit's .env.local
 loadEnv({ path: resolve(__dirname, '../apps/cockpit/.env.local') });
