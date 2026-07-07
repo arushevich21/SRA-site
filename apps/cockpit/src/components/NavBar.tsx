@@ -179,7 +179,7 @@ export default function NavBar() {
                     {SIMS.map((s) => (
                       <Link
                         key={s.slug}
-                        href={s.slug === sim.slug ? `/${s.slug}` : `/${s.slug}${subPath}`}
+                        href={`/${s.slug}`}
                         style={s.slug === sim.slug ? { color: s.accentColor, borderLeftColor: s.accentColor } : undefined}
                       >
                         <span
@@ -257,7 +257,7 @@ export default function NavBar() {
               {SIMS.map((s) => (
                 <Link
                   key={s.slug}
-                  href={sim && s.slug !== sim.slug ? `/${s.slug}${subPath}` : `/${s.slug}`}
+                  href={`/${s.slug}`}
                   className="flex items-center gap-2 px-4 py-3 border transition-colors"
                   style={{
                     borderColor: `${s.accentColor}30`,
