@@ -11,13 +11,20 @@ import type { HotLapEntry, AcEvoSessionResult } from '@sra/shared-types';
 import { supabase } from './supabase';
 import { EMPEROR_ACEVO_BASE_URL } from './emperor';
 
-const STALE_MS = 10 * 60 * 1000; // re-check Emperor at most every 10 minutes
-const LOCK_RECLAIM_MS = 5 * 60 * 1000; // a refresh that's been "in flight" this long is assumed crashed
+const STALE_MS = 10 * 60 * 1000;
+const LOCK_RECLAIM_MS = 5 * 60 * 1000;
 const REFRESH_STATE_ID = 'global';
+// 2s gap per request. Emperor's limit is ~2 req/min sustained; the cron makes
+// at most ~3 requests per 10-min window (0.3 req/min average), so this is safe.
+const CRON_REQUEST_INTERVAL_MS = 2_000;
 
-// Reads are always a single Supabase row lookup — this never makes a live
-// Emperor call itself. Refresh is fully decoupled (see maybeRefresh below),
-// so there's no "Emperor unreachable" failure mode on this path at all.
+export type IncrementalRefreshResult = {
+  processed: number;
+  tracks: string[];
+  durationMs: number;
+  needsBackfill?: boolean;
+};
+
 export async function getHotLapBoard(trackKey: string): Promise<HotLapEntry[]> {
   const { data, error } = await supabase
     .from('acevo_hotlap_cache')
@@ -29,20 +36,11 @@ export async function getHotLapBoard(trackKey: string): Promise<HotLapEntry[]> {
     console.error(`AC Evo hot-lap cache read failed for "${trackKey}":`, error);
   }
 
-  // Next.js ties background fetch() calls to the request's lifecycle and can
-  // cancel them once the response is sent — a bare `void maybeRefresh()` here
-  // was getting silently killed mid-job before it ever reached Emperor.
-  // after() explicitly tells Next this work must keep running post-response.
   after(() => maybeRefresh());
 
   return (data?.entries as HotLapEntry[] | undefined) ?? [];
 }
 
-// Total points scored by each driver (steamId) in the round held at this
-// track: finishing-position points from the latest completed Race session
-// plus the fastest-lap and pole bonuses. Emperor's API has no per-round
-// breakdown endpoint — this is computed by us from session files, the same
-// source the hot-lap board uses, refreshed by the same background job.
 export async function getRoundPoints(trackKey: string): Promise<Record<string, number>> {
   const { data, error } = await supabase
     .from('acevo_round_points_cache')
@@ -64,12 +62,8 @@ export async function getRoundPoints(trackKey: string): Promise<Record<string, n
   );
 }
 
-// In-process fast path: once this server process knows a refresh is running,
-// skip the DB round-trip entirely for the rest of the requests sharing this
-// page render (4 tracks each call getHotLapBoard → maybeRefresh). The real
-// concurrency guard is the DB-level lock acquired below, which is what keeps
-// multiple server instances (or overlapping requests before this flag is even
-// set) from piling concurrent refresh jobs onto Emperor.
+// In-process guard: prevents redundant staleness checks when the same page
+// render triggers multiple after() calls (one per track).
 let refreshing = false;
 
 async function maybeRefresh(): Promise<void> {
@@ -77,7 +71,7 @@ async function maybeRefresh(): Promise<void> {
 
   const { data: state, error: stateError } = await supabase
     .from('acevo_hotlap_refresh_state')
-    .select('updated_at, refresh_started_at')
+    .select('updated_at')
     .eq('id', REFRESH_STATE_ID)
     .maybeSingle();
 
@@ -89,6 +83,19 @@ async function maybeRefresh(): Promise<void> {
   const isStale = !state || Date.now() - new Date(state.updated_at).getTime() > STALE_MS;
   if (!isStale) return;
 
+  refreshing = true;
+  try {
+    await refreshWithLock();
+  } finally {
+    refreshing = false;
+  }
+}
+
+// Shared by maybeRefresh() (on-demand fallback) and the cron route (proactive).
+// Acquires the DB lock before running so concurrent callers (multiple server
+// instances or overlapping after() invocations) don't pile onto Emperor.
+// Returns null when the lock is already held by another caller.
+export async function refreshWithLock(): Promise<IncrementalRefreshResult | null> {
   const reclaimableBefore = new Date(Date.now() - LOCK_RECLAIM_MS).toISOString();
   const { data: claimed, error: claimError } = await supabase
     .from('acevo_hotlap_refresh_state')
@@ -99,14 +106,120 @@ async function maybeRefresh(): Promise<void> {
 
   if (claimError) {
     console.error('AC Evo hot-lap refresh lock acquisition failed:', claimError);
-    return;
+    return null;
   }
-  if (!claimed || claimed.length === 0) return; // another request/instance already holds the lock
+  if (!claimed || claimed.length === 0) return null; // another caller holds the lock
 
-  refreshing = true;
-  runRefreshJob().finally(() => {
-    refreshing = false;
+  try {
+    return await runIncrementalRefresh();
+  } catch (err) {
+    console.error('AC Evo hot-lap incremental refresh failed:', err);
+    return { processed: 0, tracks: [], durationMs: 0 };
+  } finally {
+    await releaseLock();
+  }
+}
+
+// Core incremental refresh. Fetches only page 0 of Emperor's results list
+// (confirmed newest-first: see scripts/check-emperor-page-order.ts), identifies
+// sessions not yet in acevo_processed_sessions, and processes only those.
+// Normal run (0-1 new sessions) completes in ~1-5s — well within Vercel's limit.
+async function runIncrementalRefresh(): Promise<IncrementalRefreshResult> {
+  const client = new EmperorClient(EMPEROR_ACEVO_BASE_URL, {
+    minRequestIntervalMs: CRON_REQUEST_INTERVAL_MS,
   });
+  const startedAt = Date.now();
+
+  const { entries, numPages } = await client.getResultsList(0);
+
+  // Batch-check which of these session URLs we've already processed.
+  const allUrls = entries.map((e) => e.resultsJsonUrl);
+  const { data: knownRows, error: knownError } = await supabase
+    .from('acevo_processed_sessions')
+    .select('session_url')
+    .in('session_url', allUrls);
+
+  if (knownError) throw knownError;
+
+  const knownUrls = new Set((knownRows ?? []).map((r) => r.session_url as string));
+
+  // Page 0 is newest-first: stop at the first known URL — everything after it
+  // is also already processed, so there's no need to scan further.
+  const newEntries: typeof entries = [];
+  for (const entry of entries) {
+    if (knownUrls.has(entry.resultsJsonUrl)) break;
+    newEntries.push(entry);
+  }
+
+  if (newEntries.length === 0) {
+    console.log('AC Evo hot-lap refresh: nothing new');
+    return { processed: 0, tracks: [], durationMs: Date.now() - startedAt };
+  }
+
+  // Safety: if the entire page is new AND there are more pages, we're looking
+  // at a first-run scenario with many historical sessions. The cron path isn't
+  // designed for that volume — bail and let the backfill script handle it.
+  if (newEntries.length === entries.length && numPages > 1) {
+    console.warn(
+      'AC Evo hot-lap refresh: entire page 0 is unprocessed with multiple pages — ' +
+      'run scripts/backfill-acevo-hotlaps.ts locally to catch up.',
+    );
+    return { processed: 0, tracks: [], durationMs: Date.now() - startedAt, needsBackfill: true };
+  }
+
+  const processedTracks = new Set<string>();
+
+  for (const entry of newEntries) {
+    try {
+      const raw = await client.downloadResult(entry.resultsJsonUrl);
+      const session = parseAcEvoSession(raw);
+
+      const { data: existing, error: readErr } = await supabase
+        .from('acevo_hotlap_cache')
+        .select('entries')
+        .eq('track_key', entry.track)
+        .maybeSingle();
+      if (readErr) throw readErr;
+
+      const fresh = aggregateHotLapLeaderboard([session]);
+      const merged = mergeEntries((existing?.entries as HotLapEntry[] | undefined) ?? [], fresh);
+
+      const { error: cacheErr } = await supabase
+        .from('acevo_hotlap_cache')
+        .upsert(
+          { track_key: entry.track, entries: merged, last_session_date: entry.date, updated_at: new Date().toISOString() },
+          { onConflict: 'track_key' },
+        );
+      if (cacheErr) throw cacheErr;
+
+      try {
+        await updateRoundPointsCache(entry.track, [session]);
+      } catch (pointsErr) {
+        console.error(`AC Evo round-points update failed for "${entry.track}":`, pointsErr);
+      }
+
+      const { error: markErr } = await supabase
+        .from('acevo_processed_sessions')
+        .insert({
+          session_url: entry.resultsJsonUrl,
+          track: entry.track,
+          session_type: entry.sessionType,
+          session_date: entry.date,
+        });
+      if (markErr) throw markErr;
+
+      processedTracks.add(entry.track);
+      console.log(`AC Evo hot-lap refresh: processed [${entry.sessionType}] ${entry.track} @ ${entry.date}`);
+    } catch (err) {
+      // Don't let one session abort the rest. Its URL stays out of
+      // acevo_processed_sessions, so the next run will retry it.
+      console.error(`AC Evo hot-lap refresh: failed to process ${entry.resultsJsonUrl}:`, err);
+    }
+  }
+
+  const durationMs = Date.now() - startedAt;
+  console.log(`AC Evo hot-lap refresh: done — ${newEntries.length} session(s) in ${Math.round(durationMs / 1000)}s`);
+  return { processed: newEntries.length, tracks: [...processedTracks], durationMs };
 }
 
 function mergeEntries(existing: HotLapEntry[], fresh: HotLapEntry[]): HotLapEntry[] {
@@ -127,8 +240,6 @@ async function releaseLock(): Promise<void> {
     .update({ refresh_started_at: null, updated_at: new Date().toISOString() })
     .eq('id', REFRESH_STATE_ID);
   if (error) {
-    // Lock stays held until LOCK_RECLAIM_MS passes, then self-heals — log so
-    // it's visible, but don't throw (this runs from a finally-style cleanup path).
     console.error('AC Evo hot-lap refresh lock release failed:', error);
   }
 }
@@ -146,13 +257,6 @@ function latestCompletedSession(
     );
 }
 
-// Tracks the *latest* completed Race/Qualify session per track as "the"
-// round — there's no explicit per-round session ID from Emperor, so a track
-// that sees test/practice races before the scheduled one could briefly skew
-// this until the real session (chronologically later) supersedes it. Each
-// component (race points + fastest-lap bonus vs. pole bonus) only updates
-// when a newer session of its own type arrives, so this never needs the
-// track's full session history — just whatever's new this cycle.
 async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResult[]): Promise<void> {
   const newRace = latestCompletedSession(sessions, 'Race');
   const newQualify = latestCompletedSession(sessions, 'Qualify');
@@ -178,10 +282,7 @@ async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResul
     raceSessionDate = newRace.serverStartTime;
   }
 
-  if (
-    newQualify &&
-    (!qualifySessionDate || new Date(newQualify.serverStartTime!) > new Date(qualifySessionDate))
-  ) {
+  if (newQualify && (!qualifySessionDate || new Date(newQualify.serverStartTime!) > new Date(qualifySessionDate))) {
     poleSteamId = computePoleSteamId(newQualify);
     qualifySessionDate = newQualify.serverStartTime;
   }
@@ -199,101 +300,4 @@ async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResul
     { onConflict: 'track_key' },
   );
   if (writeError) throw writeError;
-}
-
-// One global job covers every track in one pass: Emperor's results list isn't
-// filterable by track, so fetching it once and bucketing client-side avoids
-// redundant calls a per-track job would make. In steady state (no new
-// sessions since any track's cursor) this costs exactly one request.
-//
-// The cursor lives per-track (acevo_hotlap_cache.last_session_date), not as a
-// single global value, and each track is committed independently inside its
-// own try/catch. That matters because this job can take many minutes on a
-// cold backfill (rate-limited ~31s/request) and can get killed mid-flight
-// (dev-server restart, a transient Emperor error on one track) — with a
-// global cursor, any partial failure reset progress to zero and caused every
-// track to be re-fetched from scratch on every retry, forever. Per-track
-// cursors mean a track that already succeeded stays done even if a sibling
-// track fails this run.
-async function runRefreshJob(): Promise<void> {
-  const client = new EmperorClient(EMPEROR_ACEVO_BASE_URL);
-  const startedAt = Date.now();
-
-  try {
-    const all = await client.getAllResultsList();
-
-    const byTrack = new Map<string, typeof all>();
-    for (const entry of all) {
-      const arr = byTrack.get(entry.track) ?? [];
-      arr.push(entry);
-      byTrack.set(entry.track, arr);
-    }
-
-    let anyNew = false;
-    for (const [track, entries] of byTrack) {
-      try {
-        const { data: existingRow, error: readError } = await supabase
-          .from('acevo_hotlap_cache')
-          .select('entries, last_session_date')
-          .eq('track_key', track)
-          .maybeSingle();
-        if (readError) throw readError;
-
-        const cursor = existingRow?.last_session_date ? new Date(existingRow.last_session_date) : null;
-        const newEntries = cursor ? entries.filter((e) => new Date(e.date) > cursor) : entries;
-        if (newEntries.length === 0) continue;
-
-        anyNew = true;
-        console.log(`AC Evo hot-lap refresh: ${newEntries.length} new session(s) for "${track}"...`);
-
-        const sessions: AcEvoSessionResult[] = [];
-        let maxDate = cursor ?? new Date(0);
-        for (const entry of newEntries) {
-          const raw = await client.downloadResult(entry.resultsJsonUrl);
-          sessions.push(parseAcEvoSession(raw));
-          const entryDate = new Date(entry.date);
-          if (entryDate > maxDate) maxDate = entryDate;
-        }
-
-        const fresh = aggregateHotLapLeaderboard(sessions);
-        const merged = mergeEntries((existingRow?.entries as HotLapEntry[] | undefined) ?? [], fresh);
-
-        const { error: writeError } = await supabase
-          .from('acevo_hotlap_cache')
-          .upsert(
-            {
-              track_key: track,
-              entries: merged,
-              last_session_date: maxDate.toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'track_key' },
-          );
-        if (writeError) throw writeError;
-
-        // A separate try/catch: round-points failing shouldn't roll back the
-        // hot-lap board write above, and vice versa — they're independent
-        // features sharing the same downloaded `sessions`.
-        try {
-          await updateRoundPointsCache(track, sessions);
-        } catch (pointsErr) {
-          console.error(`AC Evo round-points refresh failed for "${track}":`, pointsErr);
-        }
-      } catch (err) {
-        // Don't let one track's failure roll back or block the others — it
-        // just retries on the next refresh cycle (its cursor wasn't advanced).
-        console.error(`AC Evo hot-lap refresh failed for "${track}":`, err);
-      }
-    }
-
-    if (!anyNew) {
-      console.log('AC Evo hot-lap refresh: nothing new since last check');
-    } else {
-      console.log(`AC Evo hot-lap refresh: done in ${Math.round((Date.now() - startedAt) / 1000)}s`);
-    }
-  } catch (err) {
-    console.error('AC Evo hot-lap refresh failed:', err);
-  } finally {
-    await releaseLock();
-  }
 }
