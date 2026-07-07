@@ -145,27 +145,67 @@ if (skippedSteam > 0) {
   console.log(`${skippedSteam} record(s) had invalid steam_ids — inserted with steam_id=null.`);
 }
 
+// ── Split: claimed rows vs unclaimed ─────────────────────────────────────────
+// For claimed rows (user_id IS NOT NULL), the OAuth callback already set the
+// correct display_name from Discord. Don't overwrite it — only update steam_id
+// and avatar_url from seed. For unclaimed rows, update everything.
+
+console.log('Fetching claimed discord_ids (user_id IS NOT NULL)...');
+const { data: claimedRows } = await supabase
+  .from('drivers')
+  .select('discord_id')
+  .not('user_id', 'is', null);
+
+const claimedIds = new Set((claimedRows ?? []).map((r: { discord_id: string | null }) => r.discord_id));
+console.log(`${claimedIds.size} claimed row(s) — display_name will not be overwritten for these.`);
+
+type UnclaimedRow = DriverRow;
+type ClaimedRow = Omit<DriverRow, 'display_name'>;
+
+const unclaimedRows: UnclaimedRow[] = rows.filter((r) => !claimedIds.has(r.discord_id));
+const claimedRowPayloads: ClaimedRow[] = rows
+  .filter((r) => claimedIds.has(r.discord_id))
+  .map(({ display_name: _dn, ...rest }) => rest);
+
 // ── Upsert in batches ─────────────────────────────────────────────────────────
-// On conflict (discord_id): updates display_name, avatar_url, steam_id.
-// user_id is NOT in the payload — existing claims are never clobbered.
 
 const BATCH_SIZE = 200;
 let inserted = 0;
 let errors = 0;
 
-for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-  const batch = rows.slice(i, i + BATCH_SIZE);
-
+// Unclaimed rows: full upsert (includes display_name)
+for (let i = 0; i < unclaimedRows.length; i += BATCH_SIZE) {
+  const batch = unclaimedRows.slice(i, i + BATCH_SIZE);
   const { error } = await supabase
     .from('drivers')
     .upsert(batch, { onConflict: 'discord_id' });
 
   if (error) {
-    console.error(`  ERROR on batch ${Math.floor(i / BATCH_SIZE) + 1}:`, error.message);
+    console.error(`  ERROR on unclaimed batch ${Math.floor(i / BATCH_SIZE) + 1}:`, error.message);
     errors += batch.length;
   } else {
     inserted += batch.length;
     process.stdout.write(`\r  Upserted ${inserted}/${rows.length}...`);
+  }
+}
+
+// Claimed rows: UPDATE only steam_id + avatar_url, never touch display_name
+// (OAuth callback already set the correct display name from Discord)
+for (let i = 0; i < claimedRowPayloads.length; i += BATCH_SIZE) {
+  const batch = claimedRowPayloads.slice(i, i + BATCH_SIZE);
+  for (const row of batch) {
+    const { error } = await supabase
+      .from('drivers')
+      .update({ steam_id: row.steam_id, avatar_url: row.avatar_url })
+      .eq('discord_id', row.discord_id);
+
+    if (error) {
+      console.error(`  ERROR updating claimed row ${row.discord_id}:`, error.message);
+      errors++;
+    } else {
+      inserted++;
+      process.stdout.write(`\r  Upserted ${inserted}/${rows.length}...`);
+    }
   }
 }
 
