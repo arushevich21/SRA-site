@@ -114,7 +114,7 @@ export default async function SimOverviewPage({
                           alt={champ.title}
                           width={400}
                           height={400}
-                          className="w-[150px] h-[150px] shrink-0 object-contain"
+                          className="w-[80px] h-[80px] sm:w-[150px] sm:h-[150px] shrink-0 object-contain"
                         />
                       )}
                       <div className="min-w-0 flex-1">

@@ -85,7 +85,7 @@ export function HomePageLegacy() {
 
         <div className="relative z-10 max-w-[800px] text-center">
           <Image
-            src="/sra_logo.png"
+            src="/badges/GT3TSAsset_white.png"
             alt="Sim Racing Alliance"
             width={160}
             height={160}

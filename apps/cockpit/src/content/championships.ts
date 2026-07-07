@@ -151,7 +151,7 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     title: 'SRA MX5 Cup',
     logo: '/badges/SRA_MX5_Cup_logo_transparent.png',
     raceFormat:
-      '20 min practice · 10 min qualifying · 30 min race · Daily at 9:00 PM EDT',
+      '20 min practice · 10 min qualifying · 30 min race · Weekly at 9:00 PM EDT',
     rulesBullets: [
       'Points for pole position: 5 · Points for fastest lap: 5',
       'Practice server is live — search "SRA" in the AC Evo server browser: #SRAgg | Sim Racing Alliance | Main Server #1 | #SRAM1',

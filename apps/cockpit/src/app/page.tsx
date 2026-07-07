@@ -38,7 +38,7 @@ export default function HomePage() {
 
         <div className="relative z-10 max-w-[800px] text-center">
           <Image
-            src="/sra_logo.png"
+            src="/badges/GT3TSAsset_white.png"
             alt="Sim Racing Alliance"
             width={480}
             height={120}
@@ -71,7 +71,7 @@ export default function HomePage() {
           </div>
 
           {/* Stats bar */}
-          <div className="grid grid-cols-3 gap-x-8 gap-y-3 mt-12 justify-items-center">
+          <div className="grid grid-cols-3 gap-x-4 gap-y-3 mt-12 justify-items-center sm:gap-x-8">
             {STATS.map((stat) => (
               <span key={stat.label} className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-2">
                 <span className="text-gold font-bold">{stat.value}</span> {stat.label}

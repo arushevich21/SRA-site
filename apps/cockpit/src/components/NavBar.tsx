@@ -54,10 +54,41 @@ function useSimContext(): { sim: SimConfig | null; subPath: string } {
 const LINK_CLS =
   'text-[12.5px] font-semibold tracking-[.13em] uppercase text-txt px-[13px] py-[10px] hover:text-gold-soft transition-colors whitespace-nowrap';
 
+// ── Hamburger / Close icon ──────────────────────────────────────────────────
+function HamburgerIcon({ open }: { open: boolean }) {
+  return (
+    <div className="w-5 h-[18px] flex flex-col justify-between">
+      <span
+        className={[
+          'block h-[2px] bg-txt transition-all duration-200 origin-center',
+          open ? 'translate-y-[8px] rotate-45' : '',
+        ].join(' ')}
+      />
+      <span
+        className={[
+          'block h-[2px] bg-txt transition-all duration-200',
+          open ? 'opacity-0 scale-x-0' : '',
+        ].join(' ')}
+      />
+      <span
+        className={[
+          'block h-[2px] bg-txt transition-all duration-200 origin-center',
+          open ? '-translate-y-[8px] -rotate-45' : '',
+        ].join(' ')}
+      />
+    </div>
+  );
+}
+
 export default function NavBar() {
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname();
   const { sim, subPath } = useSimContext();
   const nav = sim ? buildSimNav(sim.slug) : MAIN_NAV;
+
+  // Close mobile menu on navigation
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
@@ -65,125 +96,260 @@ export default function NavBar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [menuOpen]);
+
+  const close = () => setMenuOpen(false);
+
   return (
-    <header
-      className={[
-        'fixed top-0 left-0 right-0 z-[100]',
-        'transition-[background-color,border-color,backdrop-filter] duration-[350ms]',
-        scrolled
-          ? 'bg-[rgba(9,10,13,.82)] backdrop-blur-[14px] border-b border-line'
-          : 'border-b border-transparent',
-      ].join(' ')}
-    >
-      <div className="max-w-[1280px] mx-auto px-7 flex items-center justify-between h-[76px]">
+    <>
+      <header
+        className={[
+          'fixed top-0 left-0 right-0 z-[100]',
+          'transition-[background-color,border-color,backdrop-filter] duration-[350ms]',
+          scrolled || menuOpen
+            ? 'bg-[rgba(9,10,13,.95)] backdrop-blur-[14px] border-b border-line'
+            : 'border-b border-transparent',
+        ].join(' ')}
+      >
+        <div className="max-w-[1280px] mx-auto px-7 flex items-center justify-between h-[76px]">
 
-        {/* Brand */}
-        <Link href="/" className="flex items-center gap-3 shrink-0">
-          <Image
-            src="/sra_logo.png"
-            alt="Sim Racing Alliance"
-            width={480}
-            height={120}
-            className="h-[40px] w-auto object-contain"
-          />
-        </Link>
+          {/* Brand */}
+          <Link href="/" className="flex items-center gap-3 shrink-0" onClick={close}>
+            <Image
+              src="/badges/GT3TSAsset_white.png"
+              alt="Sim Racing Alliance"
+              width={480}
+              height={120}
+              className="h-[36px] w-auto object-contain"
+            />
+          </Link>
 
-        {/* Nav */}
-        <nav className="flex items-center gap-1" aria-label="Primary navigation">
-          {/* Sim selector pills — shown on main pages */}
-          {!sim && (
-            <div className="flex items-center gap-1 mr-2">
+          {/* Desktop nav — hidden on mobile */}
+          <nav className="hidden md:flex items-center gap-1" aria-label="Primary navigation">
+            {/* Sim selector pills — shown on main pages */}
+            {!sim && (
+              <div className="flex items-center gap-1 mr-2">
+                {SIMS.map((s) => (
+                  <Link
+                    key={s.slug}
+                    href={`/${s.slug}`}
+                    className="text-[12.5px] font-semibold tracking-[.13em] uppercase px-[13px] py-[10px] transition-colors whitespace-nowrap hover:text-txt"
+                    style={{ color: s.accentColor }}
+                  >
+                    {s.game}
+                  </Link>
+                ))}
+                <span className="w-px h-5 bg-line-2 mx-1" />
+              </div>
+            )}
+
+            {/* Sim context nav — shown on sim pages */}
+            {sim && (
+              <>
+                <Link
+                  href="/"
+                  className="text-[12.5px] font-bold tracking-[.13em] uppercase px-[13px] py-[10px] transition-colors whitespace-nowrap"
+                  style={{ color: '#e6b53d' }}
+                >
+                  Home
+                </Link>
+                <span className="w-px h-5 bg-line-2 mx-1" />
+                <div className="nav-has relative">
+                  <span
+                    className="flex items-center gap-2 px-3 py-[6px] border rounded cursor-default select-none transition-colors hover:bg-panel-2"
+                    style={{ borderColor: `${sim.accentColor}40` }}
+                  >
+                    <span
+                      className="w-[7px] h-[7px] rounded-full shrink-0"
+                      style={{ backgroundColor: sim.accentColor }}
+                    />
+                    <span
+                      className="text-[12px] font-bold tracking-[.13em] uppercase whitespace-nowrap"
+                      style={{ color: sim.accentColor }}
+                    >
+                      {sim.game}
+                    </span>
+                    <span className="text-[11px] ml-[2px]" style={{ color: `${sim.accentColor}80` }}>▾</span>
+                  </span>
+                  <div className="nav-drop">
+                    {SIMS.map((s) => (
+                      <Link
+                        key={s.slug}
+                        href={s.slug === sim.slug ? `/${s.slug}` : `/${s.slug}${subPath}`}
+                        style={s.slug === sim.slug ? { color: s.accentColor, borderLeftColor: s.accentColor } : undefined}
+                      >
+                        <span
+                          className="inline-block w-[6px] h-[6px] rounded-full mr-2 shrink-0"
+                          style={{ backgroundColor: s.accentColor }}
+                        />
+                        {s.game}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+                <span className="w-px h-5 bg-line-2 mx-2" />
+              </>
+            )}
+
+            {nav.map((item) =>
+              item.drop ? (
+                <div key={item.label} className="nav-has relative">
+                  <span className={`${LINK_CLS} flex items-center gap-[5px] cursor-pointer`}>
+                    {item.label}
+                    <span className="text-[8px] opacity-50">▾</span>
+                  </span>
+                  <div className="nav-drop">
+                    {item.drop.map((sub) => (
+                      <Link key={sub.href} href={sub.href}>
+                        {sub.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <Link key={item.href} href={item.href} className={LINK_CLS}>
+                  {item.label}
+                </Link>
+              )
+            )}
+
+            <a href="/sign-in" className="nav-signin">
+              <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
+                Sign In
+              </span>
+            </a>
+          </nav>
+
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden p-2 -mr-2"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+          >
+            <HamburgerIcon open={menuOpen} />
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile drawer */}
+      <div
+        className={[
+          'md:hidden fixed top-[76px] left-0 right-0 bottom-0 z-[99]',
+          'bg-[rgba(9,10,13,.98)] overflow-y-auto border-t border-line',
+          'transition-[opacity,visibility] duration-200',
+          menuOpen ? 'opacity-100 visible' : 'opacity-0 invisible',
+        ].join(' ')}
+        aria-hidden={!menuOpen}
+      >
+        <div className="px-7 py-6 flex flex-col">
+
+          {/* Sim switcher — main pages show all sims, sim pages show switcher */}
+          <div className="mb-2">
+            <p className="font-mono text-[10px] tracking-[.35em] uppercase text-txt-3 mb-3">
+              {sim ? 'Switch Sim' : 'Choose Your Sim'}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
               {SIMS.map((s) => (
                 <Link
                   key={s.slug}
-                  href={`/${s.slug}`}
-                  className="text-[12.5px] font-semibold tracking-[.13em] uppercase px-[13px] py-[10px] transition-colors whitespace-nowrap hover:text-txt"
-                  style={{ color: s.accentColor }}
+                  href={sim && s.slug !== sim.slug ? `/${s.slug}${subPath}` : `/${s.slug}`}
+                  className="flex items-center gap-2 px-4 py-3 border transition-colors"
+                  style={{
+                    borderColor: `${s.accentColor}30`,
+                    backgroundColor: sim?.slug === s.slug ? `${s.accentColor}10` : undefined,
+                  }}
+                  onClick={close}
                 >
-                  {s.game}
+                  <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: s.accentColor }} />
+                  <span className="font-mono text-[12px] font-bold tracking-[.12em] uppercase" style={{ color: s.accentColor }}>
+                    {s.game}
+                  </span>
                 </Link>
               ))}
-              <span className="w-px h-5 bg-line-2 mx-1" />
             </div>
-          )}
+          </div>
 
-          {/* Sim context nav — shown on sim pages */}
+          <div className="border-t border-line my-5" />
+
+          {/* Sim context sub-nav */}
           {sim && (
             <>
-              <Link
-                href="/"
-                className="text-[12.5px] font-bold tracking-[.13em] uppercase px-[13px] py-[10px] transition-colors whitespace-nowrap"
-                style={{ color: '#e6b53d' }}
-              >
-                Home
+              <Link href="/" className="flex items-center gap-3 py-3 text-[13px] font-semibold tracking-[.1em] uppercase text-txt-2 hover:text-gold transition-colors" onClick={close}>
+                ← Home
               </Link>
-              <span className="w-px h-5 bg-line-2 mx-1" />
-              <div className="nav-has relative">
-                <span
-                  className="flex items-center gap-2 px-3 py-[6px] border rounded cursor-default select-none transition-colors hover:bg-panel-2"
-                  style={{ borderColor: `${sim.accentColor}40` }}
+              {buildSimNav(sim.slug).map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={[
+                    'flex items-center gap-3 py-3 border-b border-line/30',
+                    'text-[14px] font-semibold tracking-[.08em] uppercase transition-colors',
+                    pathname === item.href ? 'text-gold' : 'text-txt hover:text-gold-soft',
+                  ].join(' ')}
+                  onClick={close}
                 >
-                  <span
-                    className="w-[7px] h-[7px] rounded-full shrink-0"
-                    style={{ backgroundColor: sim.accentColor }}
-                  />
-                  <span
-                    className="text-[12px] font-bold tracking-[.13em] uppercase whitespace-nowrap"
-                    style={{ color: sim.accentColor }}
-                  >
-                    {sim.game}
-                  </span>
-                  <span className="text-[11px] ml-[2px]" style={{ color: `${sim.accentColor}80` }}>▾</span>
-                </span>
-                <div className="nav-drop">
-                  {SIMS.map((s) => (
-                    <Link
-                      key={s.slug}
-                      href={s.slug === sim.slug ? `/${s.slug}` : `/${s.slug}${subPath}`}
-                      style={s.slug === sim.slug ? { color: s.accentColor, borderLeftColor: s.accentColor } : undefined}
-                    >
-                      <span
-                        className="inline-block w-[6px] h-[6px] rounded-full mr-2 shrink-0"
-                        style={{ backgroundColor: s.accentColor }}
-                      />
-                      {s.game}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-              <span className="w-px h-5 bg-line-2 mx-2" />
+                  {item.label}
+                </Link>
+              ))}
             </>
           )}
 
-          {nav.map((item) =>
+          {/* Main-page nav */}
+          {!sim && nav.map((item) =>
             item.drop ? (
-              <div key={item.label} className="nav-has relative">
-                <span className={`${LINK_CLS} flex items-center gap-[5px] cursor-pointer`}>
+              <div key={item.label}>
+                <p className="font-mono text-[10px] tracking-[.35em] uppercase text-txt-3 mt-2 mb-2">
                   {item.label}
-                  <span className="text-[8px] opacity-50">▾</span>
-                </span>
-                <div className="nav-drop">
-                  {item.drop.map((sub) => (
-                    <Link key={sub.href} href={sub.href}>
-                      {sub.label}
-                    </Link>
-                  ))}
-                </div>
+                </p>
+                {item.drop.map((sub) => (
+                  <Link
+                    key={sub.href}
+                    href={sub.href}
+                    className={[
+                      'flex items-center py-[10px] border-b border-line/30 pl-2',
+                      'text-[13px] font-semibold tracking-[.08em] uppercase transition-colors',
+                      pathname === sub.href ? 'text-gold' : 'text-txt-2 hover:text-gold-soft',
+                    ].join(' ')}
+                    onClick={close}
+                  >
+                    {sub.label}
+                  </Link>
+                ))}
               </div>
             ) : (
-              <Link key={item.href} href={item.href} className={LINK_CLS}>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={[
+                  'flex items-center py-3 border-b border-line/30',
+                  'text-[14px] font-semibold tracking-[.08em] uppercase transition-colors',
+                  pathname === item.href ? 'text-gold' : 'text-txt hover:text-gold-soft',
+                ].join(' ')}
+                onClick={close}
+              >
                 {item.label}
               </Link>
             )
           )}
 
-          <a href="/sign-in" className="nav-signin">
+          <div className="border-t border-line mt-5 mb-5" />
+
+          <a
+            href="/sign-in"
+            className="nav-signin self-start"
+            onClick={close}
+          >
             <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
               Sign In
             </span>
           </a>
-        </nav>
+        </div>
       </div>
-    </header>
+    </>
   );
 }
