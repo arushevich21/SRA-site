@@ -49,13 +49,13 @@ export default function DivisionsTable({
   );
 
   const filtered = useMemo(() => {
+    // Show nothing until the user has typed something or applied a filter
+    if (!search && divFilter === null && tierFilter === null && !onlyUnassigned) return [];
+
     return drivers.filter((d) => {
       if (search) {
         const q = search.toLowerCase();
-        const nameMatch = d.display_name?.toLowerCase().includes(q);
-        const discordMatch = d.discord_id?.includes(q);
-        const steamMatch = d.steam_id?.includes(q);
-        if (!nameMatch && !discordMatch && !steamMatch) return false;
+        if (!d.display_name?.toLowerCase().includes(q)) return false;
       }
       if (onlyUnassigned) {
         return d.division_id === null || d.tier === null;
@@ -170,7 +170,7 @@ export default function DivisionsTable({
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <input
           type="text"
-          placeholder="Search name / Discord ID / Steam ID…"
+          placeholder="Search by name…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="bg-panel-2 border border-line px-3 py-2 font-mono text-[12px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold w-[300px]"
@@ -294,13 +294,11 @@ export default function DivisionsTable({
 
       {/* Count + save indicator */}
       <p className="font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 mb-3">
-        {filtered.length === drivers.length
-          ? `${drivers.length} drivers`
-          : `${filtered.length} of ${drivers.length} drivers`}
+        {hasActiveFilter
+          ? `${filtered.length} result${filtered.length === 1 ? '' : 's'}`
+          : `${drivers.length} drivers total`}
         {filtered.length > 200 && ' · showing first 200 — search to narrow'}
-        {isPending && (
-          <span className="text-gold"> · saving…</span>
-        )}
+        {isPending && <span className="text-gold"> · saving…</span>}
       </p>
 
       {/* Table */}
@@ -401,9 +399,14 @@ export default function DivisionsTable({
           </tbody>
         </table>
 
-        {visibleDrivers.length === 0 && (
+        {visibleDrivers.length === 0 && !hasActiveFilter && (
           <p className="font-mono text-[12px] text-txt-3 text-center py-12">
-            No drivers match the current filters.
+            Search by name or use a filter to find drivers.
+          </p>
+        )}
+        {visibleDrivers.length === 0 && hasActiveFilter && (
+          <p className="font-mono text-[12px] text-txt-3 text-center py-12">
+            No drivers match.
           </p>
         )}
       </div>
