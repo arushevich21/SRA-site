@@ -84,7 +84,7 @@ export default function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { sim, subPath } = useSimContext();
+  const { sim } = useSimContext();
   const nav = sim ? buildSimNav(sim.slug) : MAIN_NAV;
 
   // Close mobile menu on navigation
