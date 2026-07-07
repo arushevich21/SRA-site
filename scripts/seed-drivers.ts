@@ -123,8 +123,9 @@ for (const record of byDiscordId.values()) {
     }
   }
 
-  // Prefer discord_username as display name; fall back to discord_name
-  const displayName = record.discord_username ?? record.discord_name ?? null;
+  // Prefer discord_username → discord_name → discord_id (always non-null)
+  const displayName =
+    record.discord_username ?? record.discord_name ?? record.discord_id!;
 
   // Construct Discord avatar URL from hash
   const avatarUrl =
