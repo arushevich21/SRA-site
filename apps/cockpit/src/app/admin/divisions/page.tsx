@@ -14,7 +14,8 @@ export default async function AdminDivisionsPage() {
       supabase
         .from('drivers')
         .select('id, display_name, discord_id, steam_id, division_id, tier')
-        .order('display_name', { nullsFirst: false }),
+        .order('display_name', { nullsFirst: false })
+        .limit(10000),
     ]);
 
   if (divError || drvError) {
