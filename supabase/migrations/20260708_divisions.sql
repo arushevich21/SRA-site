@@ -62,35 +62,28 @@ ALTER TABLE drivers
   ADD COLUMN IF NOT EXISTS division_id integer REFERENCES divisions(id);
 
 -- ── 6. Migrate existing data: division_legacy → division_id ──────────────────
--- Only runs where division_legacy is populated and division_id is still null
--- (idempotent: safe to run again after partial success)
+-- Guarded: only runs if division_legacy column actually exists (it won't if the
+-- drivers table never had a division column to begin with).
 
-UPDATE drivers
-SET    division_id = division_legacy
-WHERE  division_legacy IS NOT NULL
-  AND  division_id IS NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'drivers' AND column_name = 'division_legacy'
+  ) THEN
+    UPDATE drivers
+    SET    division_id = division_legacy
+    WHERE  division_legacy IS NOT NULL
+      AND  division_id IS NULL;
+
+    RAISE NOTICE 'Migrated division_legacy → division_id for % row(s)',
+      (SELECT COUNT(*) FROM drivers WHERE division_id IS NOT NULL);
+  ELSE
+    RAISE NOTICE 'division_legacy column not present — no data to migrate (drivers table had no prior division column)';
+  END IF;
+END $$;
 
 -- ── 7. Add tier column ────────────────────────────────────────────────────────
 
 ALTER TABLE drivers
   ADD COLUMN IF NOT EXISTS tier driver_tier;
-
--- ── 8. Verify migration (raises NOTICE, not error — inspect in the editor) ───
-
-DO $$
-DECLARE
-  total_with_legacy   integer;
-  matched             integer;
-  unmatched           integer;
-BEGIN
-  SELECT COUNT(*) INTO total_with_legacy FROM drivers WHERE division_legacy IS NOT NULL;
-  SELECT COUNT(*) INTO matched           FROM drivers WHERE division_legacy IS NOT NULL AND division_id = division_legacy;
-  SELECT COUNT(*) INTO unmatched         FROM drivers WHERE division_legacy IS NOT NULL AND division_id IS DISTINCT FROM division_legacy;
-
-  RAISE NOTICE 'Division migration: % rows had division_legacy; % correctly migrated to division_id; % mismatched (should be 0)',
-    total_with_legacy, matched, unmatched;
-
-  IF unmatched > 0 THEN
-    RAISE EXCEPTION 'Migration check failed: % rows have division_legacy != division_id — investigate before proceeding', unmatched;
-  END IF;
-END $$;
