@@ -156,9 +156,14 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
       'Points for pole position: 5 · Points for fastest lap: 5',
       'Practice server is live — search "SRA" in the AC Evo server browser: #SRAgg | Sim Racing Alliance | Main Server #1 | #SRAM1',
     ],
-    discordLinks: [],
-    resultsUrl: 'https://discord.com/channels/915686674833498203/915693003866275900/1520602621076045904',
-    resultsLabel: 'View on Discord',
+    discordLinks: [
+      {
+        label: 'Announcements',
+        url: 'https://discord.com/channels/915686674833498203/915693003866275900/1520602621076045904'
+      }
+    ],
+    resultsUrl: '/acevo/standings',
+    resultsLabel: 'View Standings',
     schedule: [
       { round: 1, track: 'Road Atlanta GP', date: '2026-06-29T21:00:00', raceLength: '30 min', emperorTrack: 'Road Atlanta,GP', emperorRawTrackName: 'Road Atlanta' },
       { round: 2, track: 'Sebring International Raceway GP', date: '2026-07-06T21:00:00', raceLength: '30 min', emperorTrack: 'Sebring International Raceway,GP', emperorRawTrackName: 'Sebring International Raceway' },

@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import type { ChampionshipContent } from '../../content/championships';
 import { SIMS } from '@/content/sims';
 import { CategoryTag } from './shared';
@@ -135,14 +136,23 @@ export function RealChampionshipBlock({
             ))}
           </div>
           {content.resultsUrl && (
-            <a
-              href={content.resultsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-[12px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors flex items-center gap-2 shrink-0"
-            >
-              {content.resultsLabel ?? 'View on SimGrid'} →
-            </a>
+            content.resultsUrl.startsWith('/') ? (
+              <Link
+                href={content.resultsUrl}
+                className="font-mono text-[12px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors flex items-center gap-2 shrink-0"
+              >
+                {content.resultsLabel ?? 'View on Discord'} →
+              </Link>
+            ) : (
+              <a
+                href={content.resultsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-[12px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors flex items-center gap-2 shrink-0"
+              >
+                {content.resultsLabel ?? 'View on Discord'} →
+              </a>
+            )
           )}
         </div>
       )}
