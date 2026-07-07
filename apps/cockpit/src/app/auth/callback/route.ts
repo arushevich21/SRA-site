@@ -27,7 +27,10 @@ export async function GET(request: Request) {
     (discordIdentity?.identity_data?.provider_id as string | undefined) ??
     (user.user_metadata?.provider_id as string | undefined);
 
+  // Prefer Discord's global_name (display name) over username.
+  // Supabase sometimes maps full_name to the username when global_name is absent.
   const displayName =
+    (discordIdentity?.identity_data?.global_name as string | undefined) ??
     (user.user_metadata?.full_name as string | undefined) ??
     (user.user_metadata?.name as string | undefined) ??
     user.email ??
