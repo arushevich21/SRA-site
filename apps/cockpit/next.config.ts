@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'static.simracingalliance.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'cdn.discordapp.com',
+        pathname: '/avatars/**',
+      },
     ],
   },
   // Workspace packages use NodeNext-style relative imports (e.g. './client.js' for './client.ts') —
