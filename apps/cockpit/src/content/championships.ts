@@ -23,6 +23,12 @@ export type ChampionshipContent = {
   resultsUrl: string | null;
   resultsLabel?: string; // defaults to "View on SimGrid" — override when resultsUrl points elsewhere
   schedule: ScheduleRound[];
+  // Registration — only set on championships that accept team registration
+  registrationKey?: string;      // stable slug stored in DB, e.g. 'acc-gt3-s19'
+  registrationSeason?: string;   // DB season value, e.g. 's19'
+  registrationOpen?: boolean;    // false/absent = form hidden
+  maxTeamSize?: number;          // 2 for GT3 Sprint, 1-4 for Endurance
+  allowedCars?: string[];        // car picker options
 };
 
 export function getStandingsKey(c: ChampionshipContent): string | undefined {
@@ -72,6 +78,33 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     ],
     resultsUrl: null,
     schedule: [],
+    registrationKey: 'acc-gt3-s19',
+    registrationSeason: 's19',
+    registrationOpen: true,
+    maxTeamSize: 2,
+    allowedCars: [
+      'AMR V12 Vantage GT3',
+      'AMR V8 Vantage GT3',
+      'Audi R8 LMS GT3 Evo 2',
+      'Bentley Continental GT3',
+      'BMW M4 GT3',
+      'BMW M6 GT3',
+      'Emil Frey Jaguar G3',
+      'Ferrari 296 GT3',
+      'Ferrari 488 GT3 Evo',
+      'Ford Mustang GT3',
+      'Honda NSX GT3 Evo',
+      'Lamborghini Huracán GT3 EVO2',
+      'Lexus RC F GT3',
+      'McLaren 650S GT3',
+      'McLaren 720S GT3',
+      'McLaren 720S GT3 Evo',
+      'Mercedes-AMG GT3 EVO',
+      'Nissan GT-R Nismo GT3',
+      'Porsche 991 II GT3 R',
+      'Porsche 992 GT3 R',
+      'Reiter Engineering R-EX GT3',
+    ],
   },
   {
     simgridId: null,
