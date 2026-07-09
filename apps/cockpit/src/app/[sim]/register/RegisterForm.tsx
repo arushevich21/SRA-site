@@ -101,8 +101,7 @@ export default function RegisterForm({
           <label className="block font-mono text-[11px] tracking-[.3em] uppercase text-txt-3 mb-2">
             Teammate{maxTeammates > 1 ? 's' : ''}{' '}
             <span className="text-txt-3/50 normal-case tracking-normal">
-              {selected.size}/{maxTeammates} · same division only · no consent
-              needed
+              {selected.size}/{maxTeammates} · same division only
             </span>
           </label>
 

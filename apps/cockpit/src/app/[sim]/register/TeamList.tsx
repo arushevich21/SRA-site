@@ -173,21 +173,17 @@ function TeamRow({
       {/* Drivers */}
       <div className="flex flex-wrap gap-4 flex-1">
         {team.members.map((m) => (
-          <div key={m.driver_id} className="flex items-center gap-1.5">
+          <div key={m.driver_id} className="flex items-center gap-2">
             <span className="font-mono text-[12px] text-txt-2">
               {m.display_name ?? '—'}
             </span>
             {m.tier && (
-              <span
-                className={[
-                  'font-mono text-[9px] tracking-[.1em] uppercase px-1 py-0.5',
-                  m.tier === 'gold'
-                    ? 'text-[#e6b53d] bg-[#e6b53d]/10'
-                    : 'text-txt-3 bg-panel-2',
-                ].join(' ')}
-              >
-                {m.tier}
-              </span>
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/badges/Division ${team.division_id} ${m.tier === 'gold' ? 'Gold' : 'Silver'}.png`}
+                alt={`Div ${team.division_id} ${m.tier}`}
+                className="h-5 w-auto"
+              />
             )}
           </div>
         ))}
