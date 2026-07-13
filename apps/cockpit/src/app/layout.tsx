@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Hanken_Grotesk, Saira_Condensed, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import NavBar, { type NavUser } from '@/components/NavBar';
+import { SponsorsCarousel } from '@/components/SponsorsCarousel';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 
 const hanken = Hanken_Grotesk({
@@ -60,6 +61,7 @@ export default async function RootLayout({
       <body className="bg-carbon text-txt font-sans antialiased overflow-x-hidden">
         <NavBar user={navUser} />
         <main className="pt-[76px]">{children}</main>
+        <SponsorsCarousel />
       </body>
     </html>
   );

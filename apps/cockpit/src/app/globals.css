@@ -177,3 +177,20 @@ body::after {
   display: inline-block;
   animation: shake 180ms ease-in-out infinite;
 }
+
+/* ── sponsors carousel ────────────────────────────────────────────── */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  width: max-content;
+  /* Track is 6 copies of the partner set per half (see SponsorsCarousel) —
+     duration is scaled up to match so the scroll speed stays constant. */
+  animation: marquee 270s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
