@@ -32,7 +32,7 @@ export const BOP_DATA: BopData = {
   tracks: [
     'Barcelona',
     'Brands Hatch',
-    'Circuit of The Americas',
+    'COTA',
     'Donington Park',
     'Hungaroring',
     'Imola',
@@ -148,49 +148,49 @@ export const BOP_DATA: BopData = {
 
 /**
  * Manufacturer logo URLs mapped by car name.
- * Source: https://static.simracingalliance.com/assets/images/logo/manufacturers/light/
+ * Served locally from public/sponsors/manufacturers/.
  */
 export const MANUFACTURER_LOGOS: Record<string, string> = {
   'AMR V12 Vantage GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/aston_martin.png',
+    '/sponsors/manufacturers/aston_martin.png',
   'AMR V8 Vantage GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/aston_martin.png',
+    '/sponsors/manufacturers/aston_martin.png',
   'Audi R8 LMS GT3 Evo 2':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/audi.png',
+    '/sponsors/manufacturers/audi.png',
   'Bentley Continental GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/bentley.png',
+    '/sponsors/manufacturers/bentley.png',
   'BMW M4 GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/bmw.png',
+    '/sponsors/manufacturers/bmw.png',
   'BMW M6 GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/bmw.png',
+    '/sponsors/manufacturers/bmw.png',
   'Emil Frey Jaguar G3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/jaguar.png',
+    '/sponsors/manufacturers/jaguar.png',
   'Ferrari 296 GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/ferrari.png',
+    '/sponsors/manufacturers/ferrari.png',
   'Ferrari 488 GT3 Evo':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/ferrari.png',
+    '/sponsors/manufacturers/ferrari.png',
   'Ford Mustang GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/ford.png',
+    '/sponsors/manufacturers/ford.png',
   'Honda NSX GT3 Evo':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/honda.png',
+    '/sponsors/manufacturers/honda.png',
   'Lamborghini Huracán GT3 EVO2':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/lamborghini.png',
+    '/sponsors/manufacturers/lamborghini.png',
   'Lexus RC F GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/lexus.png',
+    '/sponsors/manufacturers/lexus.png',
   'McLaren 650S GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/mclaren.png',
+    '/sponsors/manufacturers/mclaren.png',
   'McLaren 720S GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/mclaren.png',
+    '/sponsors/manufacturers/mclaren.png',
   'McLaren 720S GT3 Evo':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/mclaren.png',
+    '/sponsors/manufacturers/mclaren.png',
   'Mercedes-AMG GT3 EVO':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/mercedes.png',
+    '/sponsors/manufacturers/mercedes.png',
   'Nissan GT-R Nismo GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/nissan.png',
+    '/sponsors/manufacturers/nissan.png',
   'Porsche 991 II GT3 R':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/porsche.png',
+    '/sponsors/manufacturers/porsche.png',
   'Porsche 992 GT3 R':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/porsche.png',
+    '/sponsors/manufacturers/porsche.png',
   'Reiter Engineering R-EX GT3':
-    'https://static.simracingalliance.com/assets/images/logo/manufacturers/light/lamborghini.png',
+    '/sponsors/manufacturers/lamborghini.png',
 };

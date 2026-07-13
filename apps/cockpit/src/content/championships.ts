@@ -11,9 +11,13 @@ export type ChampionshipContent = {
   simgridId: number | null;
   emperorChampionshipId?: string;
   standingsKey?: string;
+  // Stable per-sim URL slug, e.g. /acc/championships/gt3-team-series-s19
+  slug: string;
   game: 'ACC' | 'LMU' | 'AC Evo' | (string & {});
   classTag: string;
   formatTag?: string;
+  // 'championship' (default) or 'exhibition' — shown as an extra tag chip.
+  eventType?: 'championship' | 'exhibition';
   classes: string[];
   title: string;
   logo?: string;
@@ -29,14 +33,21 @@ export type ChampionshipContent = {
   registrationOpen?: boolean;    // false/absent = form hidden
   maxTeamSize?: number;          // 2 for GT3 Sprint, 1-4 for Endurance
   allowedCars?: string[];        // car picker options
+  // Forces "coming soon" display everywhere (championship cards, sim overview)
+  // even if a real schedule is populated — for series teased ahead of launch.
+  teaserOnly?: boolean;
+  // Season has finished racing — forces "Concluded" display instead of Active.
+  concluded?: boolean;
 };
 
 export function getStandingsKey(c: ChampionshipContent): string | undefined {
   return c.standingsKey ?? (c.simgridId != null ? String(c.simgridId) : undefined);
 }
 
-export function formatScheduleDate(date: string | null): string {
-  if (!date) return 'TBA';
+// Date and time split apart so callers (e.g. calendar rows) can give the
+// date/time more visual weight than the surrounding duration/format text.
+export function formatScheduleDateTime(date: string | null): { date: string; time: string | null } {
+  if (!date) return { date: 'TBA', time: null };
   const hasTime = date.includes('T');
   const d = new Date(date);
   const dateStr = d.toLocaleDateString('en-US', {
@@ -44,18 +55,24 @@ export function formatScheduleDate(date: string | null): string {
     month: 'short',
     day: 'numeric',
   });
-  if (!hasTime) return dateStr;
+  if (!hasTime) return { date: dateStr, time: null };
   const timeStr = d.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
   });
-  return `${dateStr} · ${timeStr}`;
+  return { date: dateStr, time: timeStr };
+}
+
+export function formatScheduleDate(date: string | null): string {
+  const { date: dateStr, time } = formatScheduleDateTime(date);
+  return time ? `${dateStr} · ${time}` : dateStr;
 }
 
 export const CHAMPIONSHIPS: ChampionshipContent[] = [
   {
     simgridId: null,
+    slug: 'gt3-team-series-s19',
     game: 'ACC',
     classTag: 'GT3',
     formatTag: 'Sprint',
@@ -73,14 +90,16 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
       'The organizer reserves the right to apply a custom BoP (Balance of Performance)',
     ],
     discordLinks: [
-      { label: 'Schedule', url: 'https://discord.com/channels/915686674833498203/918718571025145886' },
       { label: 'Series Rules', url: 'https://discord.com/channels/915686674833498203/919069839476293683' },
+      { label: 'Schedule', url: '/acc/championships/gt3-team-series-s19/calendar' },
+      { label: 'Registration', url: '/acc/championships/gt3-team-series-s19/register' },
     ],
     resultsUrl: null,
     schedule: [],
     registrationKey: 'acc-gt3-s19',
     registrationSeason: 's19',
-    registrationOpen: true,
+    registrationOpen: false,
+    teaserOnly: true,
     maxTeamSize: 2,
     allowedCars: [
       'AMR V12 Vantage GT3',
@@ -109,12 +128,14 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
   {
     simgridId: null,
     standingsKey: 'endurance-s3',
+    slug: 'gt3-endurance-s3',
     game: 'ACC',
     classTag: 'GT3',
     formatTag: 'Endurance',
     classes: ['GT3'],
     title: 'SRA GT3 Endurance Series — Season 3',
     logo: '/badges/endurance-series_logo.png',
+    teaserOnly: true,
     raceFormat:
       '65 min stint timer · Refueling not fixed · Unlimited tires · Live stewarding',
     rulesBullets: [
@@ -131,12 +152,13 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
       'Custom BoP applies: simracingalliance.com/about/custom_bop',
     ],
     discordLinks: [
-      { label: 'Registration', url: 'https://discord.com/channels/915686674833498203/921128147771092993' },
       { label: 'Series Rules', url: 'https://discord.com/channels/915686674833498203/919069800863514664' },
+      { label: 'Schedule', url: '/acc/championships/gt3-endurance-s3/calendar' },
+      { label: 'Registration', url: '/acc/championships/gt3-endurance-s3/register' },
     ],
     resultsUrl: null,
     schedule: [
-      { round: 1, track: 'Circuit of the Americas', date: '2026-06-27T15:10:00', raceLength: '6h' },
+      { round: 1, track: 'COTA', date: '2026-06-27T15:10:00', raceLength: '6h' },
       { round: 2, track: 'Hungaroring', date: '2026-08-01', raceLength: '6h' },
       { round: 3, track: 'Kyalami', date: '2026-09-12', raceLength: '9h' },
       { round: 4, track: 'Watkins Glen', date: '2026-10-10', raceLength: '6h' },
@@ -146,22 +168,24 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
   },
   {
     simgridId: 22872,
+    slug: 'multiclass-mayhem-s3-split1',
     game: 'LMU',
     classTag: 'LMP2 / LMGT3',
     formatTag: 'Multiclass',
     classes: ['LMP2', 'LMGT3'],
     title: 'SRA Multiclass Mayhem - LMU - Season 3 Split 1',
     logo: '/badges/multiclass_mayhem_logo.png',
+    concluded: true,
     raceFormat:
       '30 min practice (final 10 min drivers briefing) · 10 min solo qualifying · 45–90 min race',
     rulesBullets: [],
     discordLinks: [
-      {
-        label: 'Announcements',
-        url: 'https://discord.com/channels/915686674833498203/1029145367268302858',
-      },
+      { label: 'Series Rules', url: 'https://discord.com/channels/915686674833498203/935279836396666930' },
+      { label: 'Schedule', url: '/lmu/championships/multiclass-mayhem-s3-split1/calendar' },
+      { label: 'Registration', url: '/lmu/championships/multiclass-mayhem-s3-split1/register' },
     ],
-    resultsUrl: 'https://www.thesimgrid.com/championships/22872/results',
+    resultsUrl: 'https://www.thesimgrid.com/championships/22872',
+    resultsLabel: 'View on SimGrid',
     // Split 2 (ID 23700) is a separate championship — not wired yet
     schedule: [
       { round: 1, track: 'Fuji Classic', date: '2026-04-23T20:30:00', raceLength: '75 min' },
@@ -177,6 +201,7 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
   {
     simgridId: 25580,
     emperorChampionshipId: '3a2e4266-ff5f-4c5c-b575-2a268c75f7e7',
+    slug: 'mx5-cup',
     game: 'AC Evo',
     classTag: 'MX-5',
     formatTag: 'Cup',
@@ -190,18 +215,17 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
       'Practice server is live — search "SRA" in the AC Evo server browser: #SRAgg | Sim Racing Alliance | Main Server #1 | #SRAM1',
     ],
     discordLinks: [
-      {
-        label: 'Announcements',
-        url: 'https://discord.com/channels/915686674833498203/915693003866275900/1520602621076045904'
-      }
+      { label: 'Series Rules', url: '/about/rules' },
+      { label: 'Schedule', url: '/acevo/championships/mx5-cup/calendar' },
+      { label: 'Registration', url: '/acevo/championships/mx5-cup/register' },
     ],
-    resultsUrl: '/acevo/standings',
+    resultsUrl: '/acevo/championships/mx5-cup/standings',
     resultsLabel: 'View Standings',
     schedule: [
       { round: 1, track: 'Road Atlanta GP', date: '2026-06-29T21:00:00', raceLength: '30 min', emperorTrack: 'Road Atlanta,GP', emperorRawTrackName: 'Road Atlanta' },
       { round: 2, track: 'Sebring International Raceway GP', date: '2026-07-06T21:00:00', raceLength: '30 min', emperorTrack: 'Sebring International Raceway,GP', emperorRawTrackName: 'Sebring International Raceway' },
-      { round: 3, track: 'Laguna Seca GP', date: '2026-07-13T21:00:00', raceLength: '30 min' },
-      { round: 4, track: 'Circuit of the Americas National', date: '2026-07-20T21:00:00', raceLength: '30 min' },
+      { round: 3, track: 'Laguna Seca GP', date: '2026-07-13T21:00:00', raceLength: '30 min', emperorRawTrackName: 'Laguna Seca' },
+      { round: 4, track: 'COTA National', date: '2026-07-20T21:00:00', raceLength: '30 min' },
     ],
   },
 ];

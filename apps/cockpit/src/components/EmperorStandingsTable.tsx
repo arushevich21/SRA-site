@@ -33,9 +33,6 @@ export function EmperorStandingsTable({
                   <th className="font-sans text-[15px] text-txt-3 py-2 pr-3 hidden lg:table-cell">
                     Car
                   </th>
-                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-5 pr-3 w-24 text-right">
-                    Penalty
-                  </th>
                   <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-5 w-20 text-right">
                     Pts
                   </th>
@@ -64,9 +61,6 @@ export function EmperorStandingsTable({
                     </td>
                     <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 truncate max-w-[200px] hidden lg:table-cell">
                       {entry.carModel ?? '—'}
-                    </td>
-                    <td className="font-mono text-[15px] text-txt-3 py-2 pl-5 pr-3 text-right">
-                      {entry.pointsPenalty ? `-${entry.pointsPenalty}` : '—'}
                     </td>
                     <td
                       className="font-mono text-[15px] py-2 pl-5 text-right"

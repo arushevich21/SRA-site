@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { SIMS } from '@/content/sims';
+import { GameLabel } from '@/components/GameLabel';
 
 const STATS = [
   { value: '18', label: 'Seasons' },
@@ -12,15 +13,17 @@ const STATS = [
 ];
 
 const PARTNERS = [
-  { logo: 'https://static.simracingalliance.com/assets/images/sliders/armamentario-com.png', href: 'https://www.armamentario.com' },
-  { logo: 'https://static.simracingalliance.com/assets/images/sliders/go-setups.png', href: 'https://gosetups.gg/product/acc-setups/?ref=5879' },
-  { logo: 'https://static.simracingalliance.com/assets/images/sliders/trak-racer.png', href: 'https://trakracer.com' },
-  { logo: 'https://static.simracingalliance.com/assets/images/sliders/documize-com.png', href: 'https://documize.com' },
-  { logo: 'https://static.simracingalliance.com/assets/images/sliders/retro-saga-ca.png', href: 'https://retrosaga.ca' },
-  { logo: 'https://static.simracingalliance.com/assets/images/sliders/at3d-sim-shop.png', href: 'https://at3d.net' },
-  { logo: 'https://static.simracingalliance.com/assets/images/sliders/castlecauldron.png', href: 'https://facebook.com/castlecauldron' },
-  { logo: 'https://static.simracingalliance.com/assets/images/sliders/kp_concepts.png', href: 'https://www.kpconcepts.com' },
-  { logo: 'https://static.simracingalliance.com/assets/images/sliders/echoes_of_nox.png', href: 'https://store.steampowered.com/app/4368440/Echoes_of_Nox/' },
+  { logo: '/sponsors/sliders/armamentario-com.png', href: 'https://www.armamentario.com' },
+  { logo: '/sponsors/sliders/go-setups.png', href: 'https://gosetups.gg/product/acc-setups/?ref=5879' },
+  { logo: '/sponsors/sliders/trak-racer.png', href: 'https://trakracer.com' },
+  { logo: '/sponsors/sliders/documize-com.png', href: 'https://documize.com' },
+  { logo: '/sponsors/sliders/retro-saga-ca.png', href: 'https://retrosaga.ca' },
+  { logo: '/sponsors/sliders/at3d-sim-shop.png', href: 'https://at3d.net' },
+  { logo: '/sponsors/sliders/castlecauldron.png', href: 'https://facebook.com/castlecauldron' },
+  { logo: '/sponsors/sliders/kp_concepts.png', href: 'https://www.kpconcepts.com' },
+  { logo: '/sponsors/sliders/echoes_of_nox.png', href: 'https://store.steampowered.com/app/4368440/Echoes_of_Nox/' },
+  { logo: '/sponsors/sliders/TS_Logo_White_SVG.png', href: 'https://trackside.vip' },
+  { logo: '/sponsors/partners/triple-stint/White%20Text/Logo.png', href: 'https://triplestintracing.com/' },
 ];
 
 export default function HomePage() {
@@ -52,10 +55,9 @@ export default function HomePage() {
           </h1>
 
           <p className="font-sans text-[16px] text-txt-2 leading-relaxed mt-6 max-w-[600px] mx-auto">
-            We are a North American PC-based ACC · LMU · AC Evo sim racing
-            league, and we strive to provide a competitive and clean racing
-            environment. Let&apos;s get you set up to start racing and plugged
-            into the community right away!
+            We are a North American PC-based sim racing league, and we strive to
+            provide a competitive and clean racing environment. Let&apos;s get you
+            set up to start racing and plugged into the community right away!
           </p>
 
           <div className="mt-8">
@@ -122,7 +124,7 @@ export default function HomePage() {
                     className="block font-display font-black text-[22px] uppercase leading-none tracking-[-0.3px] mb-2 transition-colors"
                     style={{ color: sim.accentColor }}
                   >
-                    {sim.game}
+                    <GameLabel game={sim.game} />
                   </span>
                   <span className="block font-sans text-[13px] text-txt-3 group-hover:text-txt-2 transition-colors">
                     {sim.displayName}
@@ -140,7 +142,7 @@ export default function HomePage() {
       {/* ── PARTNERS STRIP ────────────────────────────────────────────── */}
       <section className="border-t border-b border-line py-10 overflow-hidden">
         <div className="max-w-[1280px] mx-auto px-7">
-          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-6 items-center">
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-11 gap-6 items-center">
             {PARTNERS.map((p) => (
               <a
                 key={p.href}

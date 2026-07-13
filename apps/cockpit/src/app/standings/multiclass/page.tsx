@@ -38,10 +38,10 @@ export default async function MulticlassStandingsPage() {
         </div>
       ) : (
         <div className="mt-10 border border-gold-deep/30 bg-gold-deep/5 px-5 py-4">
-          <p className="font-mono text-[11px] tracking-[.15em] uppercase text-gold-deep">
+          <p className="font-mono text-[15px] tracking-[.15em] uppercase text-gold-deep">
             No standings data uploaded yet
           </p>
-          <p className="font-sans text-[12px] text-txt-3 mt-1">
+          <p className="font-sans text-[15px] text-txt-3 mt-1">
             Upload standings with key &quot;{STANDINGS_KEY}&quot; via /admin/standings.
           </p>
         </div>
@@ -50,7 +50,7 @@ export default async function MulticlassStandingsPage() {
       {/* Footer link */}
       <div className="mt-8 pt-5 border-t border-line">
         <a
-          href="https://www.thesimgrid.com/championships/22872/results"
+          href="https://www.thesimgrid.com/championships/22872"
           target="_blank"
           rel="noopener noreferrer"
           className="font-mono text-[12px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors"

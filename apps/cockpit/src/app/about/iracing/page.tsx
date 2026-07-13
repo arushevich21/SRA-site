@@ -1,3 +1,5 @@
+import { GameLabel } from '@/components/GameLabel';
+
 export default function IRacingPage() {
   const schedule = [
     { round: 1, track: 'Oulton Park Circuit (International)', date: 'Sep 12' },
@@ -14,7 +16,7 @@ export default function IRacingPage() {
         — About
       </span>
       <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
-        iRacing
+        <GameLabel game="iRacing" />
       </h1>
 
       <p className="font-sans text-sm text-txt-2 leading-relaxed mb-4">

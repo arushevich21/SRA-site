@@ -1,9 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { CHAMPIONSHIPS, type ChampionshipContent } from '@/content/championships';
-import { getAcEvoStandings } from '@/lib/acevo-standings';
-import { getRoundPoints } from '@/lib/acevo-hotlaps';
-import { EmperorStandingsTable } from '@/components/EmperorStandingsTable';
+import { CHAMPIONSHIPS, getStandingsKey } from '@/content/championships';
+import { ChampionshipStandingsBody } from '@/components/ChampionshipStandingsBody';
+import { GameLabel } from '@/components/GameLabel';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +15,13 @@ export default async function SimStandingsPage({
   const sim = getSimBySlug(slug);
   if (!sim) notFound();
 
-  const champ = CHAMPIONSHIPS.find((c) => c.game === sim.game && c.emperorChampionshipId);
+  // Teased championships (e.g. Endurance) stay "coming soon" here even if a
+  // standings key exists — only surface real data for non-teased series.
+  const champ = CHAMPIONSHIPS.find(
+    (c) =>
+      c.game === sim.game &&
+      (c.emperorChampionshipId || (!c.teaserOnly && getStandingsKey(c))),
+  );
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -24,14 +29,14 @@ export default async function SimStandingsPage({
         className="block font-mono text-[15px] tracking-[.3em] uppercase mb-5"
         style={{ color: 'var(--sim-accent)' }}
       >
-        — {sim.game} Standings
+        — <GameLabel game={sim.game} /> Standings
       </span>
       <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-16">
         Standings
       </h1>
 
-      {champ?.emperorChampionshipId ? (
-        <AcEvoStandingsSection champ={champ} />
+      {champ ? (
+        <ChampionshipStandingsBody champ={champ} />
       ) : (
         <div className="border border-line/50 bg-carbon-2 px-8 py-12 text-center">
           <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3">
@@ -41,43 +46,4 @@ export default async function SimStandingsPage({
       )}
     </section>
   );
-}
-
-async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) {
-  const result = await getAcEvoStandings(champ.emperorChampionshipId!);
-
-  if (!result.ok) {
-    return (
-      <div className="border border-line/50 bg-carbon-2 px-8 py-12 text-center">
-        <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 mb-3">
-          Standings temporarily unavailable
-        </p>
-        <p className="font-sans text-[15px] text-txt-3">
-          Emperor&apos;s live data couldn&apos;t be reached. Try again shortly.
-        </p>
-      </div>
-    );
-  }
-
-  const isEmpty = Object.values(result.data.driverStandings).every((s) => s.length === 0);
-  if (isEmpty) {
-    return (
-      <div className="border border-line/50 bg-carbon-2 px-8 py-12 text-center">
-        <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3">
-          No standings posted yet
-        </p>
-      </div>
-    );
-  }
-
-  const roundsWithTrack = champ.schedule.filter((r) => r.emperorRawTrackName);
-  const rounds = await Promise.all(
-    roundsWithTrack.map(async (r) => ({
-      round: r.round,
-      track: r.track,
-      points: await getRoundPoints(r.emperorRawTrackName!),
-    })),
-  );
-
-  return <EmperorStandingsTable data={result.data} rounds={rounds} />;
 }
