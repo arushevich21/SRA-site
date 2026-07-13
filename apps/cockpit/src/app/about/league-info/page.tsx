@@ -4,9 +4,21 @@ export default function LeagueInfoPage() {
       <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — About
       </span>
-      <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-10">
+      <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-8">
         League Info
       </h1>
+
+      <a
+        href="https://discord.gg/SimRacingAlliance"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-block font-display font-bold text-[20px] uppercase bg-gold text-carbon px-8 py-4 hover:bg-gold-soft transition-colors mb-12"
+        style={{ transform: 'skewX(-9deg)' }}
+      >
+        <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
+          Join Our Discord &rarr;
+        </span>
+      </a>
 
       {/* Series descriptions (left) + Videos (right) */}
       <div className="flex gap-8 flex-col lg:flex-row mb-12">
@@ -122,22 +134,12 @@ export default function LeagueInfoPage() {
       <h2 className="font-display font-bold text-[28px] uppercase text-txt mt-16 mb-6">
         Discord Community
       </h2>
-      <p className="font-sans text-sm text-txt-2 leading-relaxed mb-4">
-        Join our Discord server to stay up to date with announcements, find
-        teammates, share setups, and connect with the SRA community.
+      <p className="font-sans text-sm text-txt-2 leading-relaxed mb-6">
+        Stay up to date with announcements, find teammates, share setups, and
+        connect with the SRA community in these channels.
       </p>
       <div className="bg-panel border border-line rounded-lg p-6 mb-8">
         <ul className="space-y-3">
-          <li>
-            <a
-              href="https://discord.gg/SimRacingAlliance"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gold hover:text-gold-soft transition-colors"
-            >
-              Join the SRA Discord
-            </a>
-          </li>
           <li>
             <a
               href="https://discord.com/channels/915686674833498203/915686675575877735"

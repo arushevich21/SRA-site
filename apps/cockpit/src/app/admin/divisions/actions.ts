@@ -57,3 +57,31 @@ export async function assignBulk(
 
   if (error) throw new Error(error.message);
 }
+
+export type ResolveDiscordIdsResult = {
+  matchedIds: string[];
+  notFound: string[];
+};
+
+/**
+ * Resolves a pasted list of Discord IDs to driver row IDs, for bulk division
+ * assignment before the initial classification runthrough.
+ */
+export async function resolveDiscordIds(discordIds: string[]): Promise<ResolveDiscordIdsResult> {
+  await requireAdmin();
+  const cleaned = [...new Set(discordIds.map((id) => id.trim()).filter(Boolean))];
+  if (cleaned.length === 0) return { matchedIds: [], notFound: [] };
+
+  const { data, error } = await supabase
+    .from('drivers')
+    .select('id, discord_id')
+    .in('discord_id', cleaned);
+
+  if (error) throw new Error(error.message);
+
+  const found = new Set((data ?? []).map((d) => d.discord_id as string));
+  return {
+    matchedIds: (data ?? []).map((d) => d.id as string),
+    notFound: cleaned.filter((id) => !found.has(id)),
+  };
+}

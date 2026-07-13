@@ -15,6 +15,7 @@ type Props = {
   allowedCars: string[];
   simSlug: string;
   availableDrivers: AvailableDriver[];
+  existingTeamNames: string[];
 };
 
 export default function RegisterForm({
@@ -23,6 +24,7 @@ export default function RegisterForm({
   allowedCars,
   simSlug,
   availableDrivers,
+  existingTeamNames,
 }: Props) {
   const [state, action, pending] = useActionState<RegisterState, FormData>(
     registerTeam,
@@ -30,7 +32,11 @@ export default function RegisterForm({
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+  const [teamName, setTeamName] = useState('');
   const maxTeammates = maxTeamSize - 1;
+
+  const takenNames = new Set(existingTeamNames.map((n) => n.trim().toLowerCase()));
+  const isNameTaken = teamName.trim() !== '' && takenNames.has(teamName.trim().toLowerCase());
 
   const filtered = availableDrivers.filter(
     (d) =>
@@ -68,9 +74,19 @@ export default function RegisterForm({
           name="team_name"
           required
           maxLength={80}
+          value={teamName}
+          onChange={(e) => setTeamName(e.target.value)}
           placeholder="Enter your team name"
-          className="w-full bg-panel-2 border border-line px-4 py-3 font-mono text-[13px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold"
+          className={[
+            'w-full bg-panel-2 border px-4 py-3 font-mono text-[13px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold',
+            isNameTaken ? 'border-red-500/60' : 'border-line',
+          ].join(' ')}
         />
+        {isNameTaken && (
+          <p className="font-mono text-[11px] tracking-[.1em] uppercase text-red-400 mt-2">
+            That team name is already taken — choose a different one
+          </p>
+        )}
       </div>
 
       {/* Car */}
@@ -178,7 +194,7 @@ export default function RegisterForm({
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || isNameTaken}
         className="self-start font-mono text-[12px] tracking-[.2em] uppercase px-6 py-3 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors disabled:opacity-50"
       >
         {pending ? 'Registering…' : 'Register Team'}

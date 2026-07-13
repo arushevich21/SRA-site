@@ -14,7 +14,7 @@ export default async function ProfilePage() {
 
   const { data: driver } = await supabase
     .from('drivers')
-    .select('display_name, avatar_url, steam_id, discord_id')
+    .select('display_name, avatar_url, steam_id, discord_id, is_admin')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -23,9 +23,18 @@ export default async function ProfilePage() {
       <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — Account
       </span>
-      <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-12">
+      <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-8">
         My Profile
       </h1>
+
+      {driver?.is_admin && (
+        <Link
+          href="/admin"
+          className="inline-block font-mono text-[12px] tracking-[.2em] uppercase px-5 py-3 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors mb-12"
+        >
+          Admin Panel →
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[900px]">
         {/* Discord identity */}

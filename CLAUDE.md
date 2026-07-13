@@ -117,7 +117,7 @@ Build order: (1) auth + identity, (2) division admin UI, (3) registration flow.
   in the repo, never client-side, never in any `NEXT_PUBLIC_` var. `.env.local`
   is git-ignored. **gitleaks** runs as a pre-commit hook and in CI.
 - **Env vars** (in `.env.local` + Vercel, both Production and Preview):
-  `GRIDOS_API_KEY`, `ADMIN_PASSWORD`, `NEXT_PUBLIC_SUPABASE_URL`,
+  `GRIDOS_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`,
   `SUPABASE_SERVICE_ROLE_KEY`. [VERIFY full current list.]
 - **Windows/WSL:** avoid committing `*Zone.Identifier` NTFS metadata files
   (they break Windows checkouts — gitignored). Some pnpm/dev commands must run

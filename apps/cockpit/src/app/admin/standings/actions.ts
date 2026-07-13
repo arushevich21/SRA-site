@@ -1,18 +1,7 @@
 'use server';
 
-/**
- * TEMPORARY — server actions for the admin standings upload page.
- * Replace with real auth + persistence before production use.
- */
-
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import {
-  getSessionCookieValue,
-  isValidSession,
-  SESSION_COOKIE,
-  SESSION_MAX_AGE,
-} from '../../../lib/admin-auth';
+import { requireAdmin } from '@/lib/require-admin';
 import { validateStandingsExport } from '../../../lib/standings-types';
 import { writeStandings, isValidStandingsKey } from '../../../lib/standings-store';
 
@@ -20,38 +9,8 @@ function redirectWithResult(result: string, msg: string): never {
   redirect(`/admin/standings?result=${result}&msg=${encodeURIComponent(msg)}`);
 }
 
-export async function loginAction(formData: FormData): Promise<never> {
-  const password = formData.get('password');
-  if (typeof password !== 'string' || !password) {
-    redirectWithResult('error', 'Password is required');
-  }
-
-  const expected = process.env.ADMIN_PASSWORD;
-  if (!expected) {
-    redirectWithResult('error', 'ADMIN_PASSWORD not configured on server');
-  }
-
-  if (password !== expected) {
-    redirectWithResult('error', 'Invalid password');
-  }
-
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, getSessionCookieValue(password), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/admin',
-    maxAge: SESSION_MAX_AGE,
-  });
-
-  redirectWithResult('success', 'Logged in');
-}
-
 export async function uploadStandingsAction(formData: FormData): Promise<never> {
-  const jar = await cookies();
-  if (!isValidSession(jar.get(SESSION_COOKIE)?.value)) {
-    redirectWithResult('error', 'Not authenticated');
-  }
+  await requireAdmin();
 
   const championshipId = (formData.get('championshipId') as string)?.trim().toLowerCase();
   if (!championshipId || !isValidStandingsKey(championshipId)) {
@@ -92,10 +51,4 @@ export async function uploadStandingsAction(formData: FormData): Promise<never> 
     'success',
     `Saved standings for championship ${championshipId} (${validation.data.length} class group(s), ${validation.data.reduce((n, g) => n + g.standings.length, 0)} entries)`,
   );
-}
-
-export async function logoutAction(): Promise<never> {
-  const jar = await cookies();
-  jar.delete(SESSION_COOKIE);
-  redirectWithResult('success', 'Logged out');
 }

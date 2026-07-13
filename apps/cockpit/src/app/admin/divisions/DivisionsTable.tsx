@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useMemo } from 'react';
-import { assignDivision, assignTier, assignBulk } from './actions';
+import { assignDivision, assignTier, assignBulk, resolveDiscordIds } from './actions';
 
 export type DriverRow = {
   id: string;
@@ -42,6 +42,9 @@ export default function DivisionsTable({
   const [bulkDivision, setBulkDivision] = useState('');
   const [bulkTier, setBulkTier] = useState('');
   const [isPending, startTransition] = useTransition();
+  const [discordIdsInput, setDiscordIdsInput] = useState('');
+  const [resolving, setResolving] = useState(false);
+  const [notFoundIds, setNotFoundIds] = useState<string[] | null>(null);
 
   const unassignedCount = useMemo(
     () => drivers.filter((d) => d.division_id === null || d.tier === null).length,
@@ -152,6 +155,27 @@ export default function DivisionsTable({
     });
   }
 
+  async function handleResolveDiscordIds() {
+    const ids = discordIdsInput
+      .split(/[\s,]+/)
+      .map((id) => id.trim())
+      .filter(Boolean);
+    if (ids.length === 0) return;
+
+    setResolving(true);
+    try {
+      const { matchedIds, notFound } = await resolveDiscordIds(ids);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        matchedIds.forEach((id) => next.add(id));
+        return next;
+      });
+      setNotFoundIds(notFound);
+    } finally {
+      setResolving(false);
+    }
+  }
+
   function clearFilters() {
     setSearch('');
     setDivFilter(null);
@@ -166,6 +190,39 @@ export default function DivisionsTable({
 
   return (
     <div>
+      {/* Bulk Discord ID lookup — for initial classification runthroughs */}
+      <div className="mb-6 px-4 py-4 border border-line bg-panel-2">
+        <p className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 mb-2">
+          Bulk Add by Discord ID
+        </p>
+        <p className="font-mono text-[11px] text-txt-3 mb-3">
+          Paste Discord IDs (one per line, or comma/space separated) to add matching drivers to the selection below.
+        </p>
+        <textarea
+          value={discordIdsInput}
+          onChange={(e) => setDiscordIdsInput(e.target.value)}
+          placeholder={'123456789012345678\n234567890123456789'}
+          rows={4}
+          className="w-full bg-carbon border border-line px-3 py-2 font-mono text-[12px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold resize-y"
+        />
+        <div className="flex items-center gap-3 mt-3">
+          <button
+            onClick={handleResolveDiscordIds}
+            disabled={resolving || discordIdsInput.trim() === ''}
+            className="px-4 py-1.5 bg-gold text-carbon font-mono text-[11px] tracking-[.15em] uppercase font-bold hover:bg-gold-soft transition-colors disabled:opacity-40"
+          >
+            {resolving ? 'Looking up…' : 'Add to Selection'}
+          </button>
+          {notFoundIds && (
+            <span className="font-mono text-[11px] text-txt-3">
+              {notFoundIds.length === 0
+                ? 'All IDs matched.'
+                : `${notFoundIds.length} ID${notFoundIds.length === 1 ? '' : 's'} not found: ${notFoundIds.join(', ')}`}
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <input

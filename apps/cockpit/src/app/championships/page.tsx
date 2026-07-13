@@ -46,11 +46,11 @@ export default function ChampionshipsPage() {
       </h1>
 
       {/* Active championships */}
-      {CHAMPIONSHIPS.filter((c) => c.schedule.length > 0).length > 0 && (
+      {CHAMPIONSHIPS.filter((c) => c.schedule.length > 0 && !c.teaserOnly).length > 0 && (
         <div className="mb-20">
           <SectionLabel>Active Championships</SectionLabel>
           <div className="flex flex-col gap-6">
-            {CHAMPIONSHIPS.filter((c) => c.schedule.length > 0).map((content) => (
+            {CHAMPIONSHIPS.filter((c) => c.schedule.length > 0 && !c.teaserOnly).map((content) => (
               <RealChampionshipBlock key={content.standingsKey ?? content.simgridId ?? content.title} content={content} />
             ))}
           </div>
@@ -58,11 +58,11 @@ export default function ChampionshipsPage() {
       )}
 
       {/* Upcoming championships */}
-      {CHAMPIONSHIPS.filter((c) => c.schedule.length === 0).length > 0 && (
+      {CHAMPIONSHIPS.filter((c) => c.schedule.length === 0 || c.teaserOnly).length > 0 && (
         <div className="mb-20">
           <SectionLabel muted>Upcoming Championships</SectionLabel>
           <div className="flex flex-col gap-6">
-            {CHAMPIONSHIPS.filter((c) => c.schedule.length === 0).map((content) => (
+            {CHAMPIONSHIPS.filter((c) => c.schedule.length === 0 || c.teaserOnly).map((content) => (
               <RealChampionshipBlock key={content.standingsKey ?? content.simgridId ?? content.title} content={content} />
             ))}
           </div>

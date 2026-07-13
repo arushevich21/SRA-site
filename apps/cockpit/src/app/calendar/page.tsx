@@ -1,7 +1,28 @@
+import { Fragment } from 'react';
 import Image from 'next/image';
-import { CHAMPIONSHIPS, formatScheduleDate } from '../../content/championships';
+import { CHAMPIONSHIPS, formatScheduleDateTime } from '../../content/championships';
+import { SIMS } from '@/content/sims';
+import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid';
+import { GameLabel } from '@/components/GameLabel';
+import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
 
 export default function CalendarPage() {
+  const teasedChamps = CHAMPIONSHIPS.filter((c) => c.teaserOnly);
+  const realChamps = CHAMPIONSHIPS.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
+
+  const gridEvents: CalendarGridEvent[] = realChamps.flatMap((champ) => {
+    const sim = SIMS.find((s) => s.game === champ.game);
+    return champ.schedule
+      .filter((round) => round.date)
+      .map((round) => ({
+        date: new Date(round.date!),
+        hasTime: round.date!.includes('T'),
+        title: `${champ.game} · R${round.round} · ${round.track}`,
+        href: sim ? `/${sim.slug}/championships/${champ.slug}` : '/calendar',
+        color: sim?.accentColor,
+      }));
+  });
+
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
@@ -11,7 +32,51 @@ export default function CalendarPage() {
         Race Calendar
       </h1>
 
-      {CHAMPIONSHIPS.filter((c) => c.schedule.length > 0).map((champ) => (
+      {gridEvents.length > 0 && <CalendarGrid events={gridEvents} />}
+
+      {teasedChamps.length === 0 && realChamps.length === 0 && (
+        <div className="border border-line/50 bg-carbon-2 px-8 py-12 text-center">
+          <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3">
+            No scheduled events yet — coming soon
+          </p>
+        </div>
+      )}
+
+      {teasedChamps.length > 0 && (
+        <div className="mb-16">
+          {teasedChamps.map((champ, i) => (
+            <Fragment key={champ.standingsKey ?? champ.simgridId ?? champ.title}>
+              {i > 0 && <div className="h-px bg-line my-10" />}
+              <div className="flex items-center gap-4">
+                {champ.logo && (
+                  <Image
+                    src={champ.logo}
+                    alt={champ.title}
+                    width={96}
+                    height={96}
+                    className="w-[80px] h-[80px] shrink-0 object-contain opacity-70"
+                  />
+                )}
+                <div>
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
+                    <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-txt-3/60 border-txt-3/20">
+                      {champ.classTag}
+                    </span>
+                    <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt/70">
+                      {champ.title}
+                    </h2>
+                  </div>
+                  <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3">
+                    Coming Soon
+                  </p>
+                </div>
+              </div>
+            </Fragment>
+          ))}
+        </div>
+      )}
+
+      {realChamps.map((champ) => (
         <div key={champ.standingsKey ?? champ.simgridId ?? champ.title} className="mb-14">
           <div className="flex items-center gap-4 mb-6">
             {champ.logo && (
@@ -28,7 +93,7 @@ export default function CalendarPage() {
                 {champ.classTag}
               </span>
               <span className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border text-txt-3 border-line">
-                {champ.game}
+                <GameLabel game={champ.game} />
               </span>
               <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt">
                 {champ.title}
@@ -41,30 +106,40 @@ export default function CalendarPage() {
           </p>
 
           <div className="border border-line bg-panel">
-            {champ.schedule.map((round, i) => (
-              <div
-                key={round.round}
-                className={[
-                  'flex items-center gap-5 px-6 py-[11px]',
-                  i < champ.schedule.length - 1
-                    ? 'border-b border-line/50'
-                    : '',
-                ].join(' ')}
-              >
-                <span className="font-mono text-[12px] tracking-[.2em] uppercase text-gold w-10 shrink-0">
-                  R{round.round}
-                </span>
-                <span className="font-display font-bold text-[16px] uppercase leading-none text-txt-2 flex-1 min-w-0 truncate">
-                  {round.track}
-                </span>
-                <span className="font-mono text-[11px] tracking-[.15em] text-txt-3 shrink-0 text-right">
-                  {formatScheduleDate(round.date)}
-                </span>
-                <span className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 shrink-0 w-16 text-right">
-                  {round.raceLength}
-                </span>
-              </div>
-            ))}
+            {champ.schedule.map((round, i) => {
+              const { date: dateStr, time: timeStr } = formatScheduleDateTime(round.date);
+              return (
+                <div
+                  key={round.round}
+                  className={[
+                    'flex items-center gap-5 px-6 py-[11px]',
+                    i < champ.schedule.length - 1
+                      ? 'border-b border-line/50'
+                      : '',
+                  ].join(' ')}
+                >
+                  <span className="font-mono text-[15px] tracking-[.2em] uppercase text-gold w-10 shrink-0">
+                    R{round.round}
+                  </span>
+                  <span className="font-display font-bold text-[20px] uppercase leading-none text-txt-2 flex-1 min-w-0 truncate">
+                    {round.track}
+                  </span>
+                  <span className="flex flex-col items-end shrink-0 leading-tight">
+                    <span className="font-display font-bold text-[14px] uppercase text-txt">
+                      <LocalScheduleDate iso={round.date} initial={dateStr} />
+                    </span>
+                    {timeStr && (
+                      <span className="font-mono text-[12px] tracking-[.1em] text-txt-2">
+                        <LocalScheduleTime iso={round.date} initial={timeStr} />
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-mono text-[10px] tracking-[.15em] uppercase text-txt-3/70 shrink-0 w-16 text-right">
+                    {round.raceLength}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}

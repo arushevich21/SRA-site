@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { requireAdmin } from '@/lib/require-admin';
 import { supabase } from '@/lib/supabase';
 import DivisionsTable, { type DriverRow, type Division } from './DivisionsTable';
@@ -54,6 +55,12 @@ export default async function AdminDivisionsPage() {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <section className="max-w-[1400px] mx-auto px-7 pt-14 pb-24">
+      <Link
+        href="/admin"
+        className="inline-flex items-center gap-2 font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 hover:text-gold transition-colors mb-5"
+      >
+        ← Go back
+      </Link>
       <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — Admin
       </span>

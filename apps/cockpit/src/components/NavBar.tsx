@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { getSimBySlug, SIMS, type SimConfig } from '@/content/sims';
+import { CHAMPIONSHIPS, getStandingsKey, type ChampionshipContent } from '@/content/championships';
+import { GameLabel } from '@/components/GameLabel';
 
 export type NavUser = {
   display_name: string | null;
@@ -34,16 +36,50 @@ const MAIN_NAV: NavItem[] = [
       { label: 'Discord', href: '/about/discord' },
     ],
   },
-  { label: 'Store', href: '/store' },
+  { label: 'Calendar', href: '/calendar' },
+  { label: 'Store', href: 'https://exclaim.gg/store/simracingalliance' },
 ];
 
-function buildSimNav(slug: string): NavItem[] {
+// Only worth a dropdown once a sim actually has more than one championship
+// for that tab — a single-item dropdown is just a redundant extra click, so
+// those fall back to a plain direct link (same as before this existed).
+function tabNavItem(
+  sim: SimConfig,
+  label: string,
+  tab: string,
+  champs: ChampionshipContent[],
+): NavItem {
+  const href = `/${sim.slug}/${tab}`;
+  if (champs.length <= 1) return { label, href };
+
+  return {
+    label,
+    href,
+    drop: [
+      { label: `All ${label}`, href },
+      ...champs.map((c) => ({
+        label: c.title,
+        href: `/${sim.slug}/championships/${c.slug}/${tab}`,
+      })),
+    ],
+  };
+}
+
+function buildSimNav(sim: SimConfig): NavItem[] {
+  const champsForSim = CHAMPIONSHIPS.filter((c) => c.game === sim.game);
+  const calendarChamps = champsForSim.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
+  const standingsChamps = champsForSim.filter(
+    (c) => c.emperorChampionshipId || (!c.teaserOnly && getStandingsKey(c)),
+  );
+  const leaderboardChamps = champsForSim.filter((c) => c.emperorChampionshipId);
+  const registerChamps = champsForSim.filter((c) => c.registrationKey);
+
   return [
-    { label: 'Championships', href: `/${slug}/championships` },
-    { label: 'Calendar', href: `/${slug}/calendar` },
-    { label: 'Register', href: `/${slug}/register` },
-    { label: 'Leaderboards', href: `/${slug}/leaderboards` },
-    { label: 'Standings', href: `/${slug}/standings` },
+    { label: 'Championships', href: `/${sim.slug}/championships` },
+    tabNavItem(sim, 'Calendar', 'calendar', calendarChamps),
+    tabNavItem(sim, 'Register', 'register', registerChamps),
+    tabNavItem(sim, 'Leaderboards', 'leaderboards', leaderboardChamps),
+    tabNavItem(sim, 'Standings', 'standings', standingsChamps),
   ];
 }
 
@@ -90,7 +126,7 @@ export default function NavBar({ user }: { user?: NavUser | null }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
   const { sim } = useSimContext();
-  const nav = sim ? buildSimNav(sim.slug) : MAIN_NAV;
+  const nav = sim ? buildSimNav(sim) : MAIN_NAV;
 
   // Close mobile menu on navigation
   useEffect(() => { setMenuOpen(false); }, [pathname]);
@@ -145,7 +181,7 @@ export default function NavBar({ user }: { user?: NavUser | null }) {
                     className="text-[12.5px] font-semibold tracking-[.13em] uppercase px-[13px] py-[10px] transition-colors whitespace-nowrap hover:text-txt"
                     style={{ color: s.accentColor }}
                   >
-                    {s.game}
+                    <GameLabel game={s.game} />
                   </Link>
                 ))}
                 <span className="w-px h-5 bg-line-2 mx-1" />
@@ -176,7 +212,7 @@ export default function NavBar({ user }: { user?: NavUser | null }) {
                       className="text-[12px] font-bold tracking-[.13em] uppercase whitespace-nowrap"
                       style={{ color: sim.accentColor }}
                     >
-                      {sim.game}
+                      <GameLabel game={sim.game} />
                     </span>
                     <span className="text-[11px] ml-[2px]" style={{ color: `${sim.accentColor}80` }}>▾</span>
                   </span>
@@ -191,7 +227,7 @@ export default function NavBar({ user }: { user?: NavUser | null }) {
                           className="inline-block w-[6px] h-[6px] rounded-full mr-2 shrink-0"
                           style={{ backgroundColor: s.accentColor }}
                         />
-                        {s.game}
+                        <GameLabel game={s.game} />
                       </Link>
                     ))}
                   </div>
@@ -215,6 +251,16 @@ export default function NavBar({ user }: { user?: NavUser | null }) {
                     ))}
                   </div>
                 </div>
+              ) : item.href.startsWith('http') ? (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={LINK_CLS}
+                >
+                  {item.label}
+                </a>
               ) : (
                 <Link key={item.href} href={item.href} className={LINK_CLS}>
                   {item.label}
@@ -299,7 +345,7 @@ export default function NavBar({ user }: { user?: NavUser | null }) {
                 >
                   <span className="w-[6px] h-[6px] rounded-full shrink-0" style={{ backgroundColor: s.accentColor }} />
                   <span className="font-mono text-[12px] font-bold tracking-[.12em] uppercase" style={{ color: s.accentColor }}>
-                    {s.game}
+                    <GameLabel game={s.game} />
                   </span>
                 </Link>
               ))}
@@ -314,20 +360,52 @@ export default function NavBar({ user }: { user?: NavUser | null }) {
               <Link href="/" className="flex items-center gap-3 py-3 text-[13px] font-semibold tracking-[.1em] uppercase text-txt-2 hover:text-gold transition-colors" onClick={close}>
                 ← Home
               </Link>
-              {buildSimNav(sim.slug).map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={[
-                    'flex items-center gap-3 py-3 border-b border-line/30',
-                    'text-[14px] font-semibold tracking-[.08em] uppercase transition-colors',
-                    pathname === item.href ? 'text-gold' : 'text-txt hover:text-gold-soft',
-                  ].join(' ')}
-                  onClick={close}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {buildSimNav(sim).map((item) =>
+                item.drop ? (
+                  <div key={item.label}>
+                    <Link
+                      href={item.href}
+                      className={[
+                        'flex items-center gap-3 py-3 border-b border-line/30',
+                        'text-[14px] font-semibold tracking-[.08em] uppercase transition-colors',
+                        pathname === item.href ? 'text-gold' : 'text-txt hover:text-gold-soft',
+                      ].join(' ')}
+                      onClick={close}
+                    >
+                      {item.label}
+                    </Link>
+                    <div className="pl-4">
+                      {item.drop.map((sub) => (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          className={[
+                            'flex items-center py-[10px] border-b border-line/20',
+                            'text-[12.5px] font-semibold tracking-[.06em] uppercase transition-colors',
+                            pathname === sub.href ? 'text-gold' : 'text-txt-2 hover:text-gold-soft',
+                          ].join(' ')}
+                          onClick={close}
+                        >
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={[
+                      'flex items-center gap-3 py-3 border-b border-line/30',
+                      'text-[14px] font-semibold tracking-[.08em] uppercase transition-colors',
+                      pathname === item.href ? 'text-gold' : 'text-txt hover:text-gold-soft',
+                    ].join(' ')}
+                    onClick={close}
+                  >
+                    {item.label}
+                  </Link>
+                ),
+              )}
             </>
           )}
 
@@ -353,6 +431,17 @@ export default function NavBar({ user }: { user?: NavUser | null }) {
                   </Link>
                 ))}
               </div>
+            ) : item.href.startsWith('http') ? (
+              <a
+                key={item.href}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center py-3 border-b border-line/30 text-[14px] font-semibold tracking-[.08em] uppercase transition-colors text-txt hover:text-gold-soft"
+                onClick={close}
+              >
+                {item.label}
+              </a>
             ) : (
               <Link
                 key={item.href}
