@@ -6,43 +6,44 @@ export default function PartnersPage() {
       name: "Trackside Hospitality",
       logo: "/sponsors/sliders/TS_Logo_White_SVG.png",
       href: "https://trackside.vip",
-      quote: null,
+      description:
+        "Curated race-weekend packages bundling travel, hospitality, and exclusive motorsport access.",
     },
     {
       name: "KP Concepts",
       logo: "/sponsors/sliders/kp_concepts.png",
       href: "https://www.kpconcepts.com/",
-      quote: null,
+      description:
+        "Custom vehicle renderings, graphic design, and photography/videography services.",
     },
     {
       name: "Triple Stint",
       logo: "/sponsors/partners/triple-stint/White%20Text/Logo.png",
       href: "https://triplestintracing.com/",
-      quote: null,
+      description: "High-quality racing gloves built for sim racers.",
     },
   ];
 
   const communityPartners = [
     {
       name: "Armamentario",
-      logo: "/sponsors/partners/armamentario/ARMA-black.svg",
+      logo: "/sponsors/partners/armamentario/ARMA-white.png",
       href: "https://armamentario.com/",
-      quote:
-        "Armamentario is how ACC should have designed its HUD...",
+      description:
+        "An all-in-one toolbox for ACC — setup management, overlays, and streaming tools.",
     },
     {
       name: "Trak Racer",
-      logo: "/sponsors/partners/trak-racer/logo.png",
+      logo: "/sponsors/partners/trak-racer/logo-new.png",
       href: "https://trakracer.com/",
-      quote:
-        "I am incredibly happy with my Trak Racer TR80...",
+      description: "Sim racing rigs and cockpit hardware for enthusiasts and pros.",
     },
     {
       name: "GO Setups",
-      logo: "/sponsors/partners/go-setups/GO_Setups_dark.png",
+      logo: "/sponsors/sliders/go-setups.png",
       href: "https://gosetups.gg/product/acc-setups/?ref=5879",
-      quote:
-        "Premium ACC setups built for competitive racing — used and trusted by SRA drivers.",
+      description:
+        "Pro-built race setups plus an overlay and data-comparison app for iRacing, ACC, and more.",
     },
   ];
 
@@ -76,23 +77,21 @@ export default function PartnersPage() {
             rel="noopener noreferrer"
             className="border border-line bg-panel p-6 flex flex-col hover:border-gold/40 transition-colors"
           >
-            <div className="h-24 flex items-center justify-center mb-6">
+            <div className="h-32 flex items-center justify-center mb-6">
               <Image
                 src={partner.logo}
                 alt={partner.name}
                 width={200}
-                height={96}
+                height={128}
                 className="max-h-full max-w-full object-contain"
               />
             </div>
             <span className="font-display font-bold text-[20px] uppercase text-txt mb-3">
               {partner.name}
             </span>
-            {partner.quote && (
-              <p className="font-sans text-sm text-txt-2 leading-relaxed italic">
-                &ldquo;{partner.quote}&rdquo;
-              </p>
-            )}
+            <p className="font-sans text-sm text-txt-2 leading-relaxed">
+              {partner.description}
+            </p>
           </a>
         ))}
       </div>
@@ -124,11 +123,9 @@ export default function PartnersPage() {
             <span className="font-display font-bold text-[20px] uppercase text-txt mb-3">
               {partner.name}
             </span>
-            {partner.quote && (
-              <p className="font-sans text-sm text-txt-2 leading-relaxed italic">
-                &ldquo;{partner.quote}&rdquo;
-              </p>
-            )}
+            <p className="font-sans text-sm text-txt-2 leading-relaxed">
+              {partner.description}
+            </p>
           </a>
         ))}
       </div>
@@ -139,10 +136,10 @@ export default function PartnersPage() {
       <h2 className="font-display font-bold text-[28px] uppercase text-txt mt-16 mb-6">
         Additional Partners
       </h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-6">
+      <div className="flex flex-wrap justify-center gap-6">
         {additionalPartners.map((partner) => {
           const inner = (
-            <div className="border border-line bg-panel p-6 flex items-center justify-center aspect-square hover:border-gold/40 transition-colors">
+            <div className="w-[120px] sm:w-[130px] border border-line bg-panel p-6 flex items-center justify-center aspect-square hover:border-gold/40 transition-colors">
               <Image
                 src={partner.logo}
                 alt=""

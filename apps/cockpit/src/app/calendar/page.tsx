@@ -59,12 +59,12 @@ export default function CalendarPage() {
                 )}
                 <div>
                   <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-txt-3/60 border-txt-3/20">
-                      {champ.classTag}
-                    </span>
                     <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt/70">
                       {champ.title}
                     </h2>
+                    <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-txt-3/60 border-txt-3/20">
+                      {champ.classTag}
+                    </span>
                   </div>
                   <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3">
                     Coming Soon
@@ -89,21 +89,28 @@ export default function CalendarPage() {
               />
             )}
             <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt">
+                {champ.title}
+              </h2>
               <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-gold border-gold/40">
                 {champ.classTag}
               </span>
               <span className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border text-txt-3 border-line">
                 <GameLabel game={champ.game} />
               </span>
-              <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt">
-                {champ.title}
-              </h2>
             </div>
           </div>
 
-          <p className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 mb-5">
-            {champ.raceFormat}
-          </p>
+          <div className="mb-5 space-y-1">
+            {champ.raceDays && (
+              <p className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-2">
+                {champ.raceDays}
+              </p>
+            )}
+            <p className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3">
+              {champ.raceFormat}
+            </p>
+          </div>
 
           <div className="border border-line bg-panel">
             {champ.schedule.map((round, i) => {
@@ -124,17 +131,20 @@ export default function CalendarPage() {
                   <span className="font-display font-bold text-[20px] uppercase leading-none text-txt-2 flex-1 min-w-0 truncate">
                     {round.track}
                   </span>
-                  <span className="flex flex-col items-end shrink-0 leading-tight">
-                    <span className="font-display font-bold text-[14px] uppercase text-txt">
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="font-display font-bold text-[20px] uppercase leading-none text-txt">
                       <LocalScheduleDate iso={round.date} initial={dateStr} />
                     </span>
                     {timeStr && (
-                      <span className="font-mono text-[12px] tracking-[.1em] text-txt-2">
-                        <LocalScheduleTime iso={round.date} initial={timeStr} />
-                      </span>
+                      <>
+                        <span className="text-txt-3">·</span>
+                        <span className="font-mono text-[15px] tracking-[.1em] text-txt-2">
+                          <LocalScheduleTime iso={round.date} initial={timeStr} />
+                        </span>
+                      </>
                     )}
                   </span>
-                  <span className="font-mono text-[10px] tracking-[.15em] uppercase text-txt-3/70 shrink-0 w-16 text-right">
+                  <span className="font-mono text-[15px] tracking-[.1em] uppercase text-txt-3/70 shrink-0 w-24 text-right">
                     {round.raceLength}
                   </span>
                 </div>

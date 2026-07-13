@@ -2,28 +2,28 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { SIMS } from '@/content/sims';
 import { GameLabel } from '@/components/GameLabel';
+import { CountUpStats } from '@/components/CountUpStats';
 
 const STATS = [
   { value: '18', label: 'Seasons' },
   { value: '3,400+', label: 'Members' },
-  { value: '4', label: 'Divisions' },
-  { value: '38', label: 'ACC Servers' },
+  { value: '40+', label: 'Race Servers' },
   { value: '94,327', label: 'Sessions' },
   { value: '4,540,616', label: 'Laps' },
 ];
 
 const PARTNERS = [
-  { logo: '/sponsors/sliders/armamentario-com.png', href: 'https://www.armamentario.com' },
-  { logo: '/sponsors/sliders/go-setups.png', href: 'https://gosetups.gg/product/acc-setups/?ref=5879' },
-  { logo: '/sponsors/sliders/trak-racer.png', href: 'https://trakracer.com' },
-  { logo: '/sponsors/sliders/documize-com.png', href: 'https://documize.com' },
-  { logo: '/sponsors/sliders/retro-saga-ca.png', href: 'https://retrosaga.ca' },
-  { logo: '/sponsors/sliders/at3d-sim-shop.png', href: 'https://at3d.net' },
-  { logo: '/sponsors/sliders/castlecauldron.png', href: 'https://facebook.com/castlecauldron' },
-  { logo: '/sponsors/sliders/kp_concepts.png', href: 'https://www.kpconcepts.com' },
-  { logo: '/sponsors/sliders/echoes_of_nox.png', href: 'https://store.steampowered.com/app/4368440/Echoes_of_Nox/' },
-  { logo: '/sponsors/sliders/TS_Logo_White_SVG.png', href: 'https://trackside.vip' },
-  { logo: '/sponsors/partners/triple-stint/White%20Text/Logo.png', href: 'https://triplestintracing.com/' },
+  { name: 'Armamentario', logo: '/sponsors/sliders/armamentario-com.png', href: 'https://www.armamentario.com' },
+  { name: 'AT3D', logo: '/sponsors/sliders/at3d-sim-shop.png', href: 'https://at3d.net' },
+  { name: 'Castle Cauldron', logo: '/sponsors/sliders/castlecauldron.png', href: 'https://facebook.com/castlecauldron' },
+  { name: 'Documize', logo: '/sponsors/sliders/documize-com.png', href: 'https://documize.com' },
+  { name: 'Echoes of Nox', logo: '/sponsors/sliders/echoes_of_nox.png', href: 'https://store.steampowered.com/app/4368440/Echoes_of_Nox/' },
+  { name: 'GO Setups', logo: '/sponsors/sliders/go-setups.png', href: 'https://gosetups.gg/product/acc-setups/?ref=5879' },
+  { name: 'KP Concepts', logo: '/sponsors/sliders/kp_concepts.png', href: 'https://www.kpconcepts.com' },
+  { name: 'Retro Saga', logo: '/sponsors/sliders/retro-saga-ca.png', href: 'https://retrosaga.ca' },
+  { name: 'Trackside', logo: '/sponsors/sliders/TS_Logo_White_SVG.png', href: 'https://trackside.vip' },
+  { name: 'Trak Racer', logo: '/sponsors/sliders/trak-racer.png', href: 'https://trakracer.com' },
+  { name: 'Triple Stint', logo: '/sponsors/partners/triple-stint/White%20Text/Logo.png', href: 'https://triplestintracing.com/' },
 ];
 
 export default function HomePage() {
@@ -50,14 +50,17 @@ export default function HomePage() {
           />
 
           <h1 className="font-display font-black text-[clamp(36px,5.5vw,64px)] uppercase leading-[.95] tracking-[-1px] text-txt">
-            We are <span className="shake text-gold">excited</span> to have
-            you be a part of our league!
+            Welcome to Sim Racing Alliance
           </h1>
 
           <p className="font-sans text-[16px] text-txt-2 leading-relaxed mt-6 max-w-[600px] mx-auto">
-            We are a North American PC-based sim racing league, and we strive to
-            provide a competitive and clean racing environment. Let&apos;s get you
-            set up to start racing and plugged into the community right away!
+            We are a <span className="text-gold">North American, PC-based</span>{' '}
+            sim racing league committed to providing a{' '}
+            <span className="text-gold">competitive</span> and{' '}
+            <span className="shake text-gold">clean</span> racing
+            environment. Explore the available racing platforms,
+            select the competition that suits you, and get connected with
+            the community.
           </p>
 
           <div className="mt-8">
@@ -73,13 +76,7 @@ export default function HomePage() {
           </div>
 
           {/* Stats bar */}
-          <div className="grid grid-cols-3 gap-x-4 gap-y-3 mt-12 justify-items-center sm:gap-x-8">
-            {STATS.map((stat) => (
-              <span key={stat.label} className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-2">
-                <span className="text-gold font-bold">{stat.value}</span> {stat.label}
-              </span>
-            ))}
-          </div>
+          <CountUpStats stats={STATS} />
         </div>
       </section>
 
@@ -89,11 +86,11 @@ export default function HomePage() {
           <span className="block font-mono text-[11px] tracking-[.35em] uppercase text-gold mb-5">
             Who We Are
           </span>
-          <p className="font-sans text-[17px] text-txt-2 leading-relaxed max-w-[640px] mx-auto">
+          <p className="font-sans text-[17px] text-txt-2 leading-relaxed max-w-[700px] mx-auto text-pretty">
             Sim Racing Alliance is a competitive multi-sim racing league
             featuring organized championships across multiple platforms.
             Whether you race GT3s in ACC, prototypes in Le Mans Ultimate,
-            or MX-5s in AC Evo — there&apos;s a grid with your name on it.
+            or MX-5s in AC Evo — there&apos;s a grid with your&nbsp;name&nbsp;on&nbsp;it.
           </p>
         </div>
       </section>
@@ -153,7 +150,7 @@ export default function HomePage() {
               >
                 <Image
                   src={p.logo}
-                  alt=""
+                  alt={p.name}
                   width={120}
                   height={40}
                   className="max-h-[40px] max-w-full object-contain"

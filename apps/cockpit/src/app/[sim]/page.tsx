@@ -44,7 +44,7 @@ const ROADMAP_STEPS = [
   {
     step: '04',
     title: 'Race',
-    body: 'Show up on race night, compete clean, and climb the standings. Every race counts toward the championship.',
+    body: 'Show up on race night, attend the drivers briefing, compete clean and climb the standings. Every race counts toward the championship.',
     cta: null,
   },
 ];
@@ -90,10 +90,8 @@ export default async function SimOverviewPage({
           <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-3">
             <GameLabel game={sim.displayName} />
           </h1>
-          <p className="font-sans text-[16px] text-txt-2 leading-relaxed max-w-[520px]">
-            {allChamps.length > 0
-              ? `${allChamps.length} championship${allChamps.length !== 1 ? 's' : ''} — find your grid and start racing.`
-              : 'Championships coming soon — stay tuned.'}
+          <p className="font-sans text-[16px] text-txt-2 leading-relaxed whitespace-nowrap">
+            {sim.tagline}
           </p>
         </div>
       </section>
@@ -109,7 +107,7 @@ export default async function SimOverviewPage({
               Events
             </span>
             <h2 className="font-display font-black text-[clamp(28px,4vw,48px)] uppercase leading-[.92] tracking-[-0.5px] text-txt mb-10">
-              Pick Your Event
+              Select Your Event
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -138,6 +136,9 @@ export default async function SimOverviewPage({
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <h3 className="font-display font-bold text-[20px] uppercase leading-tight text-txt">
+                            {champ.title}
+                          </h3>
                           <span
                             className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[1px] border"
                             style={{
@@ -167,9 +168,6 @@ export default async function SimOverviewPage({
                             </span>
                           </span>
                         </div>
-                        <h3 className="font-display font-bold text-[20px] uppercase leading-tight text-txt mb-2">
-                          {champ.title}
-                        </h3>
                         <p className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3">
                           {status === 'coming-soon'
                             ? 'Coming Soon'
@@ -219,7 +217,15 @@ export default async function SimOverviewPage({
                   {step.title}
                 </h3>
                 <p className="font-sans text-[14px] text-txt leading-relaxed mb-4">
-                  {step.body}
+                  {step.step === '04' ? (
+                    <>
+                      Show up on race night, attend the drivers briefing, compete{' '}
+                      <span className="shake" style={{ color: simAccent }}>clean</span>{' '}
+                      and climb the standings. Every race counts toward the championship.
+                    </>
+                  ) : (
+                    step.body
+                  )}
                 </p>
                 {step.cta && (
                   step.cta.external ? (

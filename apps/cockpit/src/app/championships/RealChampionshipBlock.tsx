@@ -61,41 +61,6 @@ export function RealChampionshipBlock({
         </span>
       </div>
 
-      {/* Tags row */}
-      <div className="mb-5 flex items-center gap-3 flex-wrap">
-        <span
-          className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border"
-          style={{
-            color: simAccent ?? undefined,
-            borderColor: simAccent ? `${simAccent}40` : undefined,
-            opacity: isDimmed ? 0.6 : 1,
-          }}
-        >
-          <GameLabel game={content.game} />
-        </span>
-        <CategoryTag label={content.classTag} muted={isDimmed} />
-        {content.formatTag && (
-          <span
-            className={[
-              'font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border',
-              isDimmed ? 'text-txt-3/60 border-txt-3/20' : 'text-txt-3 border-line',
-            ].join(' ')}
-          >
-            {content.formatTag}
-          </span>
-        )}
-        {content.eventType === 'exhibition' && (
-          <span
-            className={[
-              'font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border',
-              isDimmed ? 'text-txt-3/60 border-txt-3/20' : 'text-txt-3 border-line',
-            ].join(' ')}
-          >
-            Exhibition
-          </span>
-        )}
-      </div>
-
       {/* Logo + info */}
       <div className="flex gap-7 flex-col sm:flex-row">
         {content.logo && (
@@ -109,30 +74,68 @@ export function RealChampionshipBlock({
         )}
 
         <div className="min-w-0 flex-1">
-          <h2
-            className={[
-              'font-display font-black text-[clamp(28px,4vw,40px)] uppercase leading-none tracking-[-0.5px]',
-              isDimmed ? 'text-txt/70' : 'text-txt',
-            ].join(' ')}
-          >
-            {href ? (
-              <Link href={href} className="hover:text-gold transition-colors">
-                {content.title}
-              </Link>
-            ) : (
-              content.title
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2
+              className={[
+                'font-display font-black text-[clamp(28px,4vw,40px)] uppercase leading-none tracking-[-0.5px]',
+                isDimmed ? 'text-txt/70' : 'text-txt',
+              ].join(' ')}
+            >
+              {href ? (
+                <Link href={href} className="hover:text-gold transition-colors">
+                  {content.title}
+                </Link>
+              ) : (
+                content.title
+              )}
+            </h2>
+            <span
+              className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border"
+              style={{
+                color: simAccent ?? undefined,
+                borderColor: simAccent ? `${simAccent}40` : undefined,
+                opacity: isDimmed ? 0.6 : 1,
+              }}
+            >
+              <GameLabel game={content.game} />
+            </span>
+            <CategoryTag label={content.classTag} muted={isDimmed} />
+            {content.formatTag && (
+              <span
+                className={[
+                  'font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border',
+                  isDimmed ? 'text-txt-3/60 border-txt-3/20' : 'text-txt-3 border-line',
+                ].join(' ')}
+              >
+                {content.formatTag}
+              </span>
             )}
-          </h2>
+            {content.eventType === 'exhibition' && (
+              <span
+                className={[
+                  'font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border',
+                  isDimmed ? 'text-txt-3/60 border-txt-3/20' : 'text-txt-3 border-line',
+                ].join(' ')}
+              >
+                Exhibition
+              </span>
+            )}
+          </div>
 
-          <p className="font-mono text-[12px] tracking-[.3em] uppercase text-txt-2 mt-3">
-            {content.schedule.length > 0 && status !== 'coming-soon' && (
-              <>
-                {content.schedule.length} Rounds
-                <span className="text-txt-3"> · </span>
-              </>
-            )}
-            {content.raceFormat}
-          </p>
+          <div className="mt-3 space-y-1">
+            <p className="font-mono text-[12px] tracking-[.3em] uppercase text-txt-2">
+              {content.schedule.length > 0 && status !== 'coming-soon' && (
+                <>
+                  {content.schedule.length} Rounds
+                  <span className="text-txt-3"> · </span>
+                </>
+              )}
+              {content.raceDays}
+            </p>
+            <p className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3">
+              {content.raceFormat}
+            </p>
+          </div>
 
           {/* Don't leak the schedule for series that haven't been officially announced yet */}
           {content.schedule.length > 0 && status !== 'coming-soon' && (

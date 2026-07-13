@@ -22,6 +22,9 @@ export type ChampionshipContent = {
   title: string;
   logo?: string;
   raceFormat: string;
+  // Days/times racing happens, e.g. "Tuesday & Wednesday nights at 9:00 PM EDT" —
+  // kept separate from raceFormat so the UI can show it on its own line.
+  raceDays?: string;
   rulesBullets: string[];
   discordLinks: { label: string; url: string }[];
   resultsUrl: string | null;
@@ -79,8 +82,8 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     classes: ['GT3'],
     title: 'GT3 Team Series — Season 19',
     logo: '/badges/gt3_team_series_logo.png',
-    raceFormat:
-      '10 min qualifying · 60 min race · Tuesday & Wednesday nights at 9:00 PM EDT',
+    raceFormat: '60 min race · 10 min qualifying',
+    raceDays: 'Tuesday & Wednesday nights at 9:00 PM EDT',
     rulesBullets: [
       'Divisions 1 & 3 race on Tuesday nights, Divisions 2 & 4 race on Wednesday nights',
       'Required pit stop with tire change, no refueling allowed (58 minute pit window)',
@@ -136,8 +139,8 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     title: 'SRA GT3 Endurance Series — Season 3',
     logo: '/badges/endurance-series_logo.png',
     teaserOnly: true,
-    raceFormat:
-      '65 min stint timer · Refueling not fixed · Unlimited tires · Live stewarding',
+    raceFormat: '65 min stint timer · Refueling not fixed · Unlimited tires · Live stewarding',
+    raceDays: 'Saturdays',
     rulesBullets: [
       '1–4 drivers per team',
       '3 divisions: Open, Silver, and Bronze',
@@ -176,8 +179,8 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     title: 'SRA Multiclass Mayhem - LMU - Season 3 Split 1',
     logo: '/badges/multiclass_mayhem_logo.png',
     concluded: true,
-    raceFormat:
-      '30 min practice (final 10 min drivers briefing) · 10 min solo qualifying · 45–90 min race',
+    raceFormat: '45–90 min race · 30 min practice (final 10 min drivers briefing) · 10 min solo qualifying',
+    raceDays: 'Thursdays at 8:30 PM EDT',
     rulesBullets: [],
     discordLinks: [
       { label: 'Series Rules', url: 'https://discord.com/channels/915686674833498203/935279836396666930' },
@@ -208,8 +211,8 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     classes: ['MX-5'],
     title: 'SRA MX5 Cup',
     logo: '/badges/SRA_MX5_Cup_logo_transparent.png',
-    raceFormat:
-      '20 min practice · 10 min qualifying · 30 min race · Weekly at 9:00 PM EDT',
+    raceFormat: '30 min race · 20 min practice · 10 min qualifying',
+    raceDays: 'Weekly at 9:00 PM EDT',
     rulesBullets: [
       'Points for pole position: 5 · Points for fastest lap: 5',
       'Practice server is live — search "SRA" in the AC Evo server browser: #SRAgg | Sim Racing Alliance | Main Server #1 | #SRAM1',
