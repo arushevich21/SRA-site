@@ -24,8 +24,7 @@ export function ChampionshipCalendarBody({
   const gridEvents: CalendarGridEvent[] = champ.schedule
     .filter((round) => round.date)
     .map((round) => ({
-      date: new Date(round.date!),
-      hasTime: round.date!.includes('T'),
+      iso: round.date!,
       title: `R${round.round} · ${round.track}`,
       href: `/${simSlug}/championships/${champ.slug}`,
       color: accentColor,
@@ -48,7 +47,7 @@ export function ChampionshipCalendarBody({
 
       <div className="border border-line bg-panel">
         {champ.schedule.map((round, i) => {
-          const { date: dateStr, time: timeStr } = formatScheduleDateTime(round.date);
+          const { time: timeStr } = formatScheduleDateTime(round.date);
           return (
             <div
               key={round.round}
@@ -65,13 +64,13 @@ export function ChampionshipCalendarBody({
               </span>
               <span className="flex items-center gap-2 shrink-0">
                 <span className="font-display font-bold text-[20px] uppercase leading-none text-txt">
-                  <LocalScheduleDate iso={round.date} initial={dateStr} />
+                  <LocalScheduleDate iso={round.date} />
                 </span>
                 {timeStr && (
                   <>
                     <span className="text-txt-3">·</span>
                     <span className="font-mono text-[15px] tracking-[.1em] text-txt-2">
-                      <LocalScheduleTime iso={round.date} initial={timeStr} />
+                      <LocalScheduleTime iso={round.date} />
                     </span>
                   </>
                 )}

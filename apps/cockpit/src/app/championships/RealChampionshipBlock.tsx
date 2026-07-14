@@ -6,6 +6,7 @@ import { SIMS } from '@/content/sims';
 import { CategoryTag } from './shared';
 import { getChampionshipStatus, CHAMPIONSHIP_STATUS_LABELS } from '@/lib/championship-status';
 import { GameLabel } from '@/components/GameLabel';
+import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
 
 const STATUS_DOT_CLASS: Record<string, string> = {
   concluded: 'bg-concluded',
@@ -141,7 +142,7 @@ export function RealChampionshipBlock({
           {content.schedule.length > 0 && status !== 'coming-soon' && (
             <div className="mt-5 border border-line/60 bg-carbon-2/40">
               {content.schedule.map((round, i) => {
-                const { date: dateStr, time: timeStr } = formatScheduleDateTime(round.date);
+                const { time: timeStr } = formatScheduleDateTime(round.date);
                 return (
                   <div
                     key={round.round}
@@ -158,10 +159,12 @@ export function RealChampionshipBlock({
                     </span>
                     <span className="flex flex-col items-end shrink-0 leading-tight">
                       <span className="font-display font-bold text-[12px] uppercase text-txt">
-                        {dateStr}
+                        <LocalScheduleDate iso={round.date} />
                       </span>
                       {timeStr && (
-                        <span className="font-mono text-[11px] text-txt-3">{timeStr}</span>
+                        <span className="font-mono text-[11px] text-txt-3">
+                          <LocalScheduleTime iso={round.date} />
+                        </span>
                       )}
                     </span>
                     <span className="font-mono text-[10px] tracking-[.1em] uppercase text-txt-3/70 shrink-0 w-14 text-right">

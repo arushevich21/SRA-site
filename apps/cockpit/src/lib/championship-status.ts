@@ -1,4 +1,5 @@
 import type { ChampionshipContent } from '@/content/championships';
+import { eventInstant } from '@/lib/event-time';
 
 export type ChampionshipStatus =
   | 'concluded'
@@ -20,7 +21,7 @@ export function getChampionshipStatus(content: ChampionshipContent): Championshi
   if (content.teaserOnly || content.schedule.length === 0) return 'coming-soon';
 
   const firstRoundDate = content.schedule.find((r) => r.date)?.date;
-  if (firstRoundDate && new Date(firstRoundDate) > new Date()) return 'upcoming';
+  if (firstRoundDate && eventInstant(firstRoundDate) > Date.now()) return 'upcoming';
 
   // The open/closed distinction only makes sense for series that gate entry
   // behind team registration. Series without one (e.g. a drop-in cup) are

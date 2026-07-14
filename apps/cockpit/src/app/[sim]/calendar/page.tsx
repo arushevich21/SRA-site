@@ -27,8 +27,7 @@ export default async function SimCalendarPage({
     champ.schedule
       .filter((round) => round.date)
       .map((round) => ({
-        date: new Date(round.date!),
-        hasTime: round.date!.includes('T'),
+        iso: round.date!,
         title: `R${round.round} · ${round.track}`,
         href: `/${slug}/championships/${champ.slug}`,
         color: sim.accentColor,
@@ -64,12 +63,12 @@ export default async function SimCalendarPage({
                     className="w-[80px] h-[80px] shrink-0 object-contain opacity-70"
                   />
                 )}
-                <div>
-                  <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt/70">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt/70 min-w-0 truncate">
                       {champ.title}
                     </h2>
-                    <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-txt-3/60 border-txt-3/20">
+                    <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-txt-3/60 border-txt-3/20 whitespace-nowrap shrink-0">
                       {champ.classTag}
                     </span>
                   </div>
@@ -96,11 +95,11 @@ export default async function SimCalendarPage({
                   className="w-[80px] h-[80px] shrink-0 object-contain"
                 />
               )}
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt min-w-0 truncate">
                   {champ.title}
                 </h2>
-                <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-gold border-gold/40">
+                <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-gold border-gold/40 whitespace-nowrap shrink-0">
                   {champ.classTag}
                 </span>
               </div>
@@ -119,7 +118,7 @@ export default async function SimCalendarPage({
 
             <div className="border border-line bg-panel">
               {champ.schedule.map((round, i) => {
-                const { date: dateStr, time: timeStr } = formatScheduleDateTime(round.date);
+                const { time: timeStr } = formatScheduleDateTime(round.date);
                 return (
                   <div
                     key={round.round}
@@ -138,13 +137,13 @@ export default async function SimCalendarPage({
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className="font-display font-bold text-[20px] uppercase leading-none text-txt">
-                        <LocalScheduleDate iso={round.date} initial={dateStr} />
+                        <LocalScheduleDate iso={round.date} />
                       </span>
                       {timeStr && (
                         <>
                           <span className="text-txt-3">·</span>
                           <span className="font-mono text-[15px] tracking-[.1em] text-txt-2">
-                            <LocalScheduleTime iso={round.date} initial={timeStr} />
+                            <LocalScheduleTime iso={round.date} />
                           </span>
                         </>
                       )}

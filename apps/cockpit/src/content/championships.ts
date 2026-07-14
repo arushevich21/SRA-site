@@ -1,7 +1,12 @@
+import { EVENT_SOURCE_TIMEZONE, eventDateTimeParts } from '@/lib/event-time';
+
 export type ScheduleRound = {
   round: number;
   track: string;
-  date: string | null; // ISO datetime in local time (EDT), null = TBA
+  // Naked ISO datetime meaning Eastern wall-clock time (America/New_York —
+  // interpreted DST-aware by lib/event-time.ts). Date-only = time TBA;
+  // null = fully TBA.
+  date: string | null;
   raceLength: string;
   emperorTrack?: string; // exact "TrackName,Layout" string for Emperor's leaderboard ?track= param
   emperorRawTrackName?: string; // raw Emperor track_name for hot-lap cache lookups, e.g. "Road Atlanta"
@@ -49,22 +54,10 @@ export function getStandingsKey(c: ChampionshipContent): string | undefined {
 
 // Date and time split apart so callers (e.g. calendar rows) can give the
 // date/time more visual weight than the surrounding duration/format text.
+// Pinned to Eastern so it's deterministic across server and client — use it
+// for SSR fallbacks; viewer-local display goes through LocalScheduleDateTime.
 export function formatScheduleDateTime(date: string | null): { date: string; time: string | null } {
-  if (!date) return { date: 'TBA', time: null };
-  const hasTime = date.includes('T');
-  const d = new Date(date);
-  const dateStr = d.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-  if (!hasTime) return { date: dateStr, time: null };
-  const timeStr = d.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  });
-  return { date: dateStr, time: timeStr };
+  return eventDateTimeParts(date, EVENT_SOURCE_TIMEZONE);
 }
 
 export function formatScheduleDate(date: string | null): string {
