@@ -57,11 +57,11 @@ export default function CalendarPage() {
                   />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt/70 min-w-0 truncate">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2">
+                    <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt/70 text-balance">
                       {champ.title}
                     </h2>
-                    <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-txt-3/60 border-txt-3/20 whitespace-nowrap shrink-0">
+                    <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-txt-3/60 border-txt-3/20 whitespace-nowrap">
                       {champ.classTag}
                     </span>
                   </div>
@@ -87,15 +87,17 @@ export default function CalendarPage() {
                 className="w-[80px] h-[80px] shrink-0 object-contain"
               />
             )}
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt min-w-0 truncate">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0 flex-1">
+              <h2 className="font-display font-bold text-[20px] uppercase leading-none text-txt text-balance">
                 {champ.title}
               </h2>
-              <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-gold border-gold/40 whitespace-nowrap shrink-0">
-                {champ.classTag}
-              </span>
-              <span className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border text-txt-3 border-line whitespace-nowrap shrink-0">
-                <GameLabel game={champ.game} />
+              <span className="flex items-center gap-3 whitespace-nowrap">
+                <span className="inline-block font-mono text-[11px] tracking-[.35em] uppercase px-2 py-[3px] border text-gold border-gold/40">
+                  {champ.classTag}
+                </span>
+                <span className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[2px] border text-txt-3 border-line">
+                  <GameLabel game={champ.game} />
+                </span>
               </span>
             </div>
           </div>

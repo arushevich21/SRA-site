@@ -131,41 +131,53 @@ export default async function SimOverviewPage({
                           alt={champ.title}
                           width={400}
                           height={400}
-                          className="w-[70px] h-[70px] sm:w-[120px] sm:h-[120px] shrink-0 object-contain"
+                          className="w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 object-contain"
                         />
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-display font-bold text-[20px] uppercase leading-tight text-txt min-w-0 flex-1 truncate">
-                            {champ.title}
-                          </h3>
-                          <span
-                            className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[1px] border whitespace-nowrap shrink-0"
-                            style={{
-                              color: simAccent,
-                              borderColor: `${simAccent}40`,
-                            }}
-                          >
-                            {champ.classTag}
-                          </span>
-                          {champ.formatTag && (
-                            <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line whitespace-nowrap shrink-0">
-                              {champ.formatTag}
+                        {/* The full title always shows on a single line (never
+                            truncated or wrapped): its wrapper is a container
+                            and the font scales down from 20px only when the
+                            card is too narrow for the longest titles. Status
+                            stays pinned right on the same line; the tag row
+                            sits on its own line beneath. */}
+                        <div className="mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0 @container">
+                              <h3 className="font-display font-bold text-[min(20px,5.8cqw)] uppercase leading-tight text-txt whitespace-nowrap">
+                                {champ.title}
+                              </h3>
+                            </div>
+                            <span className="flex items-center gap-1 whitespace-nowrap shrink-0">
+                              <span
+                                className={['w-[6px] h-[6px] rounded-full', STATUS_DOT_CLASS[status]].join(' ')}
+                                style={status === 'active-open' ? { animation: 'live-pulse 1.8s infinite' } : undefined}
+                              />
+                              <span className={['font-mono text-[10px] tracking-[.15em] uppercase', STATUS_TEXT_CLASS[status]].join(' ')}>
+                                {CHAMPIONSHIP_STATUS_LABELS[status]}
+                              </span>
                             </span>
-                          )}
-                          {champ.eventType === 'exhibition' && (
-                            <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line whitespace-nowrap shrink-0">
-                              Exhibition
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1 ml-auto whitespace-nowrap shrink-0">
+                          </div>
+                          <span className="mt-2 flex items-center gap-2 whitespace-nowrap">
                             <span
-                              className={['w-[6px] h-[6px] rounded-full', STATUS_DOT_CLASS[status]].join(' ')}
-                              style={status === 'active-open' ? { animation: 'live-pulse 1.8s infinite' } : undefined}
-                            />
-                            <span className={['font-mono text-[11px] tracking-[.2em] uppercase', STATUS_TEXT_CLASS[status]].join(' ')}>
-                              {CHAMPIONSHIP_STATUS_LABELS[status]}
+                              className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[1px] border"
+                              style={{
+                                color: simAccent,
+                                borderColor: `${simAccent}40`,
+                              }}
+                            >
+                              {champ.classTag}
                             </span>
+                            {champ.formatTag && (
+                              <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line">
+                                {champ.formatTag}
+                              </span>
+                            )}
+                            {champ.eventType === 'exhibition' && (
+                              <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line">
+                                Exhibition
+                              </span>
+                            )}
                           </span>
                         </div>
                         <p className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3">
