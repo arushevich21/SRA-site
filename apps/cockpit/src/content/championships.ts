@@ -169,10 +169,10 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     classTag: 'LMP2 / LMGT3',
     formatTag: 'Multiclass',
     classes: ['LMP2', 'LMGT3'],
-    title: 'SRA Multiclass Mayhem - LMU - Season 3 Split 1',
+    title: 'SRA Multiclass Mayhem - LMU - Season 3',
     logo: '/badges/multiclass_mayhem_logo.png',
     concluded: true,
-    raceFormat: '45–90 min race · 30 min practice (final 10 min drivers briefing) · 10 min solo qualifying',
+    raceFormat: '45-90 min race · 30 min practice (final 10 min drivers briefing) · 10 min solo qualifying',
     raceDays: 'Thursdays at 8:30 PM EDT',
     rulesBullets: [],
     discordLinks: [
