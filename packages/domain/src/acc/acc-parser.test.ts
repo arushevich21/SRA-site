@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseAccSession } from './acc-parser.js';
 
-const FIXTURES = resolve(__dirname, '../../../fixtures/acc-results');
+const FIXTURES = resolve(fileURLToPath(new URL('../../../../fixtures/acc-results', import.meta.url)));
 
 function loadFixture(name: string): unknown {
   return JSON.parse(readFileSync(resolve(FIXTURES, name), 'utf-8'));

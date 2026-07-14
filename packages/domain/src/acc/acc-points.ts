@@ -4,7 +4,7 @@ import {
   POSITION_POINTS,
   FASTEST_LAP_BONUS,
   BEST_QUAL_BONUS,
-} from './points-engine.js';
+} from '../points-engine.js';
 
 // ACC round scoring — mirrors ac-evo-points.ts's shape (small composable
 // functions, Record<string, number> keyed by steamId, plus exported point

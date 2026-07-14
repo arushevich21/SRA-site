@@ -22,10 +22,11 @@ export function computeRacePositionPoints(race: AcEvoSessionResult): {
     points[r.steamId] = (points[r.steamId] ?? 0) + (ACEVO_POSITION_POINTS[r.position] ?? 0);
   }
 
-  const fastest = race.results.reduce<AcEvoDriverResult | null>(
-    (best, r) => (r.bestLapMs != null && (best == null || r.bestLapMs < best.bestLapMs!) ? r : best),
-    null,
-  );
+  const fastest = race.results.reduce<AcEvoDriverResult | null>((best: AcEvoDriverResult | null, r: AcEvoDriverResult) => {
+    if (r.bestLapMs == null) return best;
+    if (best == null || r.bestLapMs < best.bestLapMs!) return r;
+    return best;
+  }, null);
 
   return { points, fastestLapSteamId: fastest?.steamId || null };
 }
@@ -33,13 +34,11 @@ export function computeRacePositionPoints(race: AcEvoSessionResult): {
 // Pole = best qualifying lap. qualifyingBestMs is null for a driver who set
 // no valid time, so they're naturally excluded.
 export function computePoleSteamId(qualify: AcEvoSessionResult): string | null {
-  const pole = qualify.results.reduce<AcEvoDriverResult | null>(
-    (best, r) =>
-      r.qualifyingBestMs != null && (best == null || r.qualifyingBestMs < best.qualifyingBestMs!)
-        ? r
-        : best,
-    null,
-  );
+  const pole = qualify.results.reduce<AcEvoDriverResult | null>((best: AcEvoDriverResult | null, r: AcEvoDriverResult) => {
+    if (r.qualifyingBestMs == null) return best;
+    if (best == null || r.qualifyingBestMs < best.qualifyingBestMs!) return r;
+    return best;
+  }, null);
   return pole?.steamId || null;
 }
 
