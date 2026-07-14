@@ -20,7 +20,7 @@ export default function PartnersPage() {
       name: "Triple Stint",
       logo: "/sponsors/partners/triple-stint/White%20Text/Logo.png",
       href: "https://triplestintracing.com/",
-      description: "High-quality racing gloves built for sim racers.",
+      description: "High quality gloves for questionable quality sim racers.",
     },
   ];
 

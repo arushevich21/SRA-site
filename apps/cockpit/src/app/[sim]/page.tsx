@@ -135,12 +135,12 @@ export default async function SimOverviewPage({
                         />
                       )}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <h3 className="font-display font-bold text-[20px] uppercase leading-tight text-txt">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-display font-bold text-[20px] uppercase leading-tight text-txt min-w-0 flex-1 truncate">
                             {champ.title}
                           </h3>
                           <span
-                            className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[1px] border"
+                            className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[1px] border whitespace-nowrap shrink-0"
                             style={{
                               color: simAccent,
                               borderColor: `${simAccent}40`,
@@ -149,16 +149,16 @@ export default async function SimOverviewPage({
                             {champ.classTag}
                           </span>
                           {champ.formatTag && (
-                            <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line">
+                            <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line whitespace-nowrap shrink-0">
                               {champ.formatTag}
                             </span>
                           )}
                           {champ.eventType === 'exhibition' && (
-                            <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line">
+                            <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line whitespace-nowrap shrink-0">
                               Exhibition
                             </span>
                           )}
-                          <span className="flex items-center gap-1 ml-auto">
+                          <span className="flex items-center gap-1 ml-auto whitespace-nowrap shrink-0">
                             <span
                               className={['w-[6px] h-[6px] rounded-full', STATUS_DOT_CLASS[status]].join(' ')}
                               style={status === 'active-open' ? { animation: 'live-pulse 1.8s infinite' } : undefined}

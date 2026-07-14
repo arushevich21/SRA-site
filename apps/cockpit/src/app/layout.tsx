@@ -58,9 +58,9 @@ export default async function RootLayout({
       lang="en"
       className={`${hanken.variable} ${saira.variable} ${mono.variable}`}
     >
-      <body className="bg-carbon text-txt font-sans antialiased overflow-x-hidden">
+      <body className="bg-carbon text-txt font-sans antialiased overflow-x-hidden min-h-screen flex flex-col">
         <NavBar user={navUser} />
-        <main className="pt-[76px]">{children}</main>
+        <main className="pt-[76px] flex-1">{children}</main>
         <SponsorsCarousel />
       </body>
     </html>
