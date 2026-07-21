@@ -4,7 +4,7 @@ import type {
   AccDriverResult,
   AccSessionResult,
 } from '@sra/shared-types';
-import { msToLaptime } from './ac-evo-parser.js';
+import { msToLaptime } from '../ac-evo/ac-evo-parser.js';
 import { accCarModelName, accCupCategoryName } from './acc-constants.js';
 
 // ── raw API shapes — private, never exported ────────────────────────────────

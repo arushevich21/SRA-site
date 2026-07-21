@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseAcEvoSession, isValidLap, aggregateHotLapLeaderboard } from './ac-evo-parser.js';
 import type { AcEvoSessionResult } from '@sra/shared-types';
 
-const FIXTURES = resolve(__dirname, '../../../fixtures/ac-evo-results');
+const FIXTURES = resolve(fileURLToPath(new URL('../../../../fixtures/ac-evo-results', import.meta.url)));
 
 function loadFixture(name: string): unknown {
   return JSON.parse(readFileSync(resolve(FIXTURES, name), 'utf-8'));

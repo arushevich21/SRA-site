@@ -8,7 +8,7 @@ export const ACEVO_POSITION_POINTS: readonly number[] = [
 export const ACEVO_FASTEST_LAP_BONUS = 5;
 export const ACEVO_POLE_BONUS = 5;
 
-// Position points only — bonuses are computed separately (computePoleSteamId)
+// Position points only — bonuses are computed separately (computePole)
 // since they come from a different session (Qualify) than this one (Race).
 // fastestLapSteamId is whoever set the fastest *valid* lap within this race
 // (AcEvoDriverResult.bestLapMs is already isValidLap-filtered by the parser).
@@ -22,10 +22,11 @@ export function computeRacePositionPoints(race: AcEvoSessionResult): {
     points[r.steamId] = (points[r.steamId] ?? 0) + (ACEVO_POSITION_POINTS[r.position] ?? 0);
   }
 
-  const fastest = race.results.reduce<AcEvoDriverResult | null>(
-    (best, r) => (r.bestLapMs != null && (best == null || r.bestLapMs < best.bestLapMs!) ? r : best),
-    null,
-  );
+  const fastest = race.results.reduce<AcEvoDriverResult | null>((best: AcEvoDriverResult | null, r: AcEvoDriverResult) => {
+    if (r.bestLapMs == null) return best;
+    if (best == null || r.bestLapMs < best.bestLapMs!) return r;
+    return best;
+  }, null);
 
   return { points, fastestLapSteamId: fastest?.steamId || null };
 }
