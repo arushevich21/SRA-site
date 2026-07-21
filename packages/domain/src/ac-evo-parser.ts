@@ -101,24 +101,12 @@ export function parseAcEvoSession(raw: unknown): AcEvoSessionResult {
     lapsByDriver.set(k, arr);
   }
 
-  const driverToCar = new Map<string, string>();
-  for (const lap of s.laps ?? []) {
-    driverToCar.set(gkey(lap.driver_key), gkey(lap.car_key));
-  }
-
   const carMeta = new Map<string, { model?: string; raceNumber?: number }>();
   for (const c of s.cars ?? []) {
     carMeta.set(gkey(c.car_id), {
       model: c.model_displayname,
       raceNumber: c.race_number,
     });
-  }
-
-  const startPos = new Map<string, number>();
-  for (const cs of s.car_standings ?? []) {
-    if (cs.starting_position != null) {
-      startPos.set(gkey(cs.car_id), cs.starting_position);
-    }
   }
 
   const finishing = s.driver_standings ?? [];
@@ -139,7 +127,13 @@ export function parseAcEvoSession(raw: unknown): AcEvoSessionResult {
 
     const rawTime = idx < times.length ? times[idx] : null;
 
-    const carKey = driverToCar.get(k);
+    // car_standings[idx] is Emperor's own array, positionally aligned with
+    // driver_standings[idx] — i.e. index-matched to this same driver. Use it
+    // rather than deriving car assignment from laps: a driver with zero laps
+    // (DNS/retired before a timed lap) has no entry in `laps` at all, but
+    // still has a car and starting grid slot that this preserves.
+    const carStanding = s.car_standings?.[idx];
+    const carKey = carStanding ? gkey(carStanding.car_id) : undefined;
     const meta = carKey ? carMeta.get(carKey) : undefined;
 
     // Emperor's own UI (leaderboards, standings) displays drivers by real name
@@ -162,7 +156,7 @@ export function parseAcEvoSession(raw: unknown): AcEvoSessionResult {
       nation: d?.nation ?? null,
       carModel: meta?.model ?? null,
       raceNumber: meta?.raceNumber ?? null,
-      startingPosition: carKey ? (startPos.get(carKey) ?? null) : null,
+      startingPosition: carStanding?.starting_position ?? null,
       lapsCompleted: driverLaps.length,
       noLaps: driverLaps.length === 0,
       bestLapMs,

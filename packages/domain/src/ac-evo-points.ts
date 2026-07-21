@@ -31,8 +31,14 @@ export function computeRacePositionPoints(race: AcEvoSessionResult): {
 }
 
 // Pole = best qualifying lap. qualifyingBestMs is null for a driver who set
-// no valid time, so they're naturally excluded.
-export function computePoleSteamId(qualify: AcEvoSessionResult): string | null {
+// no valid time, so they're naturally excluded. Returns the lap time itself
+// (not just who set it) so a caller tracking pole across many qualifying
+// sessions for the same round — MX5 Cup routinely runs a dozen-plus short
+// qualifying sessions across a week before race day — can compare "is this
+// new session's best lap actually faster" instead of just "is it newer".
+export function computePole(
+  qualify: AcEvoSessionResult,
+): { steamId: string; lapMs: number } | null {
   const pole = qualify.results.reduce<AcEvoDriverResult | null>(
     (best, r) =>
       r.qualifyingBestMs != null && (best == null || r.qualifyingBestMs < best.qualifyingBestMs!)
@@ -40,7 +46,8 @@ export function computePoleSteamId(qualify: AcEvoSessionResult): string | null {
         : best,
     null,
   );
-  return pole?.steamId || null;
+  if (!pole?.steamId || pole.qualifyingBestMs == null) return null;
+  return { steamId: pole.steamId, lapMs: pole.qualifyingBestMs };
 }
 
 // Merges position points with the fastest-lap and pole bonuses into one

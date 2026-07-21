@@ -77,6 +77,15 @@ describe('parseAcEvoSession', () => {
       expect(sean.lapsCompleted).toBe(0);
       expect(sean.noLaps).toBe(true);
     });
+
+    it('Sean still gets a car assignment despite having zero laps', () => {
+      // Car is read from car_standings[idx] (positionally aligned with
+      // driver_standings[idx]), not derived from laps — a driver who never
+      // set a timed lap still has a car and starting grid slot.
+      const sean = result.results[1];
+      expect(sean.carModel).toBe('Mazda MX-5 ND Cup');
+      expect(sean.startingPosition).not.toBeNull();
+    });
   });
 
   describe('Practice', () => {

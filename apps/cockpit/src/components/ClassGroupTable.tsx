@@ -1,7 +1,25 @@
-import type { ExportedClassGroup } from '../lib/standings-types';
+import { sortStandingsWithTiebreak } from '@sra/domain';
+import type { ExportedClassGroup, ExportedDriverStanding } from '../lib/standings-types';
+
+// Uploaded JSON carries a `position` per driver, but ties (equal
+// championshipPoints) aren't resolved upstream — re-derive rank here so no
+// two drivers ever share a position. Tie-break: more races participated
+// (non-DNS) ranks higher; otherwise whoever's running total reached the tied
+// value in the earliest round ranks higher.
+function withResolvedPositions(standings: ExportedDriverStanding[]): ExportedDriverStanding[] {
+  const ordered = sortStandingsWithTiebreak(
+    standings.map((entry) => ({
+      entry,
+      totalPoints: entry.championshipPoints,
+      rounds: entry.races.map((r) => ({ points: r.dns ? null : (r.pointsTotal ?? 0) })),
+    })),
+  );
+  return ordered.map(({ entry }, i) => ({ ...entry, position: i + 1 }));
+}
 
 export function ClassGroupTable({ group }: { group: ExportedClassGroup }) {
-  const raceCount = group.standings[0]?.races.length ?? 0;
+  const standings = withResolvedPositions(group.standings);
+  const raceCount = standings[0]?.races.length ?? 0;
 
   return (
     <div>
@@ -25,7 +43,7 @@ export function ClassGroupTable({ group }: { group: ExportedClassGroup }) {
             </tr>
           </thead>
           <tbody>
-            {group.standings.map((entry) => (
+            {standings.map((entry) => (
               <tr key={entry.id} className="border-b border-line/30">
                 <td className={`font-mono text-[15px] py-2 pr-3 ${entry.position <= 3 ? 'text-gold' : 'text-txt-2'}`}>
                   {entry.position}
