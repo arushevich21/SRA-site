@@ -164,7 +164,7 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
   },
   {
     simgridId: 22872,
-    slug: 'multiclass-mayhem-s3-split1',
+    slug: 'multiclass-mayhem-s3',
     game: 'LMU',
     classTag: 'LMP2 / LMGT3',
     formatTag: 'Multiclass',
@@ -177,8 +177,8 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     rulesBullets: [],
     discordLinks: [
       { label: 'Series Rules', url: 'https://discord.com/channels/915686674833498203/935279836396666930' },
-      { label: 'Schedule', url: '/lmu/championships/multiclass-mayhem-s3-split1/calendar' },
-      { label: 'Registration', url: '/lmu/championships/multiclass-mayhem-s3-split1/register' },
+      { label: 'Schedule', url: '/lmu/championships/multiclass-mayhem-s3/calendar' },
+      { label: 'Registration', url: '/lmu/championships/multiclass-mayhem-s3/register' },
     ],
     resultsUrl: 'https://www.thesimgrid.com/championships/22872',
     resultsLabel: 'View on SimGrid',
@@ -221,7 +221,7 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
       { round: 1, track: 'Road Atlanta GP', date: '2026-06-29T21:00:00', raceLength: '30 min', emperorTrack: 'Road Atlanta,GP', emperorRawTrackName: 'Road Atlanta' },
       { round: 2, track: 'Sebring International Raceway GP', date: '2026-07-06T21:00:00', raceLength: '30 min', emperorTrack: 'Sebring International Raceway,GP', emperorRawTrackName: 'Sebring International Raceway' },
       { round: 3, track: 'Laguna Seca GP', date: '2026-07-13T21:00:00', raceLength: '30 min', emperorRawTrackName: 'Laguna Seca' },
-      { round: 4, track: 'COTA National', date: '2026-07-20T21:00:00', raceLength: '30 min' },
+      { round: 4, track: 'COTA National', date: '2026-07-20T21:00:00', raceLength: '30 min', emperorTrack: 'Circuit Of The Americas,National', emperorRawTrackName: 'Circuit Of The Americas' },
     ],
   },
 ];

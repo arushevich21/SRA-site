@@ -33,7 +33,7 @@ export {
 
 export {
   computeRacePositionPoints,
-  computePoleSteamId,
+  computePole,
   totalRoundPoints,
   ACEVO_POSITION_POINTS,
   ACEVO_FASTEST_LAP_BONUS,
@@ -57,3 +57,9 @@ export {
   ACC_FASTEST_RACE_LAP_BONUS,
   ACC_FASTEST_QUALIFYING_LAP_BONUS,
 } from './acc/acc-points.js';
+
+export {
+  sortStandingsWithTiebreak,
+  type StandingsEntrant,
+  type StandingsRoundResult,
+} from './standings-order.js';

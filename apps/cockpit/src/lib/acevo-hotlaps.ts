@@ -4,7 +4,7 @@ import {
   parseAcEvoSession,
   aggregateHotLapLeaderboard,
   computeRacePositionPoints,
-  computePoleSteamId,
+  computePole,
   totalRoundPoints,
 } from '@sra/domain';
 import type { HotLapEntry, AcEvoSessionResult } from '@sra/shared-types';
@@ -264,7 +264,7 @@ async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResul
 
   const { data: existing, error: readError } = await supabase
     .from('acevo_round_points_cache')
-    .select('race_position_points, fastest_lap_steam_id, pole_steam_id, race_session_date, qualify_session_date')
+    .select('race_position_points, fastest_lap_steam_id, pole_steam_id, pole_lap_ms, race_session_date, qualify_session_date')
     .eq('track_key', track)
     .maybeSingle();
   if (readError) throw readError;
@@ -273,6 +273,7 @@ async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResul
   let fastestLapSteamId: string | null = existing?.fastest_lap_steam_id ?? null;
   let raceSessionDate: string | null = existing?.race_session_date ?? null;
   let poleSteamId: string | null = existing?.pole_steam_id ?? null;
+  let poleLapMs: number | null = existing?.pole_lap_ms ?? null;
   let qualifySessionDate: string | null = existing?.qualify_session_date ?? null;
 
   if (newRace && (!raceSessionDate || new Date(newRace.serverStartTime!) > new Date(raceSessionDate))) {
@@ -282,9 +283,18 @@ async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResul
     raceSessionDate = newRace.serverStartTime;
   }
 
-  if (newQualify && (!qualifySessionDate || new Date(newQualify.serverStartTime!) > new Date(qualifySessionDate))) {
-    poleSteamId = computePoleSteamId(newQualify);
-    qualifySessionDate = newQualify.serverStartTime;
+  // A round routinely has a dozen-plus short qualifying sessions spread
+  // across the week before race day (open practice/quali server). Pole must
+  // be the fastest lap across ALL of them, so each incoming session is
+  // compared by lap time against the best seen so far — never blindly
+  // replaced just because it's the most recently processed session.
+  if (newQualify) {
+    const candidate = computePole(newQualify);
+    if (candidate && (poleLapMs == null || candidate.lapMs < poleLapMs)) {
+      poleSteamId = candidate.steamId;
+      poleLapMs = candidate.lapMs;
+      qualifySessionDate = newQualify.serverStartTime;
+    }
   }
 
   const { error: writeError } = await supabase.from('acevo_round_points_cache').upsert(
@@ -293,6 +303,7 @@ async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResul
       race_position_points: racePositionPoints,
       fastest_lap_steam_id: fastestLapSteamId,
       pole_steam_id: poleSteamId,
+      pole_lap_ms: poleLapMs,
       race_session_date: raceSessionDate,
       qualify_session_date: qualifySessionDate,
       updated_at: new Date().toISOString(),

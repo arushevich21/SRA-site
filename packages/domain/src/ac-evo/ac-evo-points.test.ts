@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeRacePositionPoints,
-  computePoleSteamId,
+  computePole,
   totalRoundPoints,
   ACEVO_POSITION_POINTS,
 } from './ac-evo-points.js';
@@ -90,18 +90,18 @@ describe('computeRacePositionPoints', () => {
   });
 });
 
-describe('computePoleSteamId', () => {
-  it('finds the driver with the best qualifying lap', () => {
+describe('computePole', () => {
+  it('finds the driver with the best qualifying lap and returns their time', () => {
     const qualify = session('Qualify', [
       driver({ position: 2, steamId: 'A', qualifyingBestMs: 97000 }),
       driver({ position: 1, steamId: 'B', qualifyingBestMs: 96000 }),
     ]);
-    expect(computePoleSteamId(qualify)).toBe('B');
+    expect(computePole(qualify)).toEqual({ steamId: 'B', lapMs: 96000 });
   });
 
   it('is null when nobody set a valid qualifying time', () => {
     const qualify = session('Qualify', [driver({ steamId: 'A', qualifyingBestMs: null })]);
-    expect(computePoleSteamId(qualify)).toBeNull();
+    expect(computePole(qualify)).toBeNull();
   });
 });
 

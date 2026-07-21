@@ -1,6 +1,30 @@
-import type { EmperorChampionshipStandings } from '@sra/shared-types';
+import { sortStandingsWithTiebreak } from '@sra/domain';
+import type { EmperorChampionshipStandings, EmperorDriverStanding } from '@sra/shared-types';
 
 type RoundPoints = { round: number; track: string; points: Record<string, number> };
+
+// Emperor's own `position` field can repeat across a full points tie (see
+// e.g. a 4-way tie all shown as position 8) rather than resolving it — reuse
+// the same tiebreak as the locally-uploaded standings tables so no two
+// drivers ever share a rank: points desc, then rounds participated desc
+// (present in a round's cache = participated; absent = hasn't raced it yet),
+// then whoever's running total reached the tied value in the earliest round.
+function withResolvedPositions(
+  standings: EmperorDriverStanding[],
+  rounds: RoundPoints[] | undefined,
+): EmperorDriverStanding[] {
+  if (!rounds || rounds.length === 0) return standings;
+  const ordered = sortStandingsWithTiebreak(
+    standings.map((entry) => ({
+      entry,
+      totalPoints: entry.points,
+      rounds: rounds.map((r) => ({
+        points: entry.steamId in r.points ? r.points[entry.steamId] : null,
+      })),
+    })),
+  );
+  return ordered.map(({ entry }, i) => ({ ...entry, position: i + 1 }));
+}
 
 export function EmperorStandingsTable({
   data,
@@ -9,7 +33,9 @@ export function EmperorStandingsTable({
   data: EmperorChampionshipStandings;
   rounds?: RoundPoints[];
 }) {
-  const classGroups = Object.entries(data.driverStandings);
+  const classGroups = Object.entries(data.driverStandings).map(
+    ([className, standings]) => [className, withResolvedPositions(standings, rounds)] as const,
+  );
 
   return (
     <div className="flex flex-col gap-10">
