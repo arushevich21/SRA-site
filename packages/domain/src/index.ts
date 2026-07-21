@@ -40,13 +40,19 @@ export {
   ACEVO_POLE_BONUS,
 } from './ac-evo/ac-evo-points.js';
 
-export { parseAccSession } from './acc/acc-parser.js';
+export { 
+  parseAccSession, 
+  aggregateAccHotLapLeaderboard,
+} from './acc/acc-parser.js';
 
 export {
   ACC_CAR_MODEL_NAMES,
   ACC_CUP_CATEGORY_NAMES,
+  ACC_CAR_MANUFACTURER_SLUGS,
   accCarModelName,
   accCupCategoryName,
+  accCarManufacturerLogoUrl,
+  accTrackMapUrl,
 } from './acc/acc-constants.js';
 
 export {

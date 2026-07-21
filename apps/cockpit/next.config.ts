@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
         hostname: 'cdn.discordapp.com',
         pathname: '/avatars/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'flagcdn.com',
+      },
     ],
   },
   // Workspace packages use NodeNext-style relative imports (e.g. './client.js' for './client.ts') —

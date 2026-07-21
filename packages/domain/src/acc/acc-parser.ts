@@ -3,6 +3,7 @@ import type {
   AccDriverEntry,
   AccDriverResult,
   AccSessionResult,
+  AccHotLapEntry,
 } from '@sra/shared-types';
 import { msToLaptime } from '../ac-evo/ac-evo-parser.js';
 import { accCarModelName, accCupCategoryName } from './acc-constants.js';
@@ -181,4 +182,56 @@ export function parseAccSession(raw: unknown): AccSessionResult {
     bestSplits: normSplits(sr.bestSplits),
     results,
   };
+}
+
+// ── hot-lap leaderboard ─────────────────────────────────────────────────────
+
+// Mirrors aggregateHotLapLeaderboard (ac-evo-parser.ts), but keyed by
+// (carGroup, steamId) instead of just steamId — ACC times aren't comparable
+// across classes (GT3 vs GT4), so each class gets its own ranking. Attributed
+// to currentDriverSteamId, same caveat as acc-points.ts's fastestLapSteamId:
+// for a multi-driver car, a co-driver's lap can't be individually credited
+// from this data alone.
+export function aggregateAccHotLapLeaderboard(sessions: AccSessionResult[]): AccHotLapEntry[] {
+  const bestByKey = new Map<string, Omit<AccHotLapEntry, 'rank'>>();
+
+  for (const session of sessions) {
+    for (const r of session.results) {
+      const steamId = r.currentDriverSteamId;
+      if (!steamId || r.bestLapMs == null || !r.carGroup) continue;
+      const key = `${r.carGroup}:${steamId}`;
+      const existing = bestByKey.get(key);
+      if (!existing || r.bestLapMs < existing.bestLapMs) {
+        const driver = r.drivers.find((d) => d.steamId === steamId);
+        const driverName =
+          [driver?.firstName, driver?.lastName].filter(Boolean).join(' ') ||
+          driver?.shortName ||
+          'Unknown';
+        bestByKey.set(key, {
+          steamId,
+          driverName,
+          carGroup: r.carGroup,
+          carModel: r.carModel,
+          carModelName: r.carModelName,
+          bestLapMs: r.bestLapMs,
+          bestLap: msToLaptime(r.bestLapMs)!,
+          sectorsMs: r.sectorsMs,
+        });
+      }
+    }
+  }
+
+  const byCarGroup = new Map<string, Omit<AccHotLapEntry, 'rank'>[]>();
+  for (const entry of bestByKey.values()) {
+    const arr = byCarGroup.get(entry.carGroup) ?? [];
+    arr.push(entry);
+    byCarGroup.set(entry.carGroup, arr);
+  }
+
+  const result: AccHotLapEntry[] = [];
+  for (const entries of byCarGroup.values()) {
+    entries.sort((a, b) => a.bestLapMs - b.bestLapMs);
+    entries.forEach((entry, i) => result.push({ ...entry, rank: i + 1 }));
+  }
+  return result;
 }

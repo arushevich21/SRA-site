@@ -133,14 +133,15 @@ describe('parseAccSession', () => {
       expect(p17.cupCategoryName).toBe('Silver');
     });
 
-    it('a carModel not in the handbook lookup resolves to a null name, keeping the raw ID', () => {
-      // carModel 36 appears in all three fixtures but isn't in Server Admin
-      // Handbook IX.3 (revision this table was built from stops at 35 for GT3) —
-      // exercise the real "unknown ID" case rather than a synthetic one.
+    it('resolves carModel 36 (Ford Mustang GT3) from the raw ID', () => {
+      // carModel 36 appears in all three fixtures. It wasn't in Server Admin
+      // Handbook IX.3 (the revision this table was built from stops at 35 for
+      // GT3) until confirmed and added to ACC_CAR_MODEL_NAMES as Ford Mustang
+      // GT3 — this exercises the real fixture data rather than a synthetic ID.
       const p4 = result.results[3];
       expect(p4.drivers[0].lastName).toBe('Hall');
       expect(p4.carModel).toBe(36);
-      expect(p4.carModelName).toBeNull();
+      expect(p4.carModelName).toBe('Ford Mustang GT3');
     });
   });
 });

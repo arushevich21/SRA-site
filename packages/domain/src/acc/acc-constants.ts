@@ -40,6 +40,7 @@ export const ACC_CAR_MODEL_NAMES: Readonly<Record<number, string>> = {
   33: 'Lamborghini Huracan Evo2',
   34: 'Porsche 992 GT3 R',
   35: 'McLaren 720S GT3 Evo 2023',
+  36: 'Ford Mustang GT3',
   50: 'Alpine A110 GT4',
   51: 'AMR V8 Vantage GT4',
   52: 'Audi R8 LMS GT4',
@@ -59,6 +60,67 @@ export const ACC_CAR_MODEL_NAMES: Readonly<Record<number, string>> = {
   86: 'Porsche 935',
 };
 
+// Manufacturer slug per car model, for building manufacturer logo URLs (see
+// accCarManufacturerLogoUrl below). Only 'bentley' has been confirmed against
+// a real CDN URL — the rest follow the same lowercase-hyphenated convention
+// as a best guess and may need correcting per-manufacturer if a logo 404s.
+export const ACC_CAR_MANUFACTURER_SLUGS: Readonly<Record<number, string>> = {
+  0: 'porsche',
+  1: 'mercedes-amg',
+  2: 'ferrari',
+  3: 'audi',
+  4: 'lamborghini',
+  5: 'mclaren',
+  6: 'nissan',
+  7: 'bmw',
+  8: 'bentley',
+  9: 'porsche',
+  10: 'nissan',
+  11: 'bentley',
+  12: 'aston-martin',
+  13: 'lamborghini',
+  14: 'jaguar',
+  15: 'lexus',
+  16: 'lamborghini',
+  17: 'honda',
+  18: 'lamborghini',
+  19: 'audi',
+  20: 'aston-martin',
+  21: 'honda',
+  22: 'mclaren',
+  23: 'porsche',
+  24: 'ferrari',
+  25: 'mercedes-amg',
+  26: 'ferrari',
+  27: 'bmw',
+  28: 'porsche',
+  29: 'lamborghini',
+  30: 'bmw',
+  31: 'audi',
+  32: 'ferrari',
+  33: 'lamborghini',
+  34: 'porsche',
+  35: 'mclaren',
+  36: 'ford',
+  50: 'alpine',
+  51: 'aston-martin',
+  52: 'audi',
+  53: 'bmw',
+  55: 'chevrolet',
+  56: 'ginetta',
+  57: 'ktm',
+  58: 'maserati',
+  59: 'mclaren',
+  60: 'mercedes-amg',
+  61: 'porsche',
+  80: 'audi',
+  82: 'ktm',
+  83: 'maserati',
+  84: 'mercedes-amg',
+  85: 'porsche',
+  86: 'porsche',
+};
+
 export const ACC_CUP_CATEGORY_NAMES: Readonly<Record<number, string>> = {
   0: 'Overall',
   1: 'ProAm',
@@ -76,4 +138,24 @@ export function accCarModelName(carModel: number): string | null {
 
 export function accCupCategoryName(cupCategory: number): string | null {
   return ACC_CUP_CATEGORY_NAMES[cupCategory] ?? null;
+}
+
+const MANUFACTURER_LOGO_BASE_URL =
+  'https://static.simracingalliance.com/assets/images/logo/manufacturers/light';
+
+// Returns null for an unmapped car model — callers should omit the icon
+// rather than request a URL that's guaranteed to 404.
+export function accCarManufacturerLogoUrl(carModel: number): string | null {
+  const slug = ACC_CAR_MANUFACTURER_SLUGS[carModel];
+  return slug ? `${MANUFACTURER_LOGO_BASE_URL}/${slug}.png` : null;
+}
+
+const TRACK_MAP_BASE_URL = 'https://static.simracingalliance.com/assets/images/tracks';
+
+// Unlike splash art (an explicit acc_tracks.splash_art_url column, curated
+// per track), track maps follow a predictable naming convention off the same
+// track_key already used everywhere else — no DB column needed. A track
+// without a map file yet will just 404 until one's uploaded under this path.
+export function accTrackMapUrl(trackKey: string): string {
+  return `${TRACK_MAP_BASE_URL}/track_map_logo_${trackKey}.png`;
 }
