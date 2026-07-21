@@ -164,7 +164,7 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
   },
   {
     simgridId: 22872,
-    slug: 'multiclass-mayhem-s3-split1',
+    slug: 'multiclass-mayhem-s3',
     game: 'LMU',
     classTag: 'LMP2 / LMGT3',
     formatTag: 'Multiclass',
@@ -177,8 +177,8 @@ export const CHAMPIONSHIPS: ChampionshipContent[] = [
     rulesBullets: [],
     discordLinks: [
       { label: 'Series Rules', url: 'https://discord.com/channels/915686674833498203/935279836396666930' },
-      { label: 'Schedule', url: '/lmu/championships/multiclass-mayhem-s3-split1/calendar' },
-      { label: 'Registration', url: '/lmu/championships/multiclass-mayhem-s3-split1/register' },
+      { label: 'Schedule', url: '/lmu/championships/multiclass-mayhem-s3/calendar' },
+      { label: 'Registration', url: '/lmu/championships/multiclass-mayhem-s3/register' },
     ],
     resultsUrl: 'https://www.thesimgrid.com/championships/22872',
     resultsLabel: 'View on SimGrid',
