@@ -48,11 +48,12 @@ export {
 export {
   ACC_CAR_MODEL_NAMES,
   ACC_CUP_CATEGORY_NAMES,
-  ACC_CAR_MANUFACTURER_SLUGS,
+  ACC_CAR_MANUFACTURER_ICON_NAMES,
+  ACC_CAR_MANUFACTURER_CDN_SLUGS,
   accCarModelName,
   accCupCategoryName,
+  accCarManufacturerIconName,
   accCarManufacturerLogoUrl,
-  accTrackMapUrl,
 } from './acc/acc-constants.js';
 
 export {

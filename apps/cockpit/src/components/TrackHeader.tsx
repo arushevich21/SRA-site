@@ -1,7 +1,7 @@
 import Image from 'next/image';
-import { accCarManufacturerLogoUrl, accTrackMapUrl } from '@sra/domain';
-import type { AccHotLapEntry } from '@sra/shared-types';
-import type { AccTrack } from '@/lib/acc/tracks';
+import { Icon, type IconName } from '@cardog-icons/react';
+import { FallbackLogoImage } from './FallbackLogoImage';
+import type { TrackSummary, TrackTopEntry } from '@/lib/track-summary';
 
 // Regional-indicator flag emoji render unreliably on Windows/Chrome (often
 // just the letters, or nothing) — an actual image is more portable. flagcdn.com
@@ -10,16 +10,13 @@ function countryFlagUrl(countryCode: string): string {
   return `https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`;
 }
 
-export function AccTrackHeader({
+export function TrackHeader({
   track,
   fastestLap,
 }: {
-  track: AccTrack;
-  fastestLap: AccHotLapEntry | null;
+  track: TrackSummary;
+  fastestLap: TrackTopEntry | null;
 }) {
-  const logoUrl =
-    fastestLap?.carModel != null ? accCarManufacturerLogoUrl(fastestLap.carModel) : null;
-
   return (
     <div className="relative w-full h-[320px] border border-line overflow-hidden mb-10">
       {track.splashArtUrl && (
@@ -69,13 +66,19 @@ export function AccTrackHeader({
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {logoUrl && (
-                  <span className="relative w-7 h-7 shrink-0">
-                    <Image src={logoUrl} alt="" fill className="object-contain" />
+                {fastestLap.manufacturerIconName ? (
+                  <span className="relative w-7 h-7 shrink-0 flex items-center justify-center">
+                    <Icon name={fastestLap.manufacturerIconName as IconName} size={28} color="white" />
                   </span>
+                ) : (
+                  fastestLap.manufacturerLogoUrl && (
+                    <span className="relative w-7 h-7 shrink-0">
+                      <FallbackLogoImage src={fastestLap.manufacturerLogoUrl} alt="" />
+                    </span>
+                  )
                 )}
                 <span className="font-sans text-[16px] text-white/70">
-                  {fastestLap.carModelName ?? '—'}
+                  {fastestLap.carLabel ?? '—'}
                 </span>
               </div>
             </div>
@@ -83,12 +86,9 @@ export function AccTrackHeader({
         </div>
 
         <div className="relative flex-1 h-full min-w-0">
-          <Image
-            src={accTrackMapUrl(track.trackKey)}
-            alt=""
-            fill
-            className="object-contain opacity-90"
-          />
+          {track.mapUrl && (
+            <Image src={track.mapUrl} alt="" fill className="object-contain opacity-90" />
+          )}
         </div>
       </div>
     </div>

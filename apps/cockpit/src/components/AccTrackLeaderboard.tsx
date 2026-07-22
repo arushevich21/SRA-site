@@ -1,11 +1,13 @@
-import type { AccHotLapEntry, HotLapEntry } from '@sra/shared-types';
+import type { AccHotLapEntry } from '@sra/shared-types';
+import { accCarManufacturerIconName, accCarManufacturerLogoUrl } from '@sra/domain';
 import { Collapsible } from './Collapsible';
-import { HotLapBoard } from './HotLapBoard';
+import { HotLapBoard, type HotLapBoardEntry } from './HotLapBoard';
 
 // HotLapBoard is generic across sims — it just expects HotLapEntry's shape.
 // AccHotLapEntry only differs by carModelName vs carModel, so map rather than
 // forking the table component for ACC.
-function toHotLapEntry(entry: AccHotLapEntry): HotLapEntry {
+function toHotLapEntry(entry: AccHotLapEntry): HotLapBoardEntry {
+  const iconName = entry.carModel != null ? accCarManufacturerIconName(entry.carModel) : null;
   return {
     rank: entry.rank,
     steamId: entry.steamId,
@@ -14,6 +16,9 @@ function toHotLapEntry(entry: AccHotLapEntry): HotLapEntry {
     bestLapMs: entry.bestLapMs,
     bestLap: entry.bestLap,
     sectorsMs: entry.sectorsMs,
+    manufacturerIconName: iconName,
+    manufacturerLogoUrl:
+      !iconName && entry.carModel != null ? accCarManufacturerLogoUrl(entry.carModel) : null,
   };
 }
 

@@ -1,5 +1,6 @@
-import { msToLaptime } from '@sra/domain';
+import { msToLaptime, accCarManufacturerIconName, accCarManufacturerLogoUrl } from '@sra/domain';
 import type { AccHotLapEntry } from '@sra/shared-types';
+import type { TrackSummary, TrackTopEntry } from '../track-summary';
 import { supabase } from '../supabase';
 
 export type AccTrack = {
@@ -8,12 +9,37 @@ export type AccTrack = {
   splashArtUrl: string | null;
   country: string | null; // ISO 3166-1 alpha-2, e.g. 'de'
   location: string | null; // human-readable "place, country", e.g. "Nurburg, Germany"
+  mapUrl: string | null; // track_layouts.map_url — curated, null until set
 };
+
+// Cut over to the shared tracks/track_layouts schema (see
+// supabase/migrations/20260722_shared_tracks_and_acevo_v2_cache.sql and
+// scripts/backfill-tracks-v2.ts) — acc_hotlap_leaderboard itself is
+// untouched (its track_key didn't change; ACC has no layout, so
+// layout_key === the same string acc_tracks used).
+type TrackLayoutRow = {
+  layout_key: string;
+  display_name: string;
+  map_url: string | null;
+  tracks: { splash_art_url: string | null; country: string | null; location: string | null } | null;
+};
+
+function toAccTrack(row: TrackLayoutRow): AccTrack {
+  return {
+    trackKey: row.layout_key,
+    displayName: row.display_name,
+    splashArtUrl: row.tracks?.splash_art_url ?? null,
+    country: row.tracks?.country ?? null,
+    location: row.tracks?.location ?? null,
+    mapUrl: row.map_url ?? null,
+  };
+}
 
 export async function getAccTracks(): Promise<AccTrack[]> {
   const { data, error } = await supabase
-    .from('acc_tracks')
-    .select('track_key, display_name, splash_art_url, country, location')
+    .from('track_layouts')
+    .select('layout_key, display_name, map_url, tracks(splash_art_url, country, location)')
+    .eq('game', 'ACC')
     .order('display_name', { ascending: true });
 
   if (error) {
@@ -21,20 +47,15 @@ export async function getAccTracks(): Promise<AccTrack[]> {
     return [];
   }
 
-  return (data ?? []).map((row) => ({
-    trackKey: row.track_key as string,
-    displayName: row.display_name as string,
-    splashArtUrl: row.splash_art_url as string | null,
-    country: row.country as string | null,
-    location: row.location as string | null,
-  }));
+  return ((data ?? []) as unknown as TrackLayoutRow[]).map(toAccTrack);
 }
 
 export async function getAccTrack(trackKey: string): Promise<AccTrack | null> {
   const { data, error } = await supabase
-    .from('acc_tracks')
-    .select('track_key, display_name, splash_art_url, country, location')
-    .eq('track_key', trackKey)
+    .from('track_layouts')
+    .select('layout_key, display_name, map_url, tracks(splash_art_url, country, location)')
+    .eq('game', 'ACC')
+    .eq('layout_key', trackKey)
     .maybeSingle();
 
   if (error) {
@@ -43,13 +64,7 @@ export async function getAccTrack(trackKey: string): Promise<AccTrack | null> {
   }
   if (!data) return null;
 
-  return {
-    trackKey: data.track_key as string,
-    displayName: data.display_name as string,
-    splashArtUrl: data.splash_art_url as string | null,
-    country: data.country as string | null,
-    location: data.location as string | null,
-  };
+  return toAccTrack(data as unknown as TrackLayoutRow);
 }
 
 // Grouped by car_group (GT3/GT4/etc.) since ACC times aren't comparable
@@ -158,5 +173,35 @@ export async function getAccTrackStats(trackKey: string): Promise<AccTrackStats>
   return {
     entriesCount: countRes.count ?? 0,
     lastUpdated: (latestRes.data?.updated_at as string | undefined) ?? null,
+  };
+}
+
+// Adapters into the sim-neutral shapes TrackList/TrackHeader consume — this
+// is the one place that resolves ACC's numeric carModel into an actual logo
+// URL, so the shared components never need to know ACC has numeric car IDs.
+export function toTrackSummary(track: AccTrack): TrackSummary {
+  return {
+    trackKey: track.trackKey,
+    displayName: track.displayName,
+    splashArtUrl: track.splashArtUrl,
+    country: track.country,
+    location: track.location,
+    mapUrl: track.mapUrl,
+  };
+}
+
+export function toTrackTopEntry(entry: AccHotLapEntry): TrackTopEntry {
+  const iconName = entry.carModel != null ? accCarManufacturerIconName(entry.carModel) : null;
+  return {
+    rank: entry.rank,
+    steamId: entry.steamId,
+    driverName: entry.driverName,
+    carLabel: entry.carModelName,
+    manufacturerIconName: iconName,
+    // Only fall back to the CDN guess when cardog-icons has no icon at all
+    // (Alpine/Ginetta/KTM) — never both at once.
+    manufacturerLogoUrl:
+      !iconName && entry.carModel != null ? accCarManufacturerLogoUrl(entry.carModel) : null,
+    bestLap: entry.bestLap,
   };
 }

@@ -180,6 +180,27 @@ async function upsertTrackAndLeaderboard(track: string, session: AccSessionResul
     .upsert({ track_key: track, display_name: track }, { onConflict: 'track_key', ignoreDuplicates: true });
   if (trackErr) throw trackErr;
 
+  // Phase 1 of the tracks/track_layouts migration (see
+  // supabase/migrations/20260722_shared_tracks_and_acevo_v2_cache.sql).
+  // ACC has no layout concept, so layout_key === base_track_key here — no
+  // key-format change, no risk to acc_hotlap_leaderboard's existing rows.
+  // Never allowed to break the legacy acc_tracks upsert above.
+  try {
+    await supabase
+      .from('tracks')
+      .upsert({ base_track_key: track, display_name: track }, { onConflict: 'base_track_key', ignoreDuplicates: true })
+      .throwOnError();
+    await supabase
+      .from('track_layouts')
+      .upsert(
+        { layout_key: track, base_track_key: track, game: 'ACC', layout_name: null, display_name: track },
+        { onConflict: 'layout_key', ignoreDuplicates: true },
+      )
+      .throwOnError();
+  } catch (v2Err) {
+    console.error(`ACC tracks/track_layouts dual-write failed for "${track}":`, v2Err);
+  }
+
   const fresh = aggregateAccHotLapLeaderboard([session]);
   const carGroups = new Set(fresh.map((e) => e.carGroup));
 
