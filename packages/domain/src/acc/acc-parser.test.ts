@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseAccSession } from './acc-parser.js';
+import { parseAccSession, aggregateAccHotLapLeaderboard } from './acc-parser.js';
+import type { AccSessionResult, AccDriverResult } from '@sra/shared-types';
 
 const FIXTURES = resolve(fileURLToPath(new URL('../../../../fixtures/acc-results', import.meta.url)));
 
@@ -231,5 +232,100 @@ describe('parseAccSession — no-time sentinel handling', () => {
   it('missingMandatoryPitstop of -1 normalizes to null (not applicable)', () => {
     const result = parseAccSession(sessionWithTiming({}));
     expect(result.results[0].missingMandatoryPitstop).toBeNull();
+  });
+});
+
+describe('aggregateAccHotLapLeaderboard', () => {
+  function driverResult(r: Partial<AccDriverResult>): AccDriverResult {
+    return {
+      position: 1,
+      carId: 1,
+      carModel: 1,
+      carModelName: 'Mercedes-AMG GT3',
+      carGroup: 'GT3',
+      cupCategory: 0,
+      cupCategoryName: 'Overall',
+      raceNumber: null,
+      teamName: null,
+      drivers: [{ firstName: 'Unknown', lastName: null, steamId: '', shortName: null }],
+      currentDriverSteamId: '',
+      lapsCompleted: 1,
+      bestLapMs: null,
+      bestLap: null,
+      sectorsMs: null,
+      lastLapMs: null,
+      totalTimeMs: null,
+      missingMandatoryPitstop: null,
+      ...r,
+    };
+  }
+
+  function session(results: Partial<AccDriverResult>[]): AccSessionResult {
+    return {
+      sessionType: 'Practice',
+      track: 'nurburgring',
+      serverName: null,
+      date: null,
+      sessionFile: null,
+      championshipId: null,
+      seasonId: null,
+      isWetSession: false,
+      bestLapMs: null,
+      bestLap: null,
+      bestSplits: null,
+      results: results.map(driverResult),
+    };
+  }
+
+  it('keeps a separate entry per car for the same driver within a class', () => {
+    const sessions = [
+      session([
+        driverResult({ currentDriverSteamId: 'A', carModel: 1, carModelName: 'Mercedes-AMG GT3', bestLapMs: 115000, drivers: [{ firstName: 'Alice', lastName: null, steamId: 'A', shortName: null }] }),
+        driverResult({ currentDriverSteamId: 'A', carModel: 5, carModelName: 'McLaren 650S GT3', bestLapMs: 113000, drivers: [{ firstName: 'Alice', lastName: null, steamId: 'A', shortName: null }] }),
+      ]),
+    ];
+    const board = aggregateAccHotLapLeaderboard(sessions);
+    expect(board).toHaveLength(2);
+    expect(board.map((e) => e.carModel).sort()).toEqual([1, 5]);
+  });
+
+  it('does not let a faster lap in one car discard a slower lap already stored in another', () => {
+    const sessions = [
+      session([driverResult({ currentDriverSteamId: 'A', carModel: 1, bestLapMs: 115000, drivers: [{ firstName: 'Alice', lastName: null, steamId: 'A', shortName: null }] })]),
+      session([driverResult({ currentDriverSteamId: 'A', carModel: 5, bestLapMs: 113000, drivers: [{ firstName: 'Alice', lastName: null, steamId: 'A', shortName: null }] })]),
+    ];
+    const board = aggregateAccHotLapLeaderboard(sessions);
+    expect(board).toHaveLength(2);
+    const mercedesEntry = board.find((e) => e.carModel === 1);
+    expect(mercedesEntry?.bestLapMs).toBe(115000);
+  });
+
+  it('still ranks separately per carGroup', () => {
+    const sessions = [
+      session([
+        driverResult({ currentDriverSteamId: 'A', carGroup: 'GT3', bestLapMs: 115000, drivers: [{ firstName: 'Alice', lastName: null, steamId: 'A', shortName: null }] }),
+        driverResult({ currentDriverSteamId: 'B', carGroup: 'GT4', bestLapMs: 100000, drivers: [{ firstName: 'Bob', lastName: null, steamId: 'B', shortName: null }] }),
+      ]),
+    ];
+    const board = aggregateAccHotLapLeaderboard(sessions);
+    const gt3 = board.filter((e) => e.carGroup === 'GT3');
+    const gt4 = board.filter((e) => e.carGroup === 'GT4');
+    expect(gt3.map((e) => e.rank)).toEqual([1]);
+    expect(gt4.map((e) => e.rank)).toEqual([1]);
+  });
+
+  it('ignores entries with no carGroup, no steamId, or null bestLapMs', () => {
+    const sessions = [
+      session([
+        driverResult({ currentDriverSteamId: 'A', carGroup: null, bestLapMs: 100000 }),
+        driverResult({ currentDriverSteamId: '', bestLapMs: 100000 }),
+        driverResult({ currentDriverSteamId: 'B', bestLapMs: null }),
+      ]),
+    ];
+    expect(aggregateAccHotLapLeaderboard(sessions)).toEqual([]);
+  });
+
+  it('returns empty array for no sessions', () => {
+    expect(aggregateAccHotLapLeaderboard([])).toEqual([]);
   });
 });

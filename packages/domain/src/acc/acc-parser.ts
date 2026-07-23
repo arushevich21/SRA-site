@@ -6,7 +6,7 @@ import type {
   AccHotLapEntry,
 } from '@sra/shared-types';
 import { msToLaptime } from '../ac-evo/ac-evo-parser.js';
-import { accCarModelName, accCupCategoryName } from './acc-constants.js';
+import { accCarModelName, accCupCategoryName, accCarClassName } from './acc-constants.js';
 
 // ── raw API shapes — private, never exported ────────────────────────────────
 
@@ -144,7 +144,11 @@ export function parseAccSession(raw: unknown): AccSessionResult {
       carId: line.car.carId,
       carModel: line.car.carModel,
       carModelName: accCarModelName(line.car.carModel),
-      carGroup: line.car.carGroup ?? null,
+      // Prefer our own authoritative class lookup over the server-reported
+      // value — a server's class config can be wrong (confirmed: Oulton Park
+      // reported TCX cars as "GT3"). Fall back to the server's value only for
+      // a car ID our table doesn't cover yet (e.g. a brand new game update).
+      carGroup: accCarClassName(line.car.carModel) ?? line.car.carGroup ?? null,
       cupCategory: line.car.cupCategory ?? null,
       cupCategoryName:
         line.car.cupCategory == null ? null : accCupCategoryName(line.car.cupCategory),
@@ -199,7 +203,12 @@ export function aggregateAccHotLapLeaderboard(sessions: AccSessionResult[]): Acc
     for (const r of session.results) {
       const steamId = r.currentDriverSteamId;
       if (!steamId || r.bestLapMs == null || !r.carGroup) continue;
-      const key = `${r.carGroup}:${steamId}`;
+      // Keyed by (steamId, carModel) — carGroup is a pure function of
+      // carModel (see accCarClassName), so including it in the key would be
+      // redundant; a driver's fastest lap in each car is tracked
+      // independently, so switching cars doesn't discard their best time in
+      // the one they left.
+      const key = `${steamId}:${r.carModel}`;
       const existing = bestByKey.get(key);
       if (!existing || r.bestLapMs < existing.bestLapMs) {
         const driver = r.drivers.find((d) => d.steamId === steamId);

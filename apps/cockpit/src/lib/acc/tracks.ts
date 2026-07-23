@@ -1,4 +1,9 @@
-import { msToLaptime, accCarManufacturerIconName, accCarManufacturerLogoUrl } from '@sra/domain';
+import {
+  msToLaptime,
+  accCarClassName,
+  accCarManufacturerIconName,
+  accCarManufacturerLogoUrl,
+} from '@sra/domain';
 import type { AccHotLapEntry } from '@sra/shared-types';
 import type { TrackSummary, TrackTopEntry } from '../track-summary';
 import { supabase } from '../supabase';
@@ -67,17 +72,26 @@ export async function getAccTrack(trackKey: string): Promise<AccTrack | null> {
   return toAccTrack(data as unknown as TrackLayoutRow);
 }
 
-// Grouped by car_group (GT3/GT4/etc.) since ACC times aren't comparable
-// across classes. rank isn't stored in the DB (see acc_hotlap_leaderboard
-// schema) — it's derived here from the sorted position within each group.
+// Class (GT3/GT4/TCX/etc.) is never stored on acc_hotlap_leaderboard — it's
+// a pure function of car_model_id (see accCarClassName in
+// packages/domain/src/acc/acc-constants.ts), derived fresh here rather than
+// trusted from a persisted column, so a future correction to that lookup
+// table takes effect immediately with no stale data anywhere to reconcile.
+function resolveCarGroup(carModelId: number | null): string {
+  return (carModelId != null ? accCarClassName(carModelId) : null) ?? 'Other';
+}
+
+// Grouped by class since ACC times aren't comparable across classes. rank
+// isn't stored in the DB — it's derived here from the sorted position
+// within each group (rows already arrive best_lap_ms-ascending, so bucketing
+// preserves that order per group).
 export async function getAccTrackLeaderboard(
   trackKey: string,
 ): Promise<Record<string, AccHotLapEntry[]>> {
   const { data, error } = await supabase
     .from('acc_hotlap_leaderboard')
-    .select('car_group, steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
+    .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
     .eq('track_key', trackKey)
-    .order('car_group', { ascending: true })
     .order('best_lap_ms', { ascending: true });
 
   if (error) {
@@ -87,7 +101,8 @@ export async function getAccTrackLeaderboard(
 
   const byCarGroup: Record<string, AccHotLapEntry[]> = {};
   for (const row of data ?? []) {
-    const carGroup = row.car_group as string;
+    const carModelId = row.car_model_id as number | null;
+    const carGroup = resolveCarGroup(carModelId);
     const entries = byCarGroup[carGroup] ?? (byCarGroup[carGroup] = []);
     const bestLapMs = row.best_lap_ms as number;
     entries.push({
@@ -95,7 +110,7 @@ export async function getAccTrackLeaderboard(
       steamId: row.steam_id as string,
       driverName: row.driver_name as string,
       carGroup,
-      carModel: row.car_model_id as number | null,
+      carModel: carModelId,
       carModelName: row.car_model as string | null,
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,
@@ -105,16 +120,16 @@ export async function getAccTrackLeaderboard(
   return byCarGroup;
 }
 
-// Outright fastest N times at this track across every car_group combined —
-// for the track-list summary card. Per-class breakdown lives on the track's
-// own detail page (getAccTrackLeaderboard above).
+// Outright fastest N times at this track across every class combined — for
+// the track-list summary card. Per-class breakdown lives on the track's own
+// detail page (getAccTrackLeaderboard above).
 export async function getAccTrackTopTimes(
   trackKey: string,
   limit = 3,
 ): Promise<AccHotLapEntry[]> {
   const { data, error } = await supabase
     .from('acc_hotlap_leaderboard')
-    .select('car_group, steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
+    .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
     .eq('track_key', trackKey)
     .order('best_lap_ms', { ascending: true })
     .limit(limit);
@@ -125,13 +140,14 @@ export async function getAccTrackTopTimes(
   }
 
   return (data ?? []).map((row, i) => {
+    const carModelId = row.car_model_id as number | null;
     const bestLapMs = row.best_lap_ms as number;
     return {
       rank: i + 1,
       steamId: row.steam_id as string,
       driverName: row.driver_name as string,
-      carGroup: row.car_group as string,
-      carModel: row.car_model_id as number | null,
+      carGroup: resolveCarGroup(carModelId),
+      carModel: carModelId,
       carModelName: row.car_model as string | null,
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,

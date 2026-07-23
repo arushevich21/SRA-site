@@ -64,7 +64,9 @@ export function HotLapBoard({ entries }: { entries: HotLapBoardEntry[] }) {
         </thead>
         <tbody>
           {entries.map((entry) => (
-            <tr key={entry.steamId} className="border-b border-line/30">
+            // A driver can now have multiple rows here (one per car they've
+            // set a lap in) — steamId alone is no longer unique per row.
+            <tr key={`${entry.steamId}-${entry.carModel ?? ''}`} className="border-b border-line/30">
               <td
                 className="font-mono text-[15px] py-2 pr-3"
                 style={entry.rank <= 3 ? { color: 'var(--sim-accent)' } : undefined}

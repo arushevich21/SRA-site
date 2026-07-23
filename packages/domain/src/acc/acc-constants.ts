@@ -60,6 +60,80 @@ export const ACC_CAR_MODEL_NAMES: Readonly<Record<number, string>> = {
   86: 'Porsche 935',
 };
 
+// Car class per car model — ACC's real in-game class, NOT necessarily what a
+// given server session reports as car.carGroup. Confirmed bug: a server can
+// report carGroup="GT3" for cars that are actually TCX (e.g. Oulton Park —
+// BMW M2 CS Racing and Porsche 911 GT3 Cup both came through tagged GT3 by
+// the server, despite being TCX cars). Since carGroup is server-configurable
+// and apparently unreliable, this table is the authoritative source —
+// parseAccSession derives carGroup from here, falling back to the server's
+// value only for a car ID this table doesn't yet cover (e.g. a brand new
+// car from a game update).
+// Lower confidence on 13/14 (Lamborghini Gallardo R-EX, Jaguar G3) — older
+// "Challengers Pack" cars classified here as GT3 (their original in-game
+// class); worth double-checking against the handbook if either ever shows
+// up mislabeled the way the TCX cars did.
+export const ACC_CAR_CLASS_NAMES: Readonly<Record<number, string>> = {
+  0: 'GT3',
+  1: 'GT3',
+  2: 'GT3',
+  3: 'GT3',
+  4: 'GT3',
+  5: 'GT3',
+  6: 'GT3',
+  7: 'GT3',
+  8: 'GT3',
+  9: 'GTC',
+  10: 'GT3',
+  11: 'GT3',
+  12: 'GT3',
+  13: 'GT3',
+  14: 'GT3',
+  15: 'GT3',
+  16: 'GT3',
+  17: 'GT3',
+  18: 'GTC',
+  19: 'GT3',
+  20: 'GT3',
+  21: 'GT3',
+  22: 'GT3',
+  23: 'GT3',
+  24: 'GT3',
+  25: 'GT3',
+  26: 'ST',
+  27: 'TCX',
+  28: 'GTC',
+  29: 'GTC',
+  30: 'GT3',
+  31: 'GT3',
+  32: 'GT3',
+  33: 'GT3',
+  34: 'GT3',
+  35: 'GT3',
+  36: 'GT3',
+  50: 'GT4',
+  51: 'GT4',
+  52: 'GT4',
+  53: 'GT4',
+  55: 'GT4',
+  56: 'GT4',
+  57: 'GT4',
+  58: 'GT4',
+  59: 'GT4',
+  60: 'GT4',
+  61: 'GT4',
+  80: 'GT2',
+  82: 'GT2',
+  83: 'GT2',
+  84: 'GT2',
+  85: 'GT2',
+  86: 'GT2',
+};
+
+export function accCarClassName(carModel: number): string | null {
+  return ACC_CAR_CLASS_NAMES[carModel] ?? null;
+}
+
 // Manufacturer icon name per car model, matching @cardog-icons/react's
 // exported icon names exactly (e.g. 'PorscheIcon', 'MBIcon' for
 // Mercedes-AMG, 'MclarenIcon' — lowercase 'c', matching the package's own
