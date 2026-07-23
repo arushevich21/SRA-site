@@ -15,12 +15,13 @@ import { mapChampionship, type ChampionshipRow } from './championships-map';
 // before and after the seed runs. Once fully DB-driven this fallback can be
 // revisited (an empty table would then be a real, visible state).
 
+const ROUND_COLS =
+  'round, track, race_length, starts_at, emperor_track, emperor_raw_track_name';
+
 export async function getChampionships(): Promise<ChampionshipContent[]> {
   const { data, error } = await supabase
     .from('championships')
-    .select(
-      '*, championship_rounds(round, track, race_length, starts_at, emperor_track, emperor_raw_track_name)',
-    )
+    .select(`*, championship_rounds(${ROUND_COLS})`)
     .order('sort_order', { ascending: true });
 
   if (error) {
@@ -30,4 +31,49 @@ export async function getChampionships(): Promise<ChampionshipContent[]> {
   if (!data || data.length === 0) return CHAMPIONSHIPS;
 
   return (data as ChampionshipRow[]).map(mapChampionship);
+}
+
+// ── Admin reads (include the DB id, never exposed to the public render layer) ──
+
+export type ChampionshipAdminSummary = {
+  id: string;
+  slug: string;
+  game: string;
+  title: string;
+  sortOrder: number;
+  teaserOnly: boolean;
+  concluded: boolean;
+  roundCount: number;
+};
+
+export async function getChampionshipAdminList(): Promise<ChampionshipAdminSummary[]> {
+  const { data, error } = await supabase
+    .from('championships')
+    .select('id, slug, game, title, sort_order, teaser_only, concluded, championship_rounds(round)')
+    .order('sort_order', { ascending: true });
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    slug: r.slug as string,
+    game: r.game as string,
+    title: r.title as string,
+    sortOrder: r.sort_order as number,
+    teaserOnly: r.teaser_only as boolean,
+    concluded: r.concluded as boolean,
+    roundCount: (r.championship_rounds as unknown[] | null)?.length ?? 0,
+  }));
+}
+
+// Full row (incl id + rounds) for pre-filling the edit form.
+export async function getChampionshipRowById(
+  id: string,
+): Promise<(ChampionshipRow & { id: string }) | null> {
+  const { data, error } = await supabase
+    .from('championships')
+    .select(`*, championship_rounds(${ROUND_COLS})`)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as (ChampionshipRow & { id: string }) | null) ?? null;
 }
