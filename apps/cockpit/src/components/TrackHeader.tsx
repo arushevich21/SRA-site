@@ -27,7 +27,7 @@ export function TrackHeader({
       <div className="relative flex items-center h-full px-5 py-5 sm:px-9 sm:py-8 gap-10">
         <div className="flex flex-col gap-2 sm:gap-4 min-w-0 shrink sm:shrink-0 max-w-full sm:max-w-[520px]">
           <h1
-            className="font-display font-black text-[clamp(28px,8vw,64px)] uppercase leading-none tracking-[-1px] italic truncate"
+            className="font-display font-black text-[clamp(28px,8vw,64px)] uppercase leading-none tracking-[-1px] italic whitespace-nowrap"
             style={{ color: 'var(--sim-accent)' }}
           >
             {track.displayName}

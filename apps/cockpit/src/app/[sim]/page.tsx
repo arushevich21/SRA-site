@@ -9,7 +9,7 @@ import { GameLabel } from '@/components/GameLabel';
 const STATUS_DOT_CLASS: Record<string, string> = {
   concluded: 'bg-concluded',
   'coming-soon': 'bg-txt-3/40',
-  upcoming: 'bg-txt-3/40',
+  upcoming: 'bg-upcoming',
   'active-open': 'bg-live',
   'active-closed': 'bg-active-closed',
 };
@@ -17,7 +17,7 @@ const STATUS_DOT_CLASS: Record<string, string> = {
 const STATUS_TEXT_CLASS: Record<string, string> = {
   concluded: 'text-concluded',
   'coming-soon': 'text-txt-3/50',
-  upcoming: 'text-txt-3/50',
+  upcoming: 'text-upcoming',
   'active-open': 'text-live',
   'active-closed': 'text-active-closed',
 };
@@ -183,7 +183,7 @@ export default async function SimOverviewPage({
                         <p className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3">
                           {status === 'coming-soon'
                             ? 'Coming Soon'
-                            : `${champ.schedule.length} Rounds`}
+                            : `${champ.schedule.length} ${champ.schedule.length === 1 ? 'Round' : 'Rounds'}`}
                         </p>
                       </div>
                     </div>

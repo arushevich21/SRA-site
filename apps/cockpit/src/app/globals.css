@@ -16,7 +16,8 @@
   --color-gold-soft:  #f2cf73;
   --color-live:          #36e0c8;
   --color-active-closed: #4a9de0; /* steady blue — season underway, registration closed */
-  --color-concluded:     #9d6fe0; /* violet — "season finished", visually distinct from gray/Upcoming and teal/Active */
+  --color-upcoming:      #e0913a; /* amber — scheduled but not started, distinct from the gray "Coming Soon" teaser */
+  --color-concluded:     #9d6fe0; /* violet — "season finished", visually distinct from teal/Active */
   --color-purple:        #b14eff; /* fastest-sector highlight — sim-racing "purple sector" convention */
 
   /* ── semantic heading hierarchy ─────────────────────────────────── */

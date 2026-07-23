@@ -67,11 +67,12 @@ export async function refreshWithLock(): Promise<AccIncrementalRefreshResult | n
   }
 }
 
-// Loops over every configured ACCSM server (accsm1-7; only ACCSM4 is live as
-// of 2026-07, see EMPEROR_ACC_BASE_URLS), fetching only page 0 of each
-// server's results list (newest-first, same assumption as AC Evo — see
+// Loops over every configured ACCSM server (accsm1-7, see
+// EMPEROR_ACC_BASE_URLS), fetching only page 0 of each server's results list
+// (newest-first, same assumption as AC Evo — see
 // scripts/check-emperor-page-order.ts) and processing sessions not yet in
-// acc_processed_sessions.
+// acc_processed_sessions. New tracks (e.g. a quick-race venue) are
+// auto-created with a placeholder name by upsertTrackAndLeaderboard.
 async function runIncrementalRefresh(): Promise<AccIncrementalRefreshResult> {
   const startedAt = Date.now();
   const processedTracks = new Set<string>();

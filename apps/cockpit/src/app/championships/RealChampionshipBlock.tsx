@@ -11,7 +11,7 @@ import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalSchedule
 const STATUS_DOT_CLASS: Record<string, string> = {
   concluded: 'bg-concluded',
   'coming-soon': 'bg-txt-3/40',
-  upcoming: 'bg-txt-3/40',
+  upcoming: 'bg-upcoming',
   'active-open': 'bg-live',
   'active-closed': 'bg-active-closed',
 };
@@ -19,7 +19,7 @@ const STATUS_DOT_CLASS: Record<string, string> = {
 const STATUS_TEXT_CLASS: Record<string, string> = {
   concluded: 'text-concluded',
   'coming-soon': 'text-txt-3/50',
-  upcoming: 'text-txt-3/50',
+  upcoming: 'text-upcoming',
   'active-open': 'text-live',
   'active-closed': 'text-active-closed',
 };
@@ -127,7 +127,7 @@ export function RealChampionshipBlock({
             <p className="font-mono text-[12px] tracking-[.3em] uppercase text-txt-2">
               {content.schedule.length > 0 && status !== 'coming-soon' && (
                 <>
-                  {content.schedule.length} Rounds
+                  {content.schedule.length} {content.schedule.length === 1 ? 'Round' : 'Rounds'}
                   <span className="text-txt-3"> · </span>
                 </>
               )}

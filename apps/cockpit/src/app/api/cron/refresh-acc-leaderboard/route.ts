@@ -3,7 +3,8 @@ import { refreshWithLock } from '@/lib/acc/hotlaps';
 
 // Called by an external scheduler (e.g. cron-job.org), same pattern as
 // /api/cron/refresh-leaderboard for AC Evo — see that route for the timing
-// rationale. Currently only pulls from ACCSM4 (EMPEROR_ACC_BASE_URLS).
+// rationale. Pulls from every server in EMPEROR_ACC_BASE_URLS (defaults to
+// accsm1-7; idle/unreachable servers are skipped, not fatal).
 //
 // Protect with: Authorization: Bearer <CRON_SECRET>
 export async function GET(req: NextRequest): Promise<NextResponse> {

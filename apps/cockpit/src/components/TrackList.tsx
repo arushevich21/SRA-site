@@ -29,12 +29,12 @@ export function TrackList({
   }
 
   return (
-    <div className="flex flex-col border border-line divide-y divide-line">
+    <div className="flex flex-col gap-3">
       {tracks.map((track) => (
         <Link
           key={track.trackKey}
           href={`/${simSlug}/leaderboards/${track.trackKey}`}
-          className="group relative flex flex-col sm:flex-row sm:items-center h-auto sm:h-[130px] px-4 sm:px-6 py-4 sm:py-0 gap-3 sm:gap-6 overflow-hidden hover:bg-carbon-2/60 transition-colors"
+          className="group relative flex flex-col sm:flex-row sm:items-center min-h-[130px] px-4 sm:px-6 py-4 sm:py-5 gap-3 sm:gap-6 overflow-hidden border border-line hover:bg-carbon-2/60 transition-colors"
         >
           {/* Full-bleed darkened splash art */}
           {track.splashArtUrl && (
@@ -48,9 +48,9 @@ export function TrackList({
           <div className="absolute inset-0 bg-carbon/75" />
 
           {/* Left: track name + meta */}
-          <div className="relative w-full sm:w-[220px] shrink-0 flex flex-col gap-1">
+          <div className="relative w-full sm:w-[240px] shrink-0 flex flex-col gap-1">
             <span
-              className="font-display font-bold text-[20px] sm:text-[24px] uppercase underline decoration-2 underline-offset-4 leading-tight"
+              className="font-display font-bold text-[20px] sm:text-[24px] uppercase italic leading-tight"
               style={{ color: 'var(--sim-accent)' }}
             >
               {track.displayName}
