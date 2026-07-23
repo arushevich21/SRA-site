@@ -1,4 +1,4 @@
-import { CHAMPIONSHIPS } from '@/content/championships';
+import { getChampionships } from './championships-store';
 import { trackSlug } from './track-slug';
 
 export type LeaderboardTrack = {
@@ -9,9 +9,10 @@ export type LeaderboardTrack = {
 
 // Every distinct track a sim's championships have run on Emperor, deduped by
 // raw track name (a track can appear across multiple rounds/championships).
-export function getLeaderboardTracks(game: string): LeaderboardTrack[] {
+export async function getLeaderboardTracks(game: string): Promise<LeaderboardTrack[]> {
+  const championships = await getChampionships();
   const seen = new Map<string, LeaderboardTrack>();
-  for (const champ of CHAMPIONSHIPS) {
+  for (const champ of championships) {
     if (champ.game !== game) continue;
     for (const round of champ.schedule) {
       if (!round.emperorRawTrackName || seen.has(round.emperorRawTrackName)) continue;
@@ -25,6 +26,9 @@ export function getLeaderboardTracks(game: string): LeaderboardTrack[] {
   return [...seen.values()];
 }
 
-export function findLeaderboardTrack(game: string, slug: string): LeaderboardTrack | undefined {
-  return getLeaderboardTracks(game).find((t) => t.slug === slug);
+export async function findLeaderboardTrack(
+  game: string,
+  slug: string,
+): Promise<LeaderboardTrack | undefined> {
+  return (await getLeaderboardTracks(game)).find((t) => t.slug === slug);
 }

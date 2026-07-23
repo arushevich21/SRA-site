@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ChampionshipContent } from '../../content/championships';
-import { formatScheduleDateTime } from '../../content/championships';
+import { formatScheduleDateTime } from '@/lib/schedule-format';
 import { SIMS } from '@/content/sims';
 import { CategoryTag } from './shared';
 import { getChampionshipStatus, CHAMPIONSHIP_STATUS_LABELS } from '@/lib/championship-status';

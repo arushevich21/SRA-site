@@ -7,7 +7,7 @@ import type { SimConfig } from '@/content/sims';
 // rather than by championship round. Hero art is a placeholder gradient —
 // swap in real track photography per track when it's available.
 export async function AllTracksLeaderboards({ sim }: { sim: SimConfig }) {
-  const tracks = getLeaderboardTracks(sim.game);
+  const tracks = await getLeaderboardTracks(sim.game);
 
   if (tracks.length === 0) {
     return (

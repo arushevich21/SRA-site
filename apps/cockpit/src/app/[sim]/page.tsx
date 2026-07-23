@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { CHAMPIONSHIPS } from '@/content/championships';
+import { getChampionships } from '@/lib/championships-store';
 import { getChampionshipStatus, CHAMPIONSHIP_STATUS_LABELS } from '@/lib/championship-status';
 import { GameLabel } from '@/components/GameLabel';
 
@@ -58,7 +58,7 @@ export default async function SimOverviewPage({
   const sim = getSimBySlug(slug);
   if (!sim) notFound();
 
-  const champs = CHAMPIONSHIPS.filter((c) => c.game === sim.game);
+  const champs = (await getChampionships()).filter((c) => c.game === sim.game);
   const activeChamps = champs.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
   const upcomingChamps = champs.filter((c) => c.schedule.length === 0 || c.teaserOnly);
   const allChamps = [...activeChamps, ...upcomingChamps];

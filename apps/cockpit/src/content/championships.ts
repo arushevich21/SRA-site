@@ -1,5 +1,3 @@
-import { EVENT_SOURCE_TIMEZONE, eventDateTimeParts } from '@/lib/event-time';
-
 export type ScheduleRound = {
   round: number;
   track: string;
@@ -50,19 +48,6 @@ export type ChampionshipContent = {
 
 export function getStandingsKey(c: ChampionshipContent): string | undefined {
   return c.standingsKey ?? (c.simgridId != null ? String(c.simgridId) : undefined);
-}
-
-// Date and time split apart so callers (e.g. calendar rows) can give the
-// date/time more visual weight than the surrounding duration/format text.
-// Pinned to Eastern so it's deterministic across server and client — use it
-// for SSR fallbacks; viewer-local display goes through LocalScheduleDateTime.
-export function formatScheduleDateTime(date: string | null): { date: string; time: string | null } {
-  return eventDateTimeParts(date, EVENT_SOURCE_TIMEZONE);
-}
-
-export function formatScheduleDate(date: string | null): string {
-  const { date: dateStr, time } = formatScheduleDateTime(date);
-  return time ? `${dateStr} · ${time}` : dateStr;
 }
 
 export const CHAMPIONSHIPS: ChampionshipContent[] = [

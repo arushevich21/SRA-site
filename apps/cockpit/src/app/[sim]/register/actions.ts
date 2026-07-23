@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabase as adminClient } from '@/lib/supabase';
-import { CHAMPIONSHIPS } from '@/content/championships';
+import { getChampionships } from '@/lib/championships-store';
 
 export type RegisterState = { error: string } | { success: true } | null;
 
@@ -23,7 +23,7 @@ export async function registerTeam(
   // Client sends the key; config (maxTeamSize, allowedCars, season) comes from
   // the server-side content layer, never from the client.
   const champKey = formData.get('championship_key') as string | null;
-  const champ = CHAMPIONSHIPS.find((c) => c.registrationKey === champKey);
+  const champ = (await getChampionships()).find((c) => c.registrationKey === champKey);
   if (!champ?.registrationOpen) {
     return { error: 'Registration is not open for this championship' };
   }

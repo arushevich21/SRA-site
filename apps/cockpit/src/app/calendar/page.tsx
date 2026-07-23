@@ -1,14 +1,16 @@
 import { Fragment } from 'react';
 import Image from 'next/image';
-import { CHAMPIONSHIPS, formatScheduleDateTime } from '../../content/championships';
+import { formatScheduleDateTime } from '@/lib/schedule-format';
+import { getChampionships } from '@/lib/championships-store';
 import { SIMS } from '@/content/sims';
 import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid';
 import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
 
-export default function CalendarPage() {
-  const teasedChamps = CHAMPIONSHIPS.filter((c) => c.teaserOnly);
-  const realChamps = CHAMPIONSHIPS.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
+export default async function CalendarPage() {
+  const championships = await getChampionships();
+  const teasedChamps = championships.filter((c) => c.teaserOnly);
+  const realChamps = championships.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
 
   const gridEvents: CalendarGridEvent[] = realChamps.flatMap((champ) => {
     const sim = SIMS.find((s) => s.game === champ.game);

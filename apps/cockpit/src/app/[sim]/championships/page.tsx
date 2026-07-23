@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { CHAMPIONSHIPS } from '@/content/championships';
+import { getChampionships } from '@/lib/championships-store';
 import { RealChampionshipBlock } from '@/app/championships/RealChampionshipBlock';
 import { SectionLabel } from '@/app/championships/shared';
 import { GameLabel } from '@/components/GameLabel';
@@ -14,7 +14,7 @@ export default async function SimChampionshipsPage({
   const sim = getSimBySlug(slug);
   if (!sim) notFound();
 
-  const champs = CHAMPIONSHIPS.filter((c) => c.game === sim.game);
+  const champs = (await getChampionships()).filter((c) => c.game === sim.game);
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">

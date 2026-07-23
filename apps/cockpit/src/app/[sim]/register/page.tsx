@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { CHAMPIONSHIPS } from '@/content/championships';
+import { getChampionships } from '@/lib/championships-store';
 import { RegisterBody } from './RegisterBody';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ export default async function RegisterPage({ params }: Props) {
   const sim = getSimBySlug(simSlug);
   if (!sim) notFound();
 
-  const champ = CHAMPIONSHIPS.find(
+  const champ = (await getChampionships()).find(
     (c) => c.game === sim.game && c.registrationKey && c.registrationOpen,
   );
 

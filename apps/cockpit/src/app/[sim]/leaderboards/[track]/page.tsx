@@ -17,7 +17,7 @@ export default async function TrackLeaderboardPage({
   const sim = getSimBySlug(simSlug);
   if (!sim) notFound();
 
-  const track = findLeaderboardTrack(sim.game, trackSlugParam);
+  const track = await findLeaderboardTrack(sim.game, trackSlugParam);
   if (!track) notFound();
 
   const entries = await getHotLapBoard(track.rawTrackName);
