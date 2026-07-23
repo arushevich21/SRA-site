@@ -2,7 +2,8 @@ import { Fragment } from 'react';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { CHAMPIONSHIPS, formatScheduleDateTime } from '@/content/championships';
+import { formatScheduleDateTime } from '@/lib/schedule-format';
+import { getChampionships } from '@/lib/championships-store';
 import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid';
 import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
@@ -16,10 +17,11 @@ export default async function SimCalendarPage({
   const sim = getSimBySlug(slug);
   if (!sim) notFound();
 
-  const teasedChamps = CHAMPIONSHIPS.filter(
+  const championships = await getChampionships();
+  const teasedChamps = championships.filter(
     (c) => c.game === sim.game && c.teaserOnly,
   );
-  const realChamps = CHAMPIONSHIPS.filter(
+  const realChamps = championships.filter(
     (c) => c.game === sim.game && c.schedule.length > 0 && !c.teaserOnly,
   );
 

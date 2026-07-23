@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { CHAMPIONSHIPS, getStandingsKey } from '@/content/championships';
+import { getStandingsKey } from '@/content/championships';
+import { getChampionships } from '@/lib/championships-store';
 import { ChampionshipStandingsBody } from '@/components/ChampionshipStandingsBody';
 import { GameLabel } from '@/components/GameLabel';
 
@@ -17,7 +18,7 @@ export default async function SimStandingsPage({
 
   // Teased championships (e.g. Endurance) stay "coming soon" here even if a
   // standings key exists — only surface real data for non-teased series.
-  const champ = CHAMPIONSHIPS.find(
+  const champ = (await getChampionships()).find(
     (c) =>
       c.game === sim.game &&
       (c.emperorChampionshipId || (!c.teaserOnly && getStandingsKey(c))),

@@ -1,5 +1,5 @@
 import pastSeasonsData from '../../content/seasons_clean.json';
-import { CHAMPIONSHIPS } from '../../content/championships';
+import { getChampionships } from '@/lib/championships-store';
 import { DivisionGroup } from './division-group';
 import { RealChampionshipBlock } from './RealChampionshipBlock';
 import { SectionLabel } from './shared';
@@ -34,7 +34,8 @@ const divisionGroups = Object.entries(
 
 // ── page ──────────────────────────────────────────────────────────────────────
 
-export default function ChampionshipsPage() {
+export default async function ChampionshipsPage() {
+  const championships = await getChampionships();
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       {/* Page header */}
@@ -46,11 +47,11 @@ export default function ChampionshipsPage() {
       </h1>
 
       {/* Active championships */}
-      {CHAMPIONSHIPS.filter((c) => c.schedule.length > 0 && !c.teaserOnly).length > 0 && (
+      {championships.filter((c) => c.schedule.length > 0 && !c.teaserOnly).length > 0 && (
         <div className="mb-20">
           <SectionLabel>Active Championships</SectionLabel>
           <div className="flex flex-col gap-6">
-            {CHAMPIONSHIPS.filter((c) => c.schedule.length > 0 && !c.teaserOnly).map((content) => (
+            {championships.filter((c) => c.schedule.length > 0 && !c.teaserOnly).map((content) => (
               <RealChampionshipBlock key={content.standingsKey ?? content.simgridId ?? content.title} content={content} />
             ))}
           </div>
@@ -58,11 +59,11 @@ export default function ChampionshipsPage() {
       )}
 
       {/* Upcoming championships */}
-      {CHAMPIONSHIPS.filter((c) => c.schedule.length === 0 || c.teaserOnly).length > 0 && (
+      {championships.filter((c) => c.schedule.length === 0 || c.teaserOnly).length > 0 && (
         <div className="mb-20">
           <SectionLabel muted>Upcoming Championships</SectionLabel>
           <div className="flex flex-col gap-6">
-            {CHAMPIONSHIPS.filter((c) => c.schedule.length === 0 || c.teaserOnly).map((content) => (
+            {championships.filter((c) => c.schedule.length === 0 || c.teaserOnly).map((content) => (
               <RealChampionshipBlock key={content.standingsKey ?? content.simgridId ?? content.title} content={content} />
             ))}
           </div>

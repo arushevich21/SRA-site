@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { CHAMPIONSHIPS } from '@/content/championships';
+import { getChampionships } from '@/lib/championships-store';
 import { RealChampionshipBlock } from '@/app/championships/RealChampionshipBlock';
 
 export default async function ChampionshipDetailPage({
@@ -12,7 +12,7 @@ export default async function ChampionshipDetailPage({
   const sim = getSimBySlug(simSlug);
   if (!sim) notFound();
 
-  const content = CHAMPIONSHIPS.find((c) => c.game === sim.game && c.slug === slug);
+  const content = (await getChampionships()).find((c) => c.game === sim.game && c.slug === slug);
   if (!content) notFound();
 
   return (

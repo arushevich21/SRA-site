@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { getSimBySlug, SIMS, type SimConfig } from '@/content/sims';
-import { CHAMPIONSHIPS, getStandingsKey, type ChampionshipContent } from '@/content/championships';
+import { getStandingsKey, type ChampionshipContent } from '@/content/championships';
 import { GameLabel } from '@/components/GameLabel';
 
 export type NavUser = {
@@ -65,8 +65,8 @@ function tabNavItem(
   };
 }
 
-function buildSimNav(sim: SimConfig): NavItem[] {
-  const champsForSim = CHAMPIONSHIPS.filter((c) => c.game === sim.game);
+function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavItem[] {
+  const champsForSim = championships.filter((c) => c.game === sim.game);
   const calendarChamps = champsForSim.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
   const standingsChamps = champsForSim.filter(
     (c) => c.emperorChampionshipId || (!c.teaserOnly && getStandingsKey(c)),
@@ -121,12 +121,18 @@ function HamburgerIcon({ open }: { open: boolean }) {
   );
 }
 
-export default function NavBar({ user }: { user?: NavUser | null }) {
+export default function NavBar({
+  user,
+  championships = [],
+}: {
+  user?: NavUser | null;
+  championships?: ChampionshipContent[];
+}) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
   const { sim } = useSimContext();
-  const nav = sim ? buildSimNav(sim) : MAIN_NAV;
+  const nav = sim ? buildSimNav(sim, championships) : MAIN_NAV;
 
   // Close mobile menu on navigation
   useEffect(() => { setMenuOpen(false); }, [pathname]);
@@ -360,7 +366,7 @@ export default function NavBar({ user }: { user?: NavUser | null }) {
               <Link href="/" className="flex items-center gap-3 py-3 text-[13px] font-semibold tracking-[.1em] uppercase text-txt-2 hover:text-gold transition-colors" onClick={close}>
                 ← Home
               </Link>
-              {buildSimNav(sim).map((item) =>
+              {buildSimNav(sim, championships).map((item) =>
                 item.drop ? (
                   <div key={item.label}>
                     <Link

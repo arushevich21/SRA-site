@@ -3,6 +3,18 @@ import { requireAdmin } from '@/lib/require-admin';
 
 const ADMIN_SECTIONS = [
   {
+    title: 'Events',
+    description: 'Create and manage championships/events shown on the site.',
+    tools: [
+      {
+        label: 'Manage Events',
+        href: '/admin/events',
+        description:
+          'Create, edit, and delete championships and their rounds. Links to ACSM/SimGrid data sources; does not create events in ACSM itself.',
+      },
+    ],
+  },
+  {
     title: 'Divisions',
     description: 'Manage driver division and tier assignments.',
     tools: [

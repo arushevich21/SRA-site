@@ -1,4 +1,5 @@
-import { type ChampionshipContent, formatScheduleDateTime } from '@/content/championships';
+import { type ChampionshipContent } from '@/content/championships';
+import { formatScheduleDateTime } from '@/lib/schedule-format';
 import { CalendarGrid, type CalendarGridEvent } from './CalendarGrid';
 import { LocalScheduleDate, LocalScheduleTime } from './LocalScheduleDateTime';
 
