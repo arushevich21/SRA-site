@@ -85,7 +85,7 @@ export function HotLapBoard({ entries }: { entries: HotLapBoardEntry[] }) {
                       )
                     )}
                   </span>
-                  <span className="truncate max-w-[180px]">{entry.carModel ?? '—'}</span>
+                  <span className="truncate max-w-[500px]">{entry.carModel ?? '—'}</span>
                 </div>
               </td>
               {Array.from({ length: sectorCount }, (_, i) => {
