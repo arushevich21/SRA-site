@@ -199,14 +199,19 @@ export function parseAcEvoSession(raw: unknown): AcEvoSessionResult {
 // output. That's what keeps isValidLap a single source of truth in practice,
 // not just by convention.
 export function aggregateHotLapLeaderboard(sessions: AcEvoSessionResult[]): HotLapEntry[] {
-  const bestBySteamId = new Map<string, Omit<HotLapEntry, 'rank'>>();
+  // Keyed by (steamId, carModel), not just steamId — a driver's fastest lap
+  // in each car they've driven is tracked independently, so switching cars
+  // doesn't discard their best time in the one they left. carModel is a free
+  // string here (unlike ACC's numeric ID) but still a stable per-car key.
+  const bestByKey = new Map<string, Omit<HotLapEntry, 'rank'>>();
 
   for (const session of sessions) {
     for (const r of session.results) {
       if (r.bestLapMs == null || !r.steamId) continue;
-      const existing = bestBySteamId.get(r.steamId);
+      const key = `${r.steamId}:${r.carModel ?? ''}`;
+      const existing = bestByKey.get(key);
       if (!existing || r.bestLapMs < existing.bestLapMs) {
-        bestBySteamId.set(r.steamId, {
+        bestByKey.set(key, {
           steamId: r.steamId,
           driverName: r.driverName,
           carModel: r.carModel,
@@ -218,7 +223,7 @@ export function aggregateHotLapLeaderboard(sessions: AcEvoSessionResult[]): HotL
     }
   }
 
-  return [...bestBySteamId.values()]
+  return [...bestByKey.values()]
     .sort((a, b) => a.bestLapMs - b.bestLapMs)
     .map((entry, i) => ({ ...entry, rank: i + 1 }));
 }

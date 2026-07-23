@@ -248,14 +248,20 @@ async function runIncrementalRefresh(): Promise<IncrementalRefreshResult> {
   return { processed: newEntries.length, tracks: [...processedTracks], durationMs };
 }
 
+// Keyed by (steamId, carModel) — same rationale as aggregateHotLapLeaderboard
+// (packages/domain/src/ac-evo/ac-evo-parser.ts): a driver's fastest lap in
+// each car they've set a time in is tracked independently, not collapsed to
+// one all-time-best entry that a slower lap in a different car can't touch
+// but a different car's session also can't overwrite except by beating it.
 function mergeEntries(existing: HotLapEntry[], fresh: HotLapEntry[]): HotLapEntry[] {
-  const bySteamId = new Map<string, Omit<HotLapEntry, 'rank'>>();
-  for (const e of existing) bySteamId.set(e.steamId, e);
+  const bestByKey = new Map<string, Omit<HotLapEntry, 'rank'>>();
+  for (const e of existing) bestByKey.set(`${e.steamId}:${e.carModel ?? ''}`, e);
   for (const e of fresh) {
-    const prev = bySteamId.get(e.steamId);
-    if (!prev || e.bestLapMs < prev.bestLapMs) bySteamId.set(e.steamId, e);
+    const key = `${e.steamId}:${e.carModel ?? ''}`;
+    const prev = bestByKey.get(key);
+    if (!prev || e.bestLapMs < prev.bestLapMs) bestByKey.set(key, e);
   }
-  return [...bySteamId.values()]
+  return [...bestByKey.values()]
     .sort((a, b) => a.bestLapMs - b.bestLapMs)
     .map((e, i) => ({ ...e, rank: i + 1 }));
 }

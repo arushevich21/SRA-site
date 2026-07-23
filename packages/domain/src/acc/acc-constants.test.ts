@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   accCarModelName,
   accCupCategoryName,
+  accCarClassName,
   ACC_CAR_MODEL_NAMES,
   ACC_CUP_CATEGORY_NAMES,
 } from './acc-constants.js';
@@ -39,6 +40,25 @@ describe('accCupCategoryName', () => {
 
   it('returns null for an unknown ID', () => {
     expect(accCupCategoryName(99)).toBeNull();
+  });
+});
+
+describe('accCarClassName', () => {
+  it.each([
+    [1, 'GT3'], // Mercedes-AMG GT3
+    [9, 'GTC'], // Porsche 991II GT3 Cup
+    [27, 'TCX'], // BMW M2 CS Racing — confirmed mislabeled "GT3" by an Oulton Park server
+    [28, 'GTC'], // Porsche 911 GT3 Cup (Type 992) — same Oulton Park bug
+    [18, 'GTC'], // Lamborghini Huracan SuperTrofeo
+    [26, 'ST'], // Ferrari 488 Challenge Evo
+    [56, 'GT4'], // Ginetta G55 GT4
+    [82, 'GT2'], // KTM XBOW GT2
+  ])('resolves ID %i to %s', (id, expected) => {
+    expect(accCarClassName(id)).toBe(expected);
+  });
+
+  it('returns null for an ID not in the table', () => {
+    expect(accCarClassName(9999)).toBeNull();
   });
 });
 

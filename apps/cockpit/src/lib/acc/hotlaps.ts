@@ -167,8 +167,18 @@ async function runIncrementalRefresh(): Promise<AccIncrementalRefreshResult> {
 
 // Ensures the track exists in acc_tracks (placeholder display_name = the raw
 // track key if not already seeded — curate the real name/splash art later),
-// then merges this session's best laps into acc_hotlap_leaderboard, only
-// keeping a driver's fastest time per (track, carGroup).
+// then merges this session's best laps into acc_hotlap_leaderboard, keeping
+// a driver's fastest time per (track, car) — not collapsed to one
+// all-time-best per driver, so switching cars doesn't discard their best
+// time in the one they left (see acc_hotlap_leaderboard's composite PK,
+// supabase/migrations/20260725b_acc_hotlap_drop_car_group.sql).
+//
+// car_group/class is intentionally NOT stored here at all — it's a pure
+// function of car_model_id (see accCarClassName in
+// packages/domain/src/acc/acc-constants.ts), and persisting a derived value
+// goes stale the moment that lookup table is corrected (confirmed: this
+// happened twice to Oulton Park's TCX/GTC cars within the same session).
+// Every consumer derives class fresh from car_model_id instead.
 async function upsertTrackAndLeaderboard(track: string, session: AccSessionResult): Promise<void> {
   const { error: trackErr } = await supabase
     .from('acc_tracks')
@@ -197,61 +207,146 @@ async function upsertTrackAndLeaderboard(track: string, session: AccSessionResul
   }
 
   const fresh = aggregateAccHotLapLeaderboard([session]);
-  const carGroups = new Set(fresh.map((e) => e.carGroup));
 
-  for (const carGroup of carGroups) {
-    const { data: existing, error: readErr } = await supabase
-      .from('acc_hotlap_leaderboard')
-      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
-      .eq('track_key', track)
-      .eq('car_group', carGroup);
-    if (readErr) throw readErr;
+  const { data: existing, error: readErr } = await supabase
+    .from('acc_hotlap_leaderboard')
+    .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
+    .eq('track_key', track);
+  if (readErr) throw readErr;
 
-    const bySteamId = new Map(
-      (existing ?? []).map((r) => [
-        r.steam_id as string,
-        {
-          steamId: r.steam_id as string,
-          driverName: r.driver_name as string,
-          carModel: r.car_model as string | null,
-          carModelId: r.car_model_id as number | null,
-          bestLapMs: r.best_lap_ms as number,
-          sectorsMs: r.sectors_ms as number[] | null,
-        },
-      ]),
-    );
+  // Keyed by (steamId, carModelId) — a driver's fastest lap in each car is
+  // tracked independently (see acc_hotlap_leaderboard's composite PK).
+  const bestByKey = new Map(
+    (existing ?? []).map((r) => [
+      `${r.steam_id}:${r.car_model_id}`,
+      {
+        steamId: r.steam_id as string,
+        driverName: r.driver_name as string,
+        carModel: r.car_model as string | null,
+        carModelId: r.car_model_id as number | null,
+        bestLapMs: r.best_lap_ms as number,
+        sectorsMs: r.sectors_ms as number[] | null,
+      },
+    ]),
+  );
 
-    for (const entry of fresh.filter((e) => e.carGroup === carGroup)) {
-      const prev = bySteamId.get(entry.steamId);
-      if (!prev || entry.bestLapMs < prev.bestLapMs) {
-        bySteamId.set(entry.steamId, {
-          steamId: entry.steamId,
-          driverName: entry.driverName,
-          carModel: entry.carModelName,
-          carModelId: entry.carModel,
-          bestLapMs: entry.bestLapMs,
-          sectorsMs: entry.sectorsMs,
-        });
-      }
+  for (const entry of fresh) {
+    const key = `${entry.steamId}:${entry.carModel}`;
+    const prev = bestByKey.get(key);
+    if (!prev || entry.bestLapMs < prev.bestLapMs) {
+      bestByKey.set(key, {
+        steamId: entry.steamId,
+        driverName: entry.driverName,
+        carModel: entry.carModelName,
+        carModelId: entry.carModel,
+        bestLapMs: entry.bestLapMs,
+        sectorsMs: entry.sectorsMs,
+      });
     }
-
-    const rows = [...bySteamId.values()].map((e) => ({
-      track_key: track,
-      car_group: carGroup,
-      steam_id: e.steamId,
-      driver_name: e.driverName,
-      car_model: e.carModel,
-      car_model_id: e.carModelId,
-      best_lap_ms: e.bestLapMs,
-      sectors_ms: e.sectorsMs,
-      updated_at: new Date().toISOString(),
-    }));
-
-    const { error: writeErr } = await supabase
-      .from('acc_hotlap_leaderboard')
-      .upsert(rows, { onConflict: 'track_key,car_group,steam_id' });
-    if (writeErr) throw writeErr;
   }
+
+  const rows = [...bestByKey.values()].map((e) => ({
+    track_key: track,
+    steam_id: e.steamId,
+    driver_name: e.driverName,
+    car_model: e.carModel,
+    car_model_id: e.carModelId,
+    best_lap_ms: e.bestLapMs,
+    sectors_ms: e.sectorsMs,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error: writeErr } = await supabase
+    .from('acc_hotlap_leaderboard')
+    .upsert(rows, { onConflict: 'track_key,steam_id,car_model_id' });
+  if (writeErr) throw writeErr;
+}
+
+export type AccBackfillResult = {
+  results: Array<{ baseUrl: string; replayed: number; total: number; error?: string }>;
+  durationMs: number;
+};
+
+const BACKFILL_RETRY_ON_429 = 3;
+const BACKFILL_RETRY_BACKOFF_MS = 15_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// A 5s interval is well above Emperor's documented ~2 req/min sustained
+// limit — a 2s interval previously triggered 429s against this same
+// infrastructure (see CRON_REQUEST_INTERVAL_MS's history above). Retrying
+// with backoff means a rate-limit hit costs time, not the rest of that
+// server's backfill.
+async function downloadWithRetry(client: EmperorClient, url: string): Promise<unknown> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await client.downloadResult(url);
+    } catch (err) {
+      const is429 = err instanceof Error && err.message.includes('429');
+      if (!is429 || attempt >= BACKFILL_RETRY_ON_429) throw err;
+      console.warn(`ACC backfill: rate-limited on ${url}, backing off ${BACKFILL_RETRY_BACKOFF_MS}ms (attempt ${attempt + 1})`);
+      await sleep(BACKFILL_RETRY_BACKOFF_MS);
+    }
+  }
+}
+
+// One-time-use recovery: replays every entry on the given results-list page
+// (~20 results per server per page; page 0 = most recent) through
+// upsertTrackAndLeaderboard regardless of whether it's already in
+// acc_processed_sessions — never touches that registry, so this can't affect
+// what the normal incremental cron considers "new". Exists because the
+// pre-per-car-key leaderboard (before
+// supabase/migrations/20260725_acc_hotlap_per_car.sql) silently discarded a
+// driver's lap in one car whenever a faster lap in a different car of the
+// same class came in — those discarded laps aren't recoverable by the
+// normal cron, since it only ever looks at genuinely-new sessions. Re-running
+// this (or calling it again with a different page) is always safe (every
+// write is the same idempotent upsert as the live cron uses) — callers
+// should target a specific not-yet-covered page (e.g. page 1 after page 0's
+// already been backfilled) rather than re-requesting page 0 again, since
+// each page costs a full round of downloads.
+//
+// Servers run concurrently — each EmperorClient instance has its own
+// independent rate-limit clock, so hitting all of them at once doesn't
+// compound wait time the way the old sequential loop did. Not guarded by
+// the refresh lock: safe to run alongside the normal incremental cron.
+export async function backfillRecentSessions(page = 0): Promise<AccBackfillResult> {
+  const startedAt = Date.now();
+
+  const results = await Promise.all(
+    EMPEROR_ACC_BASE_URLS.map(async (baseUrl) => {
+      const client = new EmperorClient(baseUrl, { minRequestIntervalMs: CRON_REQUEST_INTERVAL_MS });
+
+      let entries;
+      try {
+        ({ entries } = await client.getResultsList(page));
+      } catch (err) {
+        return {
+          baseUrl,
+          replayed: 0,
+          total: 0,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+
+      let replayed = 0;
+      for (const entry of entries) {
+        try {
+          const raw = await downloadWithRetry(client, entry.resultsJsonUrl);
+          const session = parseAccSession(raw);
+          await upsertTrackAndLeaderboard(entry.track, session);
+          replayed++;
+        } catch (err) {
+          console.error(`ACC backfill: failed on ${baseUrl}${entry.resultsJsonUrl}:`, err);
+        }
+      }
+      return { baseUrl, replayed, total: entries.length };
+    }),
+  );
+
+  return { results, durationMs: Date.now() - startedAt };
 }
 
 async function releaseLock(): Promise<void> {
