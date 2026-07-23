@@ -7,6 +7,7 @@ import { getChampionships } from '@/lib/championships-store';
 import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid';
 import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
+import { AccServerStatus } from '@/components/AccServerStatus';
 
 export default async function SimCalendarPage({
   params,
@@ -37,7 +38,8 @@ export default async function SimCalendarPage({
   );
 
   return (
-    <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
+    <>
+      <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       <span
         className="block font-mono text-[15px] tracking-[.3em] uppercase mb-5"
         style={{ color: 'var(--sim-accent)' }}
@@ -166,6 +168,9 @@ export default async function SimCalendarPage({
           </p>
         </div>
       ) : null}
-    </section>
+      </section>
+
+      {sim.game === 'ACC' && <AccServerStatus accentColor={sim.accentColor} />}
+    </>
   );
 }
