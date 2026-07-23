@@ -85,7 +85,7 @@ async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) 
     roundsWithTrack.map(async (r) => ({
       round: r.round,
       track: r.track,
-      points: await getRoundPoints(r.emperorRawTrackName!),
+      points: await getRoundPoints(r.emperorRawTrackName!, r.emperorTrack),
     })),
   );
 

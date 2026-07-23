@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { AllTracksLeaderboards } from '@/components/AllTracksLeaderboards';
+import { TrackList, type TrackWithTopTimes } from '@/components/TrackList';
 import { GameLabel } from '@/components/GameLabel';
+import { getAccTracks, getAccTrackTopTimes, getAccTrackStats, toTrackSummary, toTrackTopEntry } from '@/lib/acc/tracks';
+import { getLeaderboardTracksWithTopTimes } from '@/lib/leaderboard-tracks';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +15,31 @@ export default async function SimLeaderboardsPage({
   const { sim: slug } = await params;
   const sim = getSimBySlug(slug);
   if (!sim) notFound();
+
+  // ACC's leaderboards are its own Supabase-backed track list
+  // (acc_tracks/acc_hotlap_leaderboard, per-class breakdown, manufacturer
+  // logos) — a genuinely different data model from the schedule-driven
+  // AC Evo path below, but both render through the same TrackList component
+  // once adapted into the shared TrackSummary/TrackTopEntry shapes.
+  let tracks: TrackWithTopTimes[];
+  if (sim.game === 'ACC') {
+    const baseTracks = await getAccTracks();
+    tracks = await Promise.all(
+      baseTracks.map(async (track) => {
+        const [topTimes, stats] = await Promise.all([
+          getAccTrackTopTimes(track.trackKey),
+          getAccTrackStats(track.trackKey),
+        ]);
+        return {
+          ...toTrackSummary(track),
+          topTimes: topTimes.map(toTrackTopEntry),
+          ...stats,
+        };
+      }),
+    );
+  } else {
+    tracks = await getLeaderboardTracksWithTopTimes(sim.game);
+  }
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -26,7 +53,7 @@ export default async function SimLeaderboardsPage({
         Leaderboards
       </h1>
 
-      <AllTracksLeaderboards sim={sim} />
+      <TrackList tracks={tracks} simSlug={sim.slug} />
     </section>
   );
 }

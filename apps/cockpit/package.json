@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cardog-icons/react": "^1.2.0",
     "@sra/domain": "workspace:*",
     "@sra/emperor-client": "workspace:*",
     "@sra/shared-types": "workspace:*",

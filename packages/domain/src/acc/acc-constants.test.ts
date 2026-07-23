@@ -20,7 +20,8 @@ describe('accCarModelName', () => {
 
   it('returns null for an ID not in the handbook table', () => {
     // e.g. a car added by a game update newer than the handbook revision.
-    expect(accCarModelName(36)).toBeNull();
+    // (36 used to be this case until Ford Mustang GT3 was confirmed and added.)
+    expect(accCarModelName(37)).toBeNull();
     expect(accCarModelName(9999)).toBeNull();
   });
 });
@@ -42,8 +43,8 @@ describe('accCupCategoryName', () => {
 });
 
 describe('lookup table completeness', () => {
-  it('matches the handbook\'s 53 documented car models (GT3, GT4, GT2 ranges)', () => {
-    expect(Object.keys(ACC_CAR_MODEL_NAMES)).toHaveLength(53);
+  it('matches the handbook\'s 53 documented car models plus confirmed post-handbook additions (Ford Mustang GT3)', () => {
+    expect(Object.keys(ACC_CAR_MODEL_NAMES)).toHaveLength(54);
   });
 
   it('has exactly the 5 documented cup categories', () => {

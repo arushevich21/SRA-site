@@ -1,5 +1,6 @@
 import type { ChampionshipContent } from '@/content/championships';
 import { getHotLapBoard } from '@/lib/acevo-hotlaps';
+import { acEvoManufacturerIconName } from '@/lib/leaderboard-tracks';
 import { HotLapBoard } from './HotLapBoard';
 import { Collapsible } from './Collapsible';
 
@@ -26,7 +27,7 @@ export async function ChampionshipLeaderboardsBody({
         .filter((round) => round.emperorRawTrackName)
         .map(
           async (round) =>
-            [round.round, await getHotLapBoard(round.emperorRawTrackName!)] as const,
+            [round.round, await getHotLapBoard(round.emperorRawTrackName!, round.emperorTrack)] as const,
         ),
     ),
   );
@@ -52,7 +53,12 @@ export async function ChampionshipLeaderboardsBody({
               </span>
             }
           >
-            <HotLapBoard entries={boards.get(round.round) ?? []} />
+            <HotLapBoard
+              entries={(boards.get(round.round) ?? []).map((entry) => ({
+                ...entry,
+                manufacturerIconName: acEvoManufacturerIconName(entry.carModel),
+              }))}
+            />
           </Collapsible>
         ) : (
           <div
