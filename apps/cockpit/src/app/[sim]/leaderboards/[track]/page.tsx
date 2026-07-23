@@ -8,6 +8,7 @@ import {
   acEvoManufacturerIconName,
 } from '@/lib/leaderboard-tracks';
 import { getHotLapBoard } from '@/lib/acevo-hotlaps';
+import { getCurrentSteamId } from '@/lib/current-driver';
 import { HotLapBoard } from '@/components/HotLapBoard';
 import { TrackHeader } from '@/components/TrackHeader';
 import {
@@ -39,9 +40,10 @@ export default async function TrackLeaderboardPage({
     const track = await getAccTrack(trackSlugParam);
     if (!track) notFound();
 
-    const [leaderboardByCarGroup, topEntries] = await Promise.all([
+    const [leaderboardByCarGroup, topEntries, currentSteamId] = await Promise.all([
       getAccTrackLeaderboard(trackSlugParam),
       getAccTrackTopTimes(trackSlugParam, 1),
+      getCurrentSteamId(),
     ]);
 
     return (
@@ -58,7 +60,10 @@ export default async function TrackLeaderboardPage({
           fastestLap={topEntries[0] ? toAccTrackTopEntry(topEntries[0]) : null}
         />
 
-        <AccTrackLeaderboard leaderboardByCarGroup={leaderboardByCarGroup} />
+        <AccTrackLeaderboard
+          leaderboardByCarGroup={leaderboardByCarGroup}
+          currentSteamId={currentSteamId}
+        />
       </section>
     );
   }
@@ -66,9 +71,10 @@ export default async function TrackLeaderboardPage({
   const track = findLeaderboardTrack(sim.game, trackSlugParam);
   if (!track) notFound();
 
-  const [entries, summary] = await Promise.all([
+  const [entries, summary, currentSteamId] = await Promise.all([
     getHotLapBoard(track.rawTrackName, track.emperorTrack),
     toTrackSummary(track),
+    getCurrentSteamId(),
   ]);
   const boardEntries = entries.map((entry) => ({
     ...entry,
@@ -89,7 +95,7 @@ export default async function TrackLeaderboardPage({
         fastestLap={entries[0] ? toTrackTopEntry(entries[0]) : null}
       />
 
-      <HotLapBoard entries={boardEntries} />
+      <HotLapBoard entries={boardEntries} currentSteamId={currentSteamId} />
     </section>
   );
 }

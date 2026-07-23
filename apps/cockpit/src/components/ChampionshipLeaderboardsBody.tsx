@@ -1,6 +1,7 @@
 import type { ChampionshipContent } from '@/content/championships';
 import { getHotLapBoard } from '@/lib/acevo-hotlaps';
 import { acEvoManufacturerIconName } from '@/lib/leaderboard-tracks';
+import { getCurrentSteamId } from '@/lib/current-driver';
 import { HotLapBoard } from './HotLapBoard';
 import { Collapsible } from './Collapsible';
 
@@ -21,16 +22,17 @@ export async function ChampionshipLeaderboardsBody({
     );
   }
 
-  const boards = new Map(
-    await Promise.all(
+  const [boards, currentSteamId] = await Promise.all([
+    Promise.all(
       champ.schedule
         .filter((round) => round.emperorRawTrackName)
         .map(
           async (round) =>
             [round.round, await getHotLapBoard(round.emperorRawTrackName!, round.emperorTrack)] as const,
         ),
-    ),
-  );
+    ).then((entries) => new Map(entries)),
+    getCurrentSteamId(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,6 +60,7 @@ export async function ChampionshipLeaderboardsBody({
                 ...entry,
                 manufacturerIconName: acEvoManufacturerIconName(entry.carModel),
               }))}
+              currentSteamId={currentSteamId}
             />
           </Collapsible>
         ) : (

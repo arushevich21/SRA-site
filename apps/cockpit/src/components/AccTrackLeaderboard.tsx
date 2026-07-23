@@ -1,7 +1,11 @@
+'use client';
+
+import { useMemo, useState } from 'react';
 import type { AccHotLapEntry } from '@sra/shared-types';
 import { accCarManufacturerIconName, accCarManufacturerLogoUrl } from '@sra/domain';
-import { Collapsible } from './Collapsible';
 import { HotLapBoard, type HotLapBoardEntry } from './HotLapBoard';
+
+const ALL_CLASSES = 'All';
 
 // HotLapBoard is generic across sims — it just expects HotLapEntry's shape.
 // AccHotLapEntry only differs by carModelName vs carModel, so map rather than
@@ -24,12 +28,15 @@ function toHotLapEntry(entry: AccHotLapEntry): HotLapBoardEntry {
 
 export function AccTrackLeaderboard({
   leaderboardByCarGroup,
+  currentSteamId,
 }: {
   leaderboardByCarGroup: Record<string, AccHotLapEntry[]>;
+  currentSteamId?: string | null;
 }) {
-  const carGroups = Object.keys(leaderboardByCarGroup).sort();
+  const classes = useMemo(() => Object.keys(leaderboardByCarGroup).sort(), [leaderboardByCarGroup]);
+  const [selectedClass, setSelectedClass] = useState<string>(ALL_CLASSES);
 
-  if (carGroups.length === 0) {
+  if (classes.length === 0) {
     return (
       <div className="border border-line/50 bg-carbon-2 px-6 py-8 text-center">
         <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3">
@@ -39,13 +46,19 @@ export function AccTrackLeaderboard({
     );
   }
 
+  const entries =
+    selectedClass === ALL_CLASSES
+      ? Object.values(leaderboardByCarGroup)
+          .flat()
+          .sort((a, b) => a.bestLapMs - b.bestLapMs)
+          .map((entry, i) => ({ ...entry, rank: i + 1 }))
+      : (leaderboardByCarGroup[selectedClass] ?? []);
+
   return (
-    <div className="flex flex-col gap-4">
-      {carGroups.map((carGroup, idx) => (
-        <Collapsible key={carGroup} defaultOpen={idx === 0} title={carGroup}>
-          <HotLapBoard entries={leaderboardByCarGroup[carGroup].map(toHotLapEntry)} />
-        </Collapsible>
-      ))}
-    </div>
+    <HotLapBoard
+      entries={entries.map(toHotLapEntry)}
+      currentSteamId={currentSteamId}
+      classFilter={{ options: [ALL_CLASSES, ...classes], selected: selectedClass, onChange: setSelectedClass }}
+    />
   );
 }
