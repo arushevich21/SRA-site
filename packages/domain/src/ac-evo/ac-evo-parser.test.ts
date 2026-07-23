@@ -334,6 +334,29 @@ describe('aggregateHotLapLeaderboard', () => {
     expect(board[0].driverName).toBe('Alice (renamed)');
   });
 
+  it('keeps a separate entry per car for the same driver', () => {
+    const sessions = [
+      session([
+        { steamId: 'A', driverName: 'Alice', carModel: 'Mazda MX-5 ND Cup', bestLapMs: 95000 },
+        { steamId: 'A', driverName: 'Alice', carModel: 'Porsche Cayman GT4', bestLapMs: 90000 },
+      ]),
+    ];
+    const board = aggregateHotLapLeaderboard(sessions);
+    expect(board).toHaveLength(2);
+    expect(board.map((e) => e.carModel)).toEqual(['Porsche Cayman GT4', 'Mazda MX-5 ND Cup']);
+  });
+
+  it('does not let a faster lap in one car discard a slower lap already stored in another', () => {
+    const sessions = [
+      session([{ steamId: 'A', driverName: 'Alice', carModel: 'Mazda MX-5 ND Cup', bestLapMs: 95000 }]),
+      session([{ steamId: 'A', driverName: 'Alice', carModel: 'Porsche Cayman GT4', bestLapMs: 90000 }]),
+    ];
+    const board = aggregateHotLapLeaderboard(sessions);
+    expect(board).toHaveLength(2);
+    const mazda = board.find((e) => e.carModel === 'Mazda MX-5 ND Cup');
+    expect(mazda?.bestLapMs).toBe(95000);
+  });
+
   it('ignores entries with null bestLapMs (no valid laps that session)', () => {
     const sessions = [session([{ steamId: 'A', driverName: 'Alice', bestLapMs: null }])];
     expect(aggregateHotLapLeaderboard(sessions)).toEqual([]);
