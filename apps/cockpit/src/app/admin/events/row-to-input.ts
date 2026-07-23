@@ -41,6 +41,7 @@ export function rowToInput(row: ChampionshipRow & { id: string }): ChampionshipI
         startsAt: r.starts_at ?? '',
         emperorTrack: r.emperor_track ?? '',
         emperorRawTrackName: r.emperor_raw_track_name ?? '',
+        hotlapReleased: r.hotlap_released ?? false,
       })),
   };
 }

@@ -8,6 +8,9 @@ export type ScheduleRound = {
   raceLength: string;
   emperorTrack?: string; // exact "TrackName,Layout" string for Emperor's leaderboard ?track= param
   emperorRawTrackName?: string; // raw Emperor track_name for hot-lap cache lookups, e.g. "Road Atlanta"
+  // Admin-controlled: when true, this round's hot-lap board is published on the
+  // Seasonal leaderboard (ACC / accsm1-7 championships). Default/absent = hidden.
+  hotlapReleased?: boolean;
 };
 
 export type ChampionshipContent = {

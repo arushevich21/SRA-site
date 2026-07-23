@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import { TrackList, type TrackWithTopTimes } from '@/components/TrackList';
+import { LeaderboardTabs } from '@/components/LeaderboardTabs';
 import { GameLabel } from '@/components/GameLabel';
+import { hasSeasonalReleased, hasEnduranceReleased } from '@/lib/seasonal-leaderboard';
 import { getAccTracks, getAccTrackTopTimes, getAccTrackStats, toTrackSummary, toTrackTopEntry } from '@/lib/acc/tracks';
 import { getLeaderboardTracksWithTopTimes } from '@/lib/leaderboard-tracks';
 
@@ -52,6 +54,14 @@ export default async function SimLeaderboardsPage({
       <h1 className="font-display font-black text-[clamp(44px,6vw,80px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-16">
         Leaderboards
       </h1>
+
+      {sim.game === 'ACC' && (
+        <LeaderboardTabs
+          simSlug={sim.slug}
+          showSeasonal={await hasSeasonalReleased()}
+          showEndurance={await hasEnduranceReleased()}
+        />
+      )}
 
       <TrackList tracks={tracks} simSlug={sim.slug} />
     </section>

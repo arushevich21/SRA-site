@@ -10,6 +10,7 @@ export type ChampionshipRoundRow = {
   starts_at: string | null;
   emperor_track: string | null;
   emperor_raw_track_name: string | null;
+  hotlap_released?: boolean;
 };
 
 export type ChampionshipRow = {
@@ -49,6 +50,7 @@ export function mapRound(r: ChampionshipRoundRow): ScheduleRound {
     raceLength: r.race_length,
     ...(r.emperor_track ? { emperorTrack: r.emperor_track } : {}),
     ...(r.emperor_raw_track_name ? { emperorRawTrackName: r.emperor_raw_track_name } : {}),
+    ...(r.hotlap_released ? { hotlapReleased: true } : {}),
   };
 }
 

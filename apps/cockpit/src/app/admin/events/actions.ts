@@ -15,6 +15,7 @@ export type ChampionshipRoundInput = {
   startsAt: string; // '' -> NULL (fully TBA); date-only or Eastern ISO otherwise
   emperorTrack: string;
   emperorRawTrackName: string;
+  hotlapReleased: boolean;
 };
 
 export type ChampionshipInput = {
@@ -99,6 +100,7 @@ function roundRows(championshipId: string, rounds: ChampionshipRoundInput[]) {
       starts_at: nullIfEmpty(r.startsAt),
       emperor_track: nullIfEmpty(r.emperorTrack),
       emperor_raw_track_name: nullIfEmpty(r.emperorRawTrackName),
+      hotlap_released: r.hotlapReleased,
     }));
 }
 

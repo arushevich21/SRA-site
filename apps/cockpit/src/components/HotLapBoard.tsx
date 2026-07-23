@@ -11,8 +11,16 @@ export type HotLapBoardEntry = HotLapEntry & {
   manufacturerLogoUrl?: string | null;
 };
 
+// Times under a minute show as plain seconds (e.g. 34.512); anything a minute
+// or longer switches to m:ss.mmm (e.g. 83_456ms → 1:23.456) — long-track
+// sectors (Nordschleife etc.) otherwise render as unreadable raw seconds.
 function formatSector(ms: number): string {
-  return (ms / 1000).toFixed(3);
+  if (ms < 60_000) return (ms / 1000).toFixed(3);
+  const totalS = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalS / 60);
+  const seconds = totalS % 60;
+  const millis = ms % 1000;
+  return `${minutes}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
 }
 
 export function HotLapBoard({ entries }: { entries: HotLapBoardEntry[] }) {
