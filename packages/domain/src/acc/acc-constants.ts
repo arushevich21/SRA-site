@@ -40,6 +40,7 @@ export const ACC_CAR_MODEL_NAMES: Readonly<Record<number, string>> = {
   33: 'Lamborghini Huracan Evo2',
   34: 'Porsche 992 GT3 R',
   35: 'McLaren 720S GT3 Evo 2023',
+  36: 'Ford Mustang GT3',
   50: 'Alpine A110 GT4',
   51: 'AMR V8 Vantage GT4',
   52: 'Audi R8 LMS GT4',
@@ -59,6 +60,69 @@ export const ACC_CAR_MODEL_NAMES: Readonly<Record<number, string>> = {
   86: 'Porsche 935',
 };
 
+// Manufacturer icon name per car model, matching @cardog-icons/react's
+// exported icon names exactly (e.g. 'PorscheIcon', 'MBIcon' for
+// Mercedes-AMG, 'MclarenIcon' — lowercase 'c', matching the package's own
+// naming). Confirmed against the package's actual type definitions, not
+// guessed. Alpine, Ginetta, and KTM (the GT4-class niche manufacturers) have
+// no icon in the package at all — omitted, same as an unmapped car model.
+export const ACC_CAR_MANUFACTURER_ICON_NAMES: Readonly<Record<number, string>> = {
+  0: 'PorscheIcon',
+  1: 'MBIconDark',
+  2: 'FerrariIconDark',
+  3: 'AudiIconDark',
+  4: 'LamborghiniIconDark',
+  5: 'MclarenIconDark',
+  6: 'NissanIconDark',
+  7: 'BMWIcon',
+  8: 'BentleyIconDark',
+  9: 'PorscheIcon',
+  10: 'NissanIconDark',
+  11: 'BentleyIconDark',
+  12: 'AstonMartinIconDark',
+  13: 'LamborghiniIcon',
+  14: 'JaguarIconDark',
+  15: 'LexusIconDark',
+  16: 'LamborghiniIcon',
+  17: 'HondaIconDark',
+  18: 'LamborghiniIcon',
+  19: 'AudiIconDark',
+  20: 'AstonMartinIconDark',
+  21: 'HondaIconDark',
+  22: 'MclarenIconDark',
+  23: 'PorscheIcon',
+  24: 'FerrariIconDark',
+  25: 'MBIconDark',
+  26: 'FerrariIconDark',
+  27: 'BMWIcon',
+  28: 'PorscheIcon',
+  29: 'LamborghiniIcon',
+  30: 'BMWIcon',
+  31: 'AudiIconDark',
+  32: 'FerrariIconDark',
+  33: 'LamborghiniIcon',
+  34: 'PorscheIcon',
+  35: 'MclarenIconDark',
+  36: 'FordIcon',
+  // 50: Alpine — no icon available
+  51: 'AstonMartinIcon',
+  52: 'AudiIcon',
+  53: 'BMWIcon',
+  55: 'ChevroletIcon',
+  // 56: Ginetta — no icon available
+  // 57: KTM — no icon available
+  58: 'MaseratiIcon',
+  59: 'MclarenIcon',
+  60: 'MBIcon',
+  61: 'PorscheIcon',
+  80: 'AudiIcon',
+  // 82: KTM — no icon available
+  83: 'MaseratiIcon',
+  84: 'MBIcon',
+  85: 'PorscheIcon',
+  86: 'PorscheIcon',
+};
+
 export const ACC_CUP_CATEGORY_NAMES: Readonly<Record<number, string>> = {
   0: 'Overall',
   1: 'ProAm',
@@ -76,4 +140,33 @@ export function accCarModelName(carModel: number): string | null {
 
 export function accCupCategoryName(cupCategory: number): string | null {
   return ACC_CUP_CATEGORY_NAMES[cupCategory] ?? null;
+}
+
+// Returns null for an unmapped car model (including the 3 manufacturers with
+// no icon in @cardog-icons/react) — callers should omit the icon rather than
+// pass a bogus name to <Icon>. The returned string is a real @cardog-icons/react
+// IconName, but kept as a plain string here so packages/domain doesn't take a
+// React-ecosystem dependency; the app layer casts it when rendering.
+export function accCarManufacturerIconName(carModel: number): string | null {
+  return ACC_CAR_MANUFACTURER_ICON_NAMES[carModel] ?? null;
+}
+
+// CDN fallback for the manufacturers @cardog-icons/react has no icon for at
+// all (Alpine, Ginetta, KTM — all GT4-class). Unlike the confirmed asset
+// convention for splash art/track maps, these slugs are unconfirmed guesses
+// — callers should render defensively (hide on load failure) rather than
+// assume the URL resolves.
+const MANUFACTURER_LOGO_BASE_URL =
+  'https://static.simracingalliance.com/assets/images/logo/manufacturers/light';
+
+export const ACC_CAR_MANUFACTURER_CDN_SLUGS: Readonly<Record<number, string>> = {
+  50: 'alpine', // Alpine A110 GT4
+  56: 'ginetta', // Ginetta G55 GT4
+  57: 'ktm', // KTM X-Bow GT4
+  82: 'ktm', // KTM XBOW GT2
+};
+
+export function accCarManufacturerLogoUrl(carModel: number): string | null {
+  const slug = ACC_CAR_MANUFACTURER_CDN_SLUGS[carModel];
+  return slug ? `${MANUFACTURER_LOGO_BASE_URL}/${slug}.png` : null;
 }

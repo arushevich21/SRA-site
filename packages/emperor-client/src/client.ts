@@ -8,7 +8,10 @@ import type {
 
 type RawResultListEntry = {
   track: string;
-  manager_session_type: string;
+  // AC Evo's results list uses manager_session_type; ACCSM's uses session_type.
+  // Accept either — see normalizeListEntry.
+  manager_session_type?: string;
+  session_type?: string;
   date: string;
   results_json_url: string;
 };
@@ -134,7 +137,7 @@ export class EmperorClient {
 function normalizeListEntry(raw: RawResultListEntry): EmperorResultListEntry {
   return {
     track: raw.track,
-    sessionType: raw.manager_session_type,
+    sessionType: raw.manager_session_type ?? raw.session_type ?? '',
     date: raw.date,
     resultsJsonUrl: raw.results_json_url,
   };

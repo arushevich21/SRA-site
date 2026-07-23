@@ -52,4 +52,5 @@ export type {
   AccDriverEntry,
   AccDriverResult,
   AccSessionResult,
+  AccHotLapEntry,
 } from './acc.js';

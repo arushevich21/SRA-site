@@ -1,10 +1,21 @@
 import type { HotLapEntry } from '@sra/shared-types';
+import { Icon, type IconName } from '@cardog-icons/react';
+import { FallbackLogoImage } from './FallbackLogoImage';
+
+// Superset of HotLapEntry — icon fields are optional so AC Evo's raw
+// getHotLapBoard() results (which don't carry them) are still assignable
+// directly; callers that have resolved an icon (ACC via AccTrackLeaderboard,
+// AC Evo's Mazda detection) populate them before passing entries in.
+export type HotLapBoardEntry = HotLapEntry & {
+  manufacturerIconName?: string | null;
+  manufacturerLogoUrl?: string | null;
+};
 
 function formatSector(ms: number): string {
   return (ms / 1000).toFixed(3);
 }
 
-export function HotLapBoard({ entries }: { entries: HotLapEntry[] }) {
+export function HotLapBoard({ entries }: { entries: HotLapBoardEntry[] }) {
   if (entries.length === 0) {
     return (
       <div className="border border-line/50 bg-carbon-2 px-6 py-8 text-center">
@@ -63,8 +74,19 @@ export function HotLapBoard({ entries }: { entries: HotLapEntry[] }) {
               <td className="font-display font-bold text-[16px] uppercase text-txt py-2 pr-3 truncate max-w-[220px]">
                 {entry.driverName}
               </td>
-              <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 truncate max-w-[200px] hidden lg:table-cell">
-                {entry.carModel ?? '—'}
+              <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 hidden lg:table-cell">
+                <div className="flex items-center gap-2">
+                  <span className="relative w-5 h-5 shrink-0 flex items-center justify-center">
+                    {entry.manufacturerIconName ? (
+                      <Icon name={entry.manufacturerIconName as IconName} size={18} />
+                    ) : (
+                      entry.manufacturerLogoUrl && (
+                        <FallbackLogoImage src={entry.manufacturerLogoUrl} alt={entry.carModel ?? ''} />
+                      )
+                    )}
+                  </span>
+                  <span className="truncate max-w-[500px]">{entry.carModel ?? '—'}</span>
+                </div>
               </td>
               {Array.from({ length: sectorCount }, (_, i) => {
                 const t = entry.sectorsMs?.[i];

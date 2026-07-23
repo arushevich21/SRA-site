@@ -42,3 +42,17 @@ export type AccSessionResult = {
   bestSplits: number[] | null; // session-wide fastest sectors
   results: AccDriverResult[]; // already in finishing/session order
 };
+
+// Like HotLapEntry (ac-evo.ts) but scoped to a car class — ACC hotlap boards
+// split by carGroup (GT3/GT4/etc.) since times aren't comparable across classes.
+export type AccHotLapEntry = {
+  rank: number;
+  steamId: string;
+  driverName: string;
+  carGroup: string;
+  carModel: number | null; // raw numeric ID — see acc-constants.ts's manufacturer/logo lookups
+  carModelName: string | null;
+  bestLapMs: number;
+  bestLap: string;
+  sectorsMs: number[] | null;
+};

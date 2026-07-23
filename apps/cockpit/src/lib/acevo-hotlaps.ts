@@ -10,6 +10,7 @@ import {
 import type { HotLapEntry, AcEvoSessionResult } from '@sra/shared-types';
 import { supabase } from './supabase';
 import { EMPEROR_ACEVO_BASE_URL } from './emperor';
+import { trackSlug, buildTrackKey, parseEmperorTrackLayout } from './track-slug';
 
 const STALE_MS = 10 * 60 * 1000;
 const LOCK_RECLAIM_MS = 5 * 60 * 1000;
@@ -25,15 +26,25 @@ export type IncrementalRefreshResult = {
   needsBackfill?: boolean;
 };
 
-export async function getHotLapBoard(trackKey: string): Promise<HotLapEntry[]> {
+// Cut over to the layout-aware v2 schema (see
+// supabase/migrations/20260722_shared_tracks_and_acevo_v2_cache.sql and
+// scripts/backfill-tracks-v2.ts). emperorTrack is content/championships.ts's
+// "TrackName,Layout" string — its layout half must produce the exact same
+// key the write side computes from the real session's own trackLayout field
+// (see dualWriteV2Cache), or this silently finds nothing.
+export async function getHotLapBoard(
+  rawTrackName: string,
+  emperorTrack?: string | null,
+): Promise<HotLapEntry[]> {
+  const layoutKey = buildTrackKey(rawTrackName, parseEmperorTrackLayout(emperorTrack));
   const { data, error } = await supabase
-    .from('acevo_hotlap_cache')
+    .from('acevo_hotlap_cache_v2')
     .select('entries')
-    .eq('track_key', trackKey)
+    .eq('layout_key', layoutKey)
     .maybeSingle();
 
   if (error) {
-    console.error(`AC Evo hot-lap cache read failed for "${trackKey}":`, error);
+    console.error(`AC Evo hot-lap cache read failed for "${layoutKey}":`, error);
   }
 
   after(() => maybeRefresh());
@@ -41,15 +52,19 @@ export async function getHotLapBoard(trackKey: string): Promise<HotLapEntry[]> {
   return (data?.entries as HotLapEntry[] | undefined) ?? [];
 }
 
-export async function getRoundPoints(trackKey: string): Promise<Record<string, number>> {
+export async function getRoundPoints(
+  rawTrackName: string,
+  emperorTrack?: string | null,
+): Promise<Record<string, number>> {
+  const layoutKey = buildTrackKey(rawTrackName, parseEmperorTrackLayout(emperorTrack));
   const { data, error } = await supabase
-    .from('acevo_round_points_cache')
+    .from('acevo_round_points_cache_v2')
     .select('race_position_points, fastest_lap_steam_id, pole_steam_id')
-    .eq('track_key', trackKey)
+    .eq('layout_key', layoutKey)
     .maybeSingle();
 
   if (error) {
-    console.error(`AC Evo round-points cache read failed for "${trackKey}":`, error);
+    console.error(`AC Evo round-points cache read failed for "${layoutKey}":`, error);
   }
 
   after(() => maybeRefresh());
@@ -193,9 +208,20 @@ async function runIncrementalRefresh(): Promise<IncrementalRefreshResult> {
       if (cacheErr) throw cacheErr;
 
       try {
-        await updateRoundPointsCache(entry.track, [session]);
+        await updateRoundPointsCache('acevo_round_points_cache', 'track_key', entry.track, [session]);
       } catch (pointsErr) {
         console.error(`AC Evo round-points update failed for "${entry.track}":`, pointsErr);
+      }
+
+      // Phase 1 of the tracks/track_layouts migration (see
+      // supabase/migrations/20260722_shared_tracks_and_acevo_v2_cache.sql):
+      // dual-write into the new layout-aware schema alongside the untouched
+      // legacy path above. Never allowed to break the legacy write — a
+      // failure here is logged and skipped, not thrown.
+      try {
+        await dualWriteV2Cache(session, entry.date);
+      } catch (v2Err) {
+        console.error(`AC Evo v2 dual-write failed for "${entry.track}":`, v2Err);
       }
 
       const { error: markErr } = await supabase
@@ -257,7 +283,17 @@ function latestCompletedSession(
     );
 }
 
-async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResult[]): Promise<void> {
+// tableName/keyColumn are parameterized so the exact same logic serves both
+// the legacy acevo_round_points_cache (keyColumn 'track_key', raw track name)
+// and the new acevo_round_points_cache_v2 (keyColumn 'layout_key', the
+// layout-aware composite key) during the dual-write phase — see
+// dualWriteV2Cache below.
+async function updateRoundPointsCache(
+  tableName: 'acevo_round_points_cache' | 'acevo_round_points_cache_v2',
+  keyColumn: 'track_key' | 'layout_key',
+  key: string,
+  sessions: AcEvoSessionResult[],
+): Promise<void> {
   const newRace = latestCompletedSession(sessions, 'Race');
   const newQualify = latestCompletedSession(sessions, 'Qualify');
   if (!newRace && !newQualify) return;
@@ -297,9 +333,9 @@ async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResul
     }
   }
 
-  const { error: writeError } = await supabase.from('acevo_round_points_cache').upsert(
+  const { error: writeError } = await supabase.from(tableName).upsert(
     {
-      track_key: track,
+      [keyColumn]: key,
       race_position_points: racePositionPoints,
       fastest_lap_steam_id: fastestLapSteamId,
       pole_steam_id: poleSteamId,
@@ -308,7 +344,61 @@ async function updateRoundPointsCache(track: string, sessions: AcEvoSessionResul
       qualify_session_date: qualifySessionDate,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: 'track_key' },
+    { onConflict: keyColumn },
   );
   if (writeError) throw writeError;
+}
+
+// Phase 1 dual-write (see supabase/migrations/20260722_shared_tracks_and_acevo_v2_cache.sql):
+// populates the new layout-aware schema alongside the untouched legacy
+// tables. Ensures the base track + layout metadata rows exist (placeholder,
+// never overwriting curated data — same ignoreDuplicates pattern as ACC's
+// upsertTrackAndLeaderboard), then writes the hot-lap cache and round-points
+// cache under the new layout_key.
+async function dualWriteV2Cache(session: AcEvoSessionResult, sessionDate: string): Promise<void> {
+  const baseTrackKey = trackSlug(session.track);
+  const layoutKey = buildTrackKey(session.track, session.trackLayout);
+  const displayName = session.trackLayout ? `${session.track} ${session.trackLayout}` : session.track;
+
+  const { error: trackErr } = await supabase
+    .from('tracks')
+    .upsert(
+      { base_track_key: baseTrackKey, display_name: session.track },
+      { onConflict: 'base_track_key', ignoreDuplicates: true },
+    );
+  if (trackErr) throw trackErr;
+
+  const { error: layoutErr } = await supabase
+    .from('track_layouts')
+    .upsert(
+      {
+        layout_key: layoutKey,
+        base_track_key: baseTrackKey,
+        game: 'AC Evo',
+        layout_name: session.trackLayout,
+        display_name: displayName,
+      },
+      { onConflict: 'layout_key', ignoreDuplicates: true },
+    );
+  if (layoutErr) throw layoutErr;
+
+  const { data: existing, error: readErr } = await supabase
+    .from('acevo_hotlap_cache_v2')
+    .select('entries')
+    .eq('layout_key', layoutKey)
+    .maybeSingle();
+  if (readErr) throw readErr;
+
+  const fresh = aggregateHotLapLeaderboard([session]);
+  const merged = mergeEntries((existing?.entries as HotLapEntry[] | undefined) ?? [], fresh);
+
+  const { error: cacheErr } = await supabase
+    .from('acevo_hotlap_cache_v2')
+    .upsert(
+      { layout_key: layoutKey, entries: merged, last_session_date: sessionDate, updated_at: new Date().toISOString() },
+      { onConflict: 'layout_key' },
+    );
+  if (cacheErr) throw cacheErr;
+
+  await updateRoundPointsCache('acevo_round_points_cache_v2', 'layout_key', layoutKey, [session]);
 }
