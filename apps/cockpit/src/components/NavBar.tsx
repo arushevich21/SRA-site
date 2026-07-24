@@ -16,7 +16,10 @@ export type NavUser = {
 type NavDrop = { label: string; href: string };
 type NavItem =
   | { label: string; href: string; drop?: undefined }
-  | { label: string; href: string; drop: NavDrop[] };
+  // clickParent: render the parent label itself as a link to `href` (desktop)
+  // instead of a hover-only span. Used by Calendar so the word opens the
+  // cumulative calendar while the dropdown still lists each championship.
+  | { label: string; href: string; drop: NavDrop[]; clickParent?: boolean };
 
 const MAIN_NAV: NavItem[] = [
   {
@@ -48,20 +51,38 @@ function tabNavItem(
   label: string,
   tab: string,
   champs: ChampionshipContent[],
+  // Whether to lead the dropdown with an "All {label}" link to the tab index.
+  // Register has no meaningful "all" landing (you sign up per championship), so
+  // it opts out — the dropdown lists only the individual championships.
+  includeAllItem = true,
+  // Whether the parent label links to the tab index (see NavItem.clickParent).
+  // The tab index then replaces the "All" head as the way to reach it.
+  clickableParent = false,
 ): NavItem {
   const href = `/${sim.slug}/${tab}`;
-  if (champs.length <= 1) return { label, href };
+  if (champs.length === 0) return { label, href };
+  if (champs.length === 1) {
+    // A dropdown of one is redundant. If the parent isn't itself a link and
+    // has no "all" head, point straight at the lone championship (Register);
+    // otherwise fall back to the tab index (clickable parent still reaches it).
+    if (!includeAllItem && !clickableParent) {
+      return { label, href: `/${sim.slug}/championships/${champs[0].slug}/${tab}` };
+    }
+    return { label, href };
+  }
+
+  const champLinks = champs.map((c) => ({
+    label: c.title,
+    href: `/${sim.slug}/championships/${c.slug}/${tab}`,
+  }));
 
   return {
     label,
     href,
-    drop: [
-      { label: `All ${label}`, href },
-      ...champs.map((c) => ({
-        label: c.title,
-        href: `/${sim.slug}/championships/${c.slug}/${tab}`,
-      })),
-    ],
+    clickParent: clickableParent || undefined,
+    drop: includeAllItem
+      ? [{ label: `All ${label}`, href }, ...champLinks]
+      : champLinks,
   };
 }
 
@@ -72,13 +93,53 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
     (c) => c.emperorChampionshipId || (!c.teaserOnly && getStandingsKey(c)),
   );
   const leaderboardChamps = champsForSim.filter((c) => c.emperorChampionshipId);
-  const registerChamps = champsForSim.filter((c) => c.registrationKey);
+  // Only championships with registration currently OPEN belong in the Register
+  // menu — a closed/disabled one drops out (and the whole Register item goes
+  // away once none are open).
+  const registerChamps = champsForSim.filter(
+    (c) => c.registrationKey && c.registrationOpen,
+  );
+
+  // ACC leaderboards split into Hot Lap / (Seasonal) / (Endurance). The
+  // "Leaderboards" word opens the always-on Hot Lap board. Seasonal and
+  // Endurance each appear only once a championship of that type has released a
+  // round (endurance = formatTag "Endurance"). Other sims keep the champ list.
+  const isEndurance = (c: ChampionshipContent) =>
+    (c.formatTag ?? '').trim().toLowerCase() === 'endurance';
+  const hasSeasonal = champsForSim.some(
+    (c) => !isEndurance(c) && c.schedule.some((r) => r.hotlapReleased),
+  );
+  const hasEndurance = champsForSim.some(
+    (c) => isEndurance(c) && c.schedule.some((r) => r.hotlapReleased),
+  );
+  const leaderboardItem: NavItem =
+    sim.game === 'ACC'
+      ? {
+          label: 'Leaderboards',
+          href: `/${sim.slug}/leaderboards`,
+          clickParent: true,
+          drop: [
+            { label: 'Hot Lap', href: `/${sim.slug}/leaderboards` },
+            ...(hasSeasonal
+              ? [{ label: 'Hot Lap (Seasonal)', href: `/${sim.slug}/leaderboards/seasonal` }]
+              : []),
+            ...(hasEndurance
+              ? [{ label: 'Hot Lap (Endurance)', href: `/${sim.slug}/leaderboards/endurance` }]
+              : []),
+          ],
+        }
+      : tabNavItem(sim, 'Leaderboards', 'leaderboards', leaderboardChamps);
 
   return [
     { label: 'Championships', href: `/${sim.slug}/championships` },
-    tabNavItem(sim, 'Calendar', 'calendar', calendarChamps),
-    tabNavItem(sim, 'Register', 'register', registerChamps),
-    tabNavItem(sim, 'Leaderboards', 'leaderboards', leaderboardChamps),
+    // Calendar keeps its per-championship dropdown but drops the "All" head —
+    // clicking the "Calendar" word itself goes to the cumulative sim calendar.
+    tabNavItem(sim, 'Calendar', 'calendar', calendarChamps, false, true),
+    // Register always shows. With open championships it's a dropdown of them;
+    // with none open it's a plain link to /[sim]/register, which renders the
+    // "coming soon — watch Discord" state.
+    tabNavItem(sim, 'Register', 'register', registerChamps, false),
+    leaderboardItem,
     tabNavItem(sim, 'Standings', 'standings', standingsChamps),
   ];
 }
@@ -245,10 +306,17 @@ export default function NavBar({
             {nav.map((item) =>
               item.drop ? (
                 <div key={item.label} className="nav-has relative">
-                  <span className={`${LINK_CLS} flex items-center gap-[5px] cursor-pointer`}>
-                    {item.label}
-                    <span className="text-[8px] opacity-50">▾</span>
-                  </span>
+                  {item.clickParent ? (
+                    <Link href={item.href} className={`${LINK_CLS} flex items-center gap-[5px]`}>
+                      {item.label}
+                      <span className="text-[8px] opacity-50">▾</span>
+                    </Link>
+                  ) : (
+                    <span className={`${LINK_CLS} flex items-center gap-[5px] cursor-pointer`}>
+                      {item.label}
+                      <span className="text-[8px] opacity-50">▾</span>
+                    </span>
+                  )}
                   <div className="nav-drop">
                     {item.drop.map((sub) => (
                       <Link key={sub.href} href={sub.href}>

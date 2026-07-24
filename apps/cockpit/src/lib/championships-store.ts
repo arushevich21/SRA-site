@@ -16,7 +16,7 @@ import { mapChampionship, type ChampionshipRow } from './championships-map';
 // revisited (an empty table would then be a real, visible state).
 
 const ROUND_COLS =
-  'round, track, race_length, starts_at, emperor_track, emperor_raw_track_name';
+  'round, track, race_length, starts_at, emperor_track, emperor_raw_track_name, hotlap_released';
 
 export async function getChampionships(): Promise<ChampionshipContent[]> {
   const { data, error } = await supabase

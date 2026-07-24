@@ -27,6 +27,30 @@ const ADMIN_SECTIONS = [
     ],
   },
   {
+    title: 'Registrations',
+    description: 'Manage championship team registrations.',
+    tools: [
+      {
+        label: 'Manage Registrations',
+        href: '/admin/registrations',
+        description:
+          'View and manage registered teams per championship — inspect SteamID/Discord, remove a driver or delete a team, and export the entry list as CSV.',
+      },
+    ],
+  },
+  {
+    title: 'Custom BoP',
+    description: 'Balance of Performance ballast & restrictor settings.',
+    tools: [
+      {
+        label: 'Custom BoP',
+        href: '/admin/bop',
+        description:
+          'Edit ballast & restrictor per track and car, then download an ACCSM-ready bop.json (or import an existing one).',
+      },
+    ],
+  },
+  {
     title: 'Standings',
     description: 'Manage manually-uploaded championship standings.',
     tools: [

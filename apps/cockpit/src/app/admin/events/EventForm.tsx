@@ -10,8 +10,16 @@ import {
   type ChampionshipRoundInput,
 } from './actions';
 import { blankRound } from './blank';
+import { SIMS } from '@/content/sims';
+import { getGameCatalog } from '@/content/sim-catalog';
+import {
+  SelectField,
+  MultiSelectField,
+  ComboField,
+  RoundStartField,
+} from './FormFields';
 
-const GAMES = ['ACC', 'LMU', 'iRacing', 'AC Evo'];
+const GAMES = SIMS.map((s) => s.game);
 
 // ── small presentational helpers ──────────────────────────────────────────────
 const labelCls = 'font-mono text-[11px] tracking-[.3em] uppercase text-txt-3';
@@ -68,7 +76,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // multiline <-> array helpers
 const linesToArr = (s: string) => s.split('\n').map((l) => l.trim()).filter(Boolean);
 const arrToLines = (a: string[]) => a.join('\n');
-const csvToArr = (s: string) => s.split(',').map((l) => l.trim()).filter(Boolean);
 
 function parseDiscord(s: string): { label: string; url: string }[] {
   return s.split('\n').map((l) => l.trim()).filter(Boolean).map((line) => {
@@ -86,14 +93,15 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
 
   // Core fields
   const [f, setF] = useState(initial);
-  // Raw text mirrors for the array/structured fields
-  const [classesRaw, setClassesRaw] = useState(initial.classes.join(', '));
+  // Raw text mirrors for the free-text list fields (rules/discord stay textareas)
   const [rulesRaw, setRulesRaw] = useState(arrToLines(initial.rulesBullets));
-  const [carsRaw, setCarsRaw] = useState(arrToLines(initial.allowedCars));
   const [discordRaw, setDiscordRaw] = useState(discordToLines(initial.discordLinks));
 
   const set = <K extends keyof ChampionshipInput>(k: K, v: ChampionshipInput[K]) =>
     setF((prev) => ({ ...prev, [k]: v }));
+
+  // Game-scoped pick lists — recomputed when the selected game changes.
+  const catalog = getGameCatalog(f.game);
 
   function updateRound(i: number, patch: Partial<ChampionshipRoundInput>) {
     setF((prev) => ({ ...prev, rounds: prev.rounds.map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
@@ -113,21 +121,32 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
     if (!file) return;
     setUploading(true);
     setError(null);
-    const fd = new FormData();
-    fd.set('file', file);
-    const res = await uploadChampionshipLogo(fd);
-    setUploading(false);
-    if (res.ok) set('logoUrl', res.id);
-    else setError(res.error);
+    // Guard the size client-side too: an over-limit body is rejected by Next's
+    // Server Action body cap and throws before the action's own check runs.
+    if (file.size > 2 * 1024 * 1024) {
+      setUploading(false);
+      setError('Image must be under 2 MB.');
+      e.target.value = '';
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.set('file', file);
+      const res = await uploadChampionshipLogo(fd);
+      if (res.ok) set('logoUrl', res.id);
+      else setError(res.error);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Logo upload failed.');
+    } finally {
+      setUploading(false);
+    }
   }
 
   function onSubmit() {
     setError(null);
     const payload: ChampionshipInput = {
       ...f,
-      classes: csvToArr(classesRaw),
       rulesBullets: linesToArr(rulesRaw),
-      allowedCars: linesToArr(carsRaw),
       discordLinks: parseDiscord(discordRaw),
     };
     startTransition(async () => {
@@ -159,8 +178,10 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
           </label>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <Text label="Class Tag" value={f.classTag} onChange={(v) => set('classTag', v)} required placeholder="GT3" />
-          <Text label="Format Tag" value={f.formatTag} onChange={(v) => set('formatTag', v)} placeholder="Endurance" />
+          <SelectField label="Class Tag" value={f.classTag} onChange={(v) => set('classTag', v)}
+            options={catalog.classTags} required placeholder="— Select —" />
+          <SelectField label="Format Tag" value={f.formatTag} onChange={(v) => set('formatTag', v)}
+            options={catalog.formatTags} placeholder="— Select —" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <label className={labelCls}>
@@ -171,7 +192,8 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
               <option value="exhibition">exhibition</option>
             </select>
           </label>
-          <Text label="Classes (comma-separated)" value={classesRaw} onChange={setClassesRaw} placeholder="LMP2, LMGT3" />
+          <MultiSelectField label="Classes" value={f.classes} onChange={(v) => set('classes', v)}
+            options={catalog.classes} />
         </div>
       </Section>
 
@@ -230,12 +252,19 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
             onChange={(v) => set('registrationSeason', v)} placeholder="s19" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <Text label="Max team size" value={f.maxTeamSize} onChange={(v) => set('maxTeamSize', v)} placeholder="2" />
+          <label className={labelCls}>
+            Max team size
+            <select className={inputCls} value={f.maxTeamSize}
+              onChange={(e) => set('maxTeamSize', e.target.value)}>
+              <option value="">— None —</option>
+              {['1', '2', '3', '4'].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
           <div className="flex items-end"><Check label="Registration open" value={f.registrationOpen}
             onChange={(v) => set('registrationOpen', v)} /></div>
         </div>
-        <Area label="Allowed cars (one per line)" value={carsRaw} onChange={setCarsRaw} rows={4}
-          placeholder={'Ferrari 296 GT3\nBMW M4 GT3'} />
+        <MultiSelectField label="Allowed cars" value={f.allowedCars} onChange={(v) => set('allowedCars', v)}
+          options={catalog.cars} />
       </Section>
 
       <Section title="Rounds">
@@ -250,17 +279,45 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Text label="Track (display)" value={r.track} onChange={(v) => updateRound(i, { track: v })}
-                  placeholder="COTA National" />
-                <Text label="Race length" value={r.raceLength} onChange={(v) => updateRound(i, { raceLength: v })}
-                  placeholder="30 min" />
-                <Text label="Starts at (Eastern; blank = TBA)" value={r.startsAt}
-                  onChange={(v) => updateRound(i, { startsAt: v })} placeholder="2026-07-20T21:00:00" />
-                <Text label="ACSM track,layout" value={r.emperorTrack}
-                  onChange={(v) => updateRound(i, { emperorTrack: v })} placeholder="Circuit Of The Americas,National" />
-                <Text label="ACSM raw track name" value={r.emperorRawTrackName}
-                  onChange={(v) => updateRound(i, { emperorRawTrackName: v })} placeholder="Circuit Of The Americas" />
+                <SelectField label="Track" value={r.track}
+                  options={catalog.tracks.map((t) => t.displayName)} placeholder="— Select track —"
+                  onChange={(v) => {
+                    // Picking a catalogued track auto-fills its Emperor identifiers
+                    // (AC Evo only — ACC/LMU have none). Custom entries clear them.
+                    const t = catalog.tracks.find((ct) => ct.displayName === v);
+                    updateRound(i, {
+                      track: v,
+                      emperorTrack: t?.emperorTrack ?? '',
+                      emperorRawTrackName: t?.emperorRawTrackName ?? '',
+                    });
+                  }} />
+                <ComboField label="Race length" value={r.raceLength} listId={`race-len-${i}`}
+                  options={catalog.raceLengths} placeholder="30 min"
+                  onChange={(v) => updateRound(i, { raceLength: v })} />
+                <RoundStartField value={r.startsAt}
+                  onChange={(v) => updateRound(i, { startsAt: v })} />
+                {f.game === 'AC Evo' && (
+                  <>
+                    <Text label="ACSM track,layout" value={r.emperorTrack}
+                      onChange={(v) => updateRound(i, { emperorTrack: v })} placeholder="Circuit Of The Americas,National" />
+                    <Text label="ACSM raw track name" value={r.emperorRawTrackName}
+                      onChange={(v) => updateRound(i, { emperorRawTrackName: v })} placeholder="Circuit Of The Americas" />
+                  </>
+                )}
               </div>
+              {f.game === 'ACC' && (
+                <div className="mt-3 pt-3 border-t border-line/50">
+                  <Check
+                    label="Release hot-lap leaderboard (Seasonal)"
+                    value={r.hotlapReleased}
+                    onChange={(v) => updateRound(i, { hotlapReleased: v })}
+                  />
+                  <p className="font-sans text-[12px] text-txt-3 mt-1.5">
+                    When on, this round&apos;s hot-lap board shows on the Seasonal
+                    leaderboard. Leave off until you want it public.
+                  </p>
+                </div>
+              )}
             </div>
           ))}
           <button type="button" onClick={addRound}

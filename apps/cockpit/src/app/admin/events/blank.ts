@@ -5,7 +5,7 @@ import type { ChampionshipInput, ChampionshipRoundInput } from './actions';
 // function exported from a client module can't be invoked on the server.
 
 export function blankRound(round: number): ChampionshipRoundInput {
-  return { round, track: '', raceLength: '', startsAt: '', emperorTrack: '', emperorRawTrackName: '' };
+  return { round, track: '', raceLength: '', startsAt: '', emperorTrack: '', emperorRawTrackName: '', hotlapReleased: false };
 }
 
 export function blankInput(): ChampionshipInput {

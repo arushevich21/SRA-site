@@ -15,6 +15,15 @@ const supabaseHost = (() => {
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@sra/shared-types', '@sra/simgrid-client', '@sra/domain', '@sra/emperor-client'],
+  // Logo uploads go through a Server Action, whose request body defaults to a
+  // 1 MB cap. uploadChampionshipLogo accepts images up to 2 MB, so raise the
+  // limit to match — otherwise 1–2 MB logos are rejected by Next before the
+  // action runs (surfaces only as "Body exceeded 1 MB limit" in the server log).
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
   images: {
     remotePatterns: [
       {
