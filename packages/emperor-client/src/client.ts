@@ -55,6 +55,14 @@ export type EmperorClientOptions = {
   // Minimum gap between consecutive requests made by this client instance.
   // Emperor's documented limit is ~2 req/min; default stays safely under that.
   minRequestIntervalMs?: number;
+  // Hard ceiling on a single request. Emperor (ACCSM especially) sometimes
+  // accepts a connection then stalls without ever responding — a plain fetch()
+  // has no timeout, so that request hangs forever. In a serverless caller that
+  // means the whole function runs until the platform kills it, so any DB lock
+  // it holds (see the ACC hot-lap refresh lock) is stranded and no work gets
+  // done. Aborting after this many ms turns an indefinite hang into a normal
+  // per-request error the caller can log and move past. Default 15s.
+  requestTimeoutMs?: number;
 };
 
 function sleep(ms: number): Promise<void> {
@@ -77,7 +85,22 @@ export class EmperorClient {
     const wait = this.lastRequestAt + minInterval - Date.now();
     if (wait > 0) await sleep(wait);
     this.lastRequestAt = Date.now();
-    return fetch(url);
+
+    const timeoutMs = this.opts.requestTimeoutMs ?? 15_000;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { signal: controller.signal });
+    } catch (err) {
+      // A timeout surfaces as an AbortError; rewrite it into something the
+      // caller's logs can act on, and leave every other network error as-is.
+      if (controller.signal.aborted) {
+        throw new Error(`Emperor request timed out after ${timeoutMs}ms: ${url}`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async getHealthcheck(): Promise<EmperorHealthcheck> {
