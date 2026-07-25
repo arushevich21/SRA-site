@@ -28,10 +28,22 @@ const CRON_REQUEST_INTERVAL_MS = 2_000;
 // once or never (see git history for the all-or-nothing guard this replaced).
 const MAX_SESSIONS_PER_SERVER_PER_RUN = 5;
 
+// Wall-clock ceiling on a single run, kept safely under the route's
+// maxDuration (60s). If any step stalls (a server that accepts a connection
+// then never responds, a DB write that hangs), we still resolve here, run
+// releaseLock in the finally, and return 200 — instead of being killed
+// mid-run by the platform and stranding the lock for the 5-minute reclaim
+// window. Sessions finished before the deadline are already persisted (each
+// is marked done as it completes), so a cut-off run simply resumes next tick.
+const RUN_DEADLINE_MS = 50_000;
+
 export type AccIncrementalRefreshResult = {
   processed: number;
   tracks: string[];
   durationMs: number;
+  // True when the run hit RUN_DEADLINE_MS rather than finishing on its own —
+  // surfaced in the cron response and logged so a chronic stall is visible.
+  timedOut?: boolean;
 };
 
 // Shared by the cron route. Acquires the DB lock before running so concurrent
@@ -55,7 +67,22 @@ export async function refreshWithLock(): Promise<AccIncrementalRefreshResult | n
   if (!claimed || claimed.length === 0) return null; // another caller holds the lock
 
   try {
-    return await runIncrementalRefresh();
+    // Race the run against a hard deadline so a hung step can never keep the
+    // function alive until the platform kills it (which would skip the finally
+    // below and strand the lock). The losing runIncrementalRefresh keeps going
+    // on the background instance but is no longer awaited; its already-marked
+    // sessions persist and releaseLock frees the row for the next tick.
+    const deadline = new Promise<AccIncrementalRefreshResult>((resolve) =>
+      setTimeout(
+        () => resolve({ processed: 0, tracks: [], durationMs: RUN_DEADLINE_MS, timedOut: true }),
+        RUN_DEADLINE_MS,
+      ),
+    );
+    const result = await Promise.race([runIncrementalRefresh(), deadline]);
+    if (result.timedOut) {
+      console.error(`ACC hot-lap refresh: hit ${RUN_DEADLINE_MS}ms deadline — a step stalled; releasing lock (see per-step timing logs above)`);
+    }
+    return result;
   } catch (err) {
     console.error('ACC hot-lap incremental refresh failed:', err);
     return { processed: 0, tracks: [], durationMs: 0 };
@@ -79,7 +106,10 @@ async function runIncrementalRefresh(): Promise<AccIncrementalRefreshResult> {
     try {
       const client = new EmperorClient(baseUrl, { minRequestIntervalMs: CRON_REQUEST_INTERVAL_MS });
 
+      console.log(`ACC refresh: [${baseUrl}] fetching results list…`);
+      const listStart = Date.now();
       const { entries } = await client.getResultsList(0);
+      console.log(`ACC refresh: [${baseUrl}] results list returned ${entries.length} entries in ${Date.now() - listStart}ms`);
       if (entries.length === 0) continue;
 
       // Registry check is the sole source of truth for "already processed" —
@@ -93,10 +123,12 @@ async function runIncrementalRefresh(): Promise<AccIncrementalRefreshResult> {
       // 2026-07-22T18:13:41Z, still unprocessed, excluded because a later run
       // had already bumped the cutoff past it).
       const allUrls = entries.map((e) => e.resultsJsonUrl);
+      const knownStart = Date.now();
       const { data: knownRows, error: knownError } = await supabase
         .from('acc_processed_sessions')
         .select('session_url')
         .in('session_url', allUrls);
+      console.log(`ACC refresh: [${baseUrl}] known-sessions lookup took ${Date.now() - knownStart}ms`);
 
       if (knownError) {
         console.error(`ACC hot-lap refresh: known-sessions lookup failed for ${baseUrl}:`, knownError);
@@ -128,10 +160,19 @@ async function runIncrementalRefresh(): Promise<AccIncrementalRefreshResult> {
 
       for (const entry of toProcess) {
         try {
+          // Per-step timing: the last line logged before the run goes silent
+          // (and hits RUN_DEADLINE_MS) pinpoints which await stalled — Emperor
+          // download, parse, hot-lap upsert, race ingest, or the mark insert.
+          console.log(`ACC refresh: → download ${entry.resultsJsonUrl} (${baseUrl})`);
+          const tStart = Date.now();
           const raw = await client.downloadResult(entry.resultsJsonUrl);
+          const tDownload = Date.now();
+
           const session = parseAccSession(raw);
+          const tParse = Date.now();
 
           await upsertTrackAndLeaderboard(entry.track, session);
+          const tHotlap = Date.now();
 
           // Full race-results storage — separate table/concern from the
           // hot-lap leaderboard above. Its own try/catch so a failure here
@@ -142,6 +183,7 @@ async function runIncrementalRefresh(): Promise<AccIncrementalRefreshResult> {
           } catch (raceResultsErr) {
             console.error(`ACC race-results ingest failed for ${entry.resultsJsonUrl}:`, raceResultsErr);
           }
+          const tRace = Date.now();
 
           const { error: markErr } = await supabase.from('acc_processed_sessions').insert({
             session_url: entry.resultsJsonUrl,
@@ -150,10 +192,15 @@ async function runIncrementalRefresh(): Promise<AccIncrementalRefreshResult> {
             session_date: entry.date,
           });
           if (markErr) throw markErr;
+          const tMark = Date.now();
 
           processedTracks.add(entry.track);
           processedCount++;
-          console.log(`ACC hot-lap refresh: processed [${entry.sessionType}] ${entry.track} @ ${entry.date} (${baseUrl})`);
+          console.log(
+            `ACC hot-lap refresh: processed [${entry.sessionType}] ${entry.track} @ ${entry.date} (${baseUrl}) — ` +
+              `download=${tDownload - tStart}ms parse=${tParse - tDownload}ms hotlap=${tHotlap - tParse}ms ` +
+              `race=${tRace - tHotlap}ms mark=${tMark - tRace}ms`,
+          );
         } catch (err) {
           // Don't let one session abort the rest — its URL stays unmarked, so
           // the next run retries it.
