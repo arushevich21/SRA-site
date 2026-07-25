@@ -12,12 +12,10 @@ const REFRESH_STATE_ID = 'global';
 // backfill burst of many requests at 2s apart is ~30 req/min and gets 429'd
 // (confirmed against ACCSM4). This mirrors the same wrong assumption in the
 // AC Evo cron's comment, carried over — that one's steady-state is small
-// enough it never triggers the bug.
-// TEMPORARY for the backfill run: matches Emperor's real ~2 req/min limit.
-// Revert to 2_000 after — steady-state is 0-1 requests per run so the gap
-// barely matters there.
-// const CRON_REQUEST_INTERVAL_MS = 2_000;
-const CRON_REQUEST_INTERVAL_MS = 5000;
+// enough it never triggers the bug. The backfill path (backfillRecentSessions)
+// uses downloadWithRetry to survive the occasional 429 rather than pacing at
+// 5s here, which would push a full run past the cron/function timeout.
+const CRON_REQUEST_INTERVAL_MS = 2_000;
 
 // Caps how many new sessions get downloaded per server per run. There's no
 // backfill script for ACC (unlike AC Evo), so on a cold start every entry on
@@ -27,9 +25,7 @@ const CRON_REQUEST_INTERVAL_MS = 5000;
 // newest-first); anything left over stays unprocessed and is simply picked
 // up on the next run, so a big backlog drains gradually instead of all at
 // once or never (see git history for the all-or-nothing guard this replaced).
-// TEMPORARY: raised to 20 to backfill car_model_id into existing rows and pull
-// in the rest of page 0's backlog in one go. Revert to 5 after this populate run.
-const MAX_SESSIONS_PER_SERVER_PER_RUN = 20;
+const MAX_SESSIONS_PER_SERVER_PER_RUN = 5;
 
 export type AccIncrementalRefreshResult = {
   processed: number;
