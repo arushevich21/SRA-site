@@ -7,6 +7,13 @@ import { refreshWithLock } from '@/lib/acc/hotlaps';
 // accsm1-7; idle/unreachable servers are skipped, not fatal).
 //
 // Protect with: Authorization: Bearer <CRON_SECRET>
+
+// Give the function headroom above Vercel's short default limit: a run walks
+// every server in EMPEROR_ACC_BASE_URLS sequentially, paced by
+// CRON_REQUEST_INTERVAL_MS, so even a modest backlog can take tens of seconds.
+// Also raise the external scheduler's own request timeout to match.
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
