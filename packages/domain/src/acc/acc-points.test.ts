@@ -29,6 +29,8 @@ function driver(overrides: Partial<AccDriverResult>): AccDriverResult {
     lastLapMs: null,
     totalTimeMs: null,
     missingMandatoryPitstop: null,
+    avgCleanLapMs: null,
+    avgCleanLap: null,
     ...overrides,
   };
 }
@@ -45,6 +47,7 @@ function session(
     sessionFile: null,
     championshipId: null,
     seasonId: null,
+    metaDataRaw: null,
     isWetSession: false,
     bestLapMs: null,
     bestLap: null,

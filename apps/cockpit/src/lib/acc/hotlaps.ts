@@ -3,6 +3,7 @@ import { parseAccSession, aggregateAccHotLapLeaderboard } from '@sra/domain';
 import type { AccSessionResult } from '@sra/shared-types';
 import { supabase } from '../supabase';
 import { EMPEROR_ACC_BASE_URLS } from '../emperor';
+import { ingestAccRaceSession } from './race-results-store';
 
 const LOCK_RECLAIM_MS = 5 * 60 * 1000;
 const REFRESH_STATE_ID = 'global';
@@ -135,6 +136,16 @@ async function runIncrementalRefresh(): Promise<AccIncrementalRefreshResult> {
           const session = parseAccSession(raw);
 
           await upsertTrackAndLeaderboard(entry.track, session);
+
+          // Full race-results storage — separate table/concern from the
+          // hot-lap leaderboard above. Its own try/catch so a failure here
+          // can't leave this session stuck unprocessed (it's still marked
+          // done below) or abort the rest of the run.
+          try {
+            await ingestAccRaceSession(session, entry.resultsJsonUrl);
+          } catch (raceResultsErr) {
+            console.error(`ACC race-results ingest failed for ${entry.resultsJsonUrl}:`, raceResultsErr);
+          }
 
           const { error: markErr } = await supabase.from('acc_processed_sessions').insert({
             session_url: entry.resultsJsonUrl,

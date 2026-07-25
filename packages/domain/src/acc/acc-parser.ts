@@ -49,6 +49,15 @@ type RawSessionResult = {
   leaderBoardLines?: RawLeaderBoardLine[];
 };
 
+// Flat per-lap log, one entry per completed lap across all cars, in session
+// order (not grouped by car) — see fixtures/acc-results/RESULTS_FORMAT.md.
+type RawLap = {
+  carId: number;
+  driverIndex?: number;
+  isValidForBest?: boolean;
+  laptime?: number;
+};
+
 type RawSession = {
   sessionType?: string;
   trackName?: string;
@@ -56,6 +65,7 @@ type RawSession = {
   Date?: string;
   SessionFile?: string;
   metaData?: string;
+  laps?: RawLap[];
   sessionResult?: RawSessionResult;
 };
 
@@ -123,10 +133,25 @@ function toDriverEntry(d: RawDriver): AccDriverEntry {
 
 // ── parser ───────────────────────────────────────────────────────────────────
 
+// Mean laptime of a car's isValidForBest laps, across every driver of that
+// car (endurance stints included) — matches how bestLap/totalTime are
+// already aggregated per-car rather than per-individual-stint. Formation
+// laps / pit-affected laps can produce huge laptime outliers even when
+// flagged valid (see RESULTS_FORMAT.md), but isValidForBest is ACC's own
+// resolved validity flag — no extra outlier filtering is layered on top of
+// what the server itself already decided.
+function avgCleanLapMsForCar(laps: RawLap[], carId: number): number | null {
+  const valid = laps.filter((l) => l.carId === carId && l.isValidForBest && typeof l.laptime === 'number');
+  if (valid.length === 0) return null;
+  const sum = valid.reduce((acc, l) => acc + (l.laptime as number), 0);
+  return Math.round(sum / valid.length);
+}
+
 export function parseAccSession(raw: unknown): AccSessionResult {
   const s = raw as RawSession;
   const sr = s.sessionResult ?? {};
   const { championshipId, seasonId } = parseMetaData(s.metaData);
+  const laps = s.laps ?? [];
 
   // leaderBoardLines is already in finishing/session order (index 0 = winner /
   // pole-sitter / practice P1) — same principle as AC Evo's driver_standings:
@@ -138,6 +163,7 @@ export function parseAccSession(raw: unknown): AccSessionResult {
 
     const timing = line.timing ?? {};
     const bestLapMs = normMs(timing.bestLap);
+    const avgCleanLapMs = avgCleanLapMsForCar(laps, line.car.carId);
 
     return {
       position: idx + 1,
@@ -167,6 +193,8 @@ export function parseAccSession(raw: unknown): AccSessionResult {
         line.missingMandatoryPitstop == null || line.missingMandatoryPitstop < 0
           ? null
           : Boolean(line.missingMandatoryPitstop),
+      avgCleanLapMs,
+      avgCleanLap: msToLaptime(avgCleanLapMs),
     };
   });
 
@@ -180,12 +208,28 @@ export function parseAccSession(raw: unknown): AccSessionResult {
     sessionFile: s.SessionFile ?? null,
     championshipId,
     seasonId,
+    metaDataRaw: s.metaData ?? null,
     isWetSession: Boolean(sr.isWetSession),
     bestLapMs: sessionBestLapMs,
     bestLap: msToLaptime(sessionBestLapMs),
     bestSplits: normSplits(sr.bestSplits),
     results,
   };
+}
+
+// ── race-event grouping ──────────────────────────────────────────────────────
+
+// Groups a session into the "race event" its FP/Q/R siblings belong to.
+// metaDataRaw is the only reliable discriminant between a real championship
+// round and a custom race (see the field's doc comment in shared-types), so
+// it anchors the key; track guards against two different metaData strings
+// coincidentally sharing a value across venues, and the date bucket (not the
+// full timestamp) guards against a championship round or a reused
+// custom_race id recurring at the same track later — FP/Q/R of one event all
+// land on the same calendar day, so this still groups them together.
+export function computeAccEventKey(session: AccSessionResult): string {
+  const dateBucket = session.date ? session.date.slice(0, 10) : 'unknown-date';
+  return `${session.metaDataRaw ?? 'none'}|${session.track}|${dateBucket}`;
 }
 
 // ── hot-lap leaderboard ─────────────────────────────────────────────────────

@@ -26,6 +26,8 @@ export type AccDriverResult = {
   lastLapMs: number | null;
   totalTimeMs: number | null;
   missingMandatoryPitstop: boolean | null; // null when not applicable (FP/Q)
+  avgCleanLapMs: number | null; // mean of this car's isValidForBest laps; null if none
+  avgCleanLap: string | null;
 };
 
 export type AccSessionResult = {
@@ -36,6 +38,11 @@ export type AccSessionResult = {
   sessionFile: string | null;
   championshipId: string | null;
   seasonId: string | null;
+  // Raw metaData string verbatim (e.g. "championship:<id>:<id>" or
+  // "custom_race:<id>") — championshipId/seasonId above discard which prefix
+  // it was, so this is the only reliable way to tell a real championship
+  // apart from a custom race, and to derive a stable race-event grouping key.
+  metaDataRaw: string | null;
   isWetSession: boolean;
   bestLapMs: number | null; // session-wide fastest lap
   bestLap: string | null;

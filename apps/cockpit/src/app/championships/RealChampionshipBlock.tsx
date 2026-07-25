@@ -143,14 +143,13 @@ export function RealChampionshipBlock({
             <div className="mt-5 border border-line/60 bg-carbon-2/40">
               {content.schedule.map((round, i) => {
                 const { time: timeStr } = formatScheduleDateTime(round.date);
-                return (
-                  <div
-                    key={round.round}
-                    className={[
-                      'flex items-center gap-4 px-4 py-[9px]',
-                      i < content.schedule.length - 1 ? 'border-b border-line/40' : '',
-                    ].join(' ')}
-                  >
+                const rowClassName = [
+                  'flex items-center gap-4 px-4 py-[9px]',
+                  i < content.schedule.length - 1 ? 'border-b border-line/40' : '',
+                  round.emperorRawTrackName && sim ? 'hover:bg-panel-2 transition-colors' : '',
+                ].join(' ');
+                const rowContent = (
+                  <>
                     <span className="font-mono text-[12px] tracking-[.15em] uppercase text-gold w-8 shrink-0">
                       R{round.round}
                     </span>
@@ -170,6 +169,27 @@ export function RealChampionshipBlock({
                     <span className="font-mono text-[10px] tracking-[.1em] uppercase text-txt-3/70 shrink-0 w-14 text-right">
                       {round.raceLength}
                     </span>
+                  </>
+                );
+
+                // Only rounds with a known Emperor track key have a results
+                // page to link to — other rounds (or sims without a live
+                // results source yet) stay as plain, non-interactive rows.
+                if (round.emperorRawTrackName && sim) {
+                  return (
+                    <Link
+                      key={round.round}
+                      href={`/${sim.slug}/championships/${content.slug}/results/${round.round}`}
+                      className={rowClassName}
+                    >
+                      {rowContent}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <div key={round.round} className={rowClassName}>
+                    {rowContent}
                   </div>
                 );
               })}

@@ -40,9 +40,10 @@ export {
   ACEVO_POLE_BONUS,
 } from './ac-evo/ac-evo-points.js';
 
-export { 
-  parseAccSession, 
+export {
+  parseAccSession,
   aggregateAccHotLapLeaderboard,
+  computeAccEventKey,
 } from './acc/acc-parser.js';
 
 export {

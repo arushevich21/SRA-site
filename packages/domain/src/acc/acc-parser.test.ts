@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseAccSession, aggregateAccHotLapLeaderboard } from './acc-parser.js';
+import { parseAccSession, aggregateAccHotLapLeaderboard, computeAccEventKey } from './acc-parser.js';
 import type { AccSessionResult, AccDriverResult } from '@sra/shared-types';
 
 const FIXTURES = resolve(fileURLToPath(new URL('../../../../fixtures/acc-results', import.meta.url)));
@@ -256,6 +256,8 @@ describe('aggregateAccHotLapLeaderboard', () => {
       lastLapMs: null,
       totalTimeMs: null,
       missingMandatoryPitstop: null,
+      avgCleanLapMs: null,
+      avgCleanLap: null,
       ...r,
     };
   }
@@ -269,6 +271,7 @@ describe('aggregateAccHotLapLeaderboard', () => {
       sessionFile: null,
       championshipId: null,
       seasonId: null,
+      metaDataRaw: null,
       isWetSession: false,
       bestLapMs: null,
       bestLap: null,
@@ -327,5 +330,65 @@ describe('aggregateAccHotLapLeaderboard', () => {
 
   it('returns empty array for no sessions', () => {
     expect(aggregateAccHotLapLeaderboard([])).toEqual([]);
+  });
+});
+
+describe('parseAccSession — average clean lap and metaDataRaw (260617 fixtures)', () => {
+  it("computes avgCleanLapMs as the mean of a car's valid laps (FP winner)", () => {
+    const fp = parseAccSession(loadFixture('260617_210032_FP.json'));
+    const p1 = fp.results[0];
+    expect(p1.carId).toBe(1005);
+    // Car 1005's laps: 114995 (valid), 114337 (valid), 119580 (valid), 120812 (invalid, excluded)
+    expect(p1.avgCleanLapMs).toBe(116304);
+    expect(p1.avgCleanLap).toMatch(/^\d+:\d{2}\.\d{3}$/);
+  });
+
+  it('avgCleanLapMs is null for a car with no laps at all', () => {
+    const fp = parseAccSession(loadFixture('260617_210032_FP.json'));
+    const zeroLapCar = fp.results.find((r) => r.carId === 1022);
+    expect(zeroLapCar?.lapsCompleted).toBe(0);
+    expect(zeroLapCar?.avgCleanLapMs).toBeNull();
+    expect(zeroLapCar?.avgCleanLap).toBeNull();
+  });
+
+  it('parses metaDataRaw verbatim for a custom race', () => {
+    const fp = parseAccSession(loadFixture('260617_210032_FP.json'));
+    expect(fp.metaDataRaw).toBe('custom_race:e8acb295-5255-46a2-8a82-9a214f940726');
+  });
+
+  it('parses metaDataRaw verbatim for a championship round', () => {
+    const q = parseAccSession(loadFixture('260617_213527_Q.json'));
+    expect(q.metaDataRaw).toBe(
+      'championship:8e16c79b-ec15-4602-ba3a-a8ba8ae6f91f:9da5229f-ca43-4d16-971f-8a93ba39a9f3',
+    );
+  });
+
+  it('computes avgCleanLapMs across a full 31-lap race, excluding invalid laps', () => {
+    const r = parseAccSession(loadFixture('260617_224418_R.json'));
+    const winner = r.results[0];
+    expect(winner.carId).toBe(1006);
+    expect(winner.lapsCompleted).toBe(31);
+    // 29 of 31 laps valid (2 excluded: 121350, 171235); sum of the 29 valid laptimes is 3,340,769
+    expect(winner.avgCleanLapMs).toBe(115199);
+  });
+});
+
+describe('computeAccEventKey', () => {
+  it('groups the Q and R fixtures into the same event (same metaData, track, day)', () => {
+    const q = parseAccSession(loadFixture('260617_213527_Q.json'));
+    const r = parseAccSession(loadFixture('260617_224418_R.json'));
+    expect(computeAccEventKey(q)).toBe(computeAccEventKey(r));
+  });
+
+  it('does not group the FP fixture with Q/R — different metaData (custom_race vs championship)', () => {
+    const fp = parseAccSession(loadFixture('260617_210032_FP.json'));
+    const q = parseAccSession(loadFixture('260617_213527_Q.json'));
+    expect(computeAccEventKey(fp)).not.toBe(computeAccEventKey(q));
+  });
+
+  it('treats the same metaData+track on a different day as a different event', () => {
+    const q = parseAccSession(loadFixture('260617_213527_Q.json'));
+    const differentDay = { ...q, date: '2026-07-01T21:35:27Z' };
+    expect(computeAccEventKey(differentDay)).not.toBe(computeAccEventKey(q));
   });
 });
