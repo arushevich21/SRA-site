@@ -102,26 +102,41 @@ body::after {
   z-index: 200;
 }
 
+/* Right-edge dropdowns (e.g. the account menu) would otherwise overflow the
+   viewport opening left-aligned like every other nav-drop. */
+.nav-has .nav-drop.nav-drop--end {
+  left: auto;
+  right: 0;
+}
+
 .nav-has:hover .nav-drop {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
 }
 
-.nav-drop a {
+.nav-drop a,
+.nav-drop button {
   display: flex;
   align-items: center;
+  width: 100%;
   padding: 9px 12px;
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--color-txt-2);
+  border: none;
   border-left: 2px solid transparent;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
   transition: background .15s, border-color .15s, color .15s;
 }
 
-.nav-drop a:hover {
+.nav-drop a:hover,
+.nav-drop button:hover {
   background: var(--color-panel-2);
   border-left-color: var(--color-gold);
   color: var(--color-gold);

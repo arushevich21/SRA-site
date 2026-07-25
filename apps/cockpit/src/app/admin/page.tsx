@@ -38,6 +38,18 @@ const ADMIN_SECTIONS = [
       },
     ],
   },
+  {
+    title: 'Race Results',
+    description: 'Manage ACC race results shown on the public Results page.',
+    tools: [
+      {
+        label: 'Race Results Upload',
+        href: '/admin/results',
+        description:
+          'Backfill or re-add ACC session results (FP/Q/R) from ACCSM; new sessions are normally ingested automatically.',
+      },
+    ],
+  },
 ];
 
 export default async function AdminIndexPage() {
