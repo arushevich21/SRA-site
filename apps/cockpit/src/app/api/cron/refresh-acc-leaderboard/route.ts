@@ -45,5 +45,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     processed: result.processed,
     tracks: result.tracks,
     durationMs: result.durationMs,
+    ...(result.timedOut ? { timedOut: true } : {}),
   });
 }
