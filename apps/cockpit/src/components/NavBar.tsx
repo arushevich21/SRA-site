@@ -300,11 +300,11 @@ export default function NavBar({
                 </form>
               </div>
             ) : (
-              <a href="/auth/login" className="nav-signin">
+              <Link href="/auth/login" className="nav-signin">
                 <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
                   Sign In
                 </span>
-              </a>
+              </Link>
             )}
           </nav>
 
@@ -499,11 +499,11 @@ export default function NavBar({
               </form>
             </div>
           ) : (
-            <a href="/auth/login" className="nav-signin self-start" onClick={close}>
+            <Link href="/auth/login" className="nav-signin self-start" onClick={close}>
               <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
                 Sign In
               </span>
-            </a>
+            </Link>
           )}
         </div>
       </div>
