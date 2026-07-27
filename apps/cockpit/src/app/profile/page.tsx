@@ -16,7 +16,7 @@ export default async function ProfilePage() {
   const { data: driver } = await supabase
     .from('drivers')
     .select(
-      'display_name, avatar_url, steam_id, discord_id, is_admin, first_name, last_name, short_name, country, driver_number'
+      'display_name, avatar_url, steam_id, steam_verified, discord_id, is_admin, first_name, last_name, short_name, country, driver_number'
     )
     .eq('user_id', user.id)
     .maybeSingle();
@@ -30,14 +30,22 @@ export default async function ProfilePage() {
         My Profile
       </h1>
 
-      {driver?.is_admin && (
+      <div className="flex flex-wrap gap-3 mb-12">
+        {driver?.is_admin && (
+          <Link
+            href="/admin"
+            className="inline-block font-mono text-[12px] tracking-[.2em] uppercase px-5 py-3 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors"
+          >
+            Admin Panel →
+          </Link>
+        )}
         <Link
-          href="/admin"
-          className="inline-block font-mono text-[12px] tracking-[.2em] uppercase px-5 py-3 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors mb-12"
+          href="/numbers"
+          className="inline-block font-mono text-[12px] tracking-[.2em] uppercase px-5 py-3 border border-line text-txt hover:border-gold hover:text-gold transition-colors"
         >
-          Admin Panel →
+          Driver Numbers →
         </Link>
-      )}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1280px] mb-6">
         {/* Discord identity */}
         <div className="border border-line bg-panel px-7 py-6">
@@ -74,15 +82,42 @@ export default async function ProfilePage() {
           <p className="font-mono text-[11px] tracking-[.35em] uppercase text-gold mb-5">
             Steam Identity
           </p>
-          {driver?.steam_id && (
+
+          {driver?.steam_verified ? (
             <div className="mb-4">
               <p className="font-mono text-[14px] text-txt">{driver.steam_id}</p>
+              <p className="font-mono text-[10px] tracking-[.25em] uppercase text-green-400 mt-1">
+                ✓ Verified · used for race result matching
+              </p>
+            </div>
+          ) : (
+            <div className="mb-4">
+              {driver?.steam_id && (
+                <p className="font-mono text-[14px] text-txt-3 line-through">
+                  {driver.steam_id}
+                </p>
+              )}
               <p className="font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 mt-1">
-                Linked · used for race result matching
+                Not verified — confirm ownership through Steam
               </p>
             </div>
           )}
-          <SteamLinkForm currentSteamId={driver?.steam_id ?? null} />
+
+          <Link href="/auth/steam/login" className="nav-signin inline-block">
+            <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
+              {driver?.steam_verified ? 'Re-verify with Steam' : 'Verify with Steam'}
+            </span>
+          </Link>
+
+          {/* Manual override — admins only. Regular drivers must verify via Steam. */}
+          {driver?.is_admin && (
+            <div className="mt-6 pt-6 border-t border-line">
+              <p className="font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 mb-3">
+                Admin override
+              </p>
+              <SteamLinkForm currentSteamId={driver?.steam_id ?? null} />
+            </div>
+          )}
         </div>
       </div>
 
