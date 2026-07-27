@@ -1,6 +1,8 @@
 -- Migration: divisions + tier + is_admin (Step 2 — division admin)
 -- Run in Supabase SQL editor after 20260707_auth_identity.sql.
 -- Safe to re-run: all schema changes are idempotent.
+-- Extended 2026-07-29 (§8): driver-editable profile fields + column-privilege
+-- hardening. Re-run the whole file — earlier sections no-op if already applied.
 
 -- ── 1. driver_tier enum ───────────────────────────────────────────────────────
 
@@ -87,3 +89,65 @@ END $$;
 
 ALTER TABLE drivers
   ADD COLUMN IF NOT EXISTS tier driver_tier;
+
+-- ── 8. Driver-editable profile fields (short_name, country) + hardening ───────
+-- driver_number, simgrid_driver_id, steam_id, first_name, last_name already
+-- exist on drivers (with UNIQUE constraints on the first three) — this only
+-- adds short_name/country, adds a range check on driver_number, and locks
+-- down which columns the authenticated role may UPDATE (previously any
+-- column on your own row was writable via direct REST calls, including
+-- admin-only flags).
+
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS short_name varchar(3);
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS country char(2);
+
+DO $$
+DECLARE bad_count integer;
+BEGIN
+  SELECT COUNT(*) INTO bad_count FROM drivers
+  WHERE driver_number IS NOT NULL AND (driver_number < 2 OR driver_number > 999);
+
+  IF bad_count > 0 THEN
+    RAISE EXCEPTION 'BLOCKED: % row(s) have driver_number outside 2-999', bad_count;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'drivers'::regclass AND conname = 'drivers_number_range'
+  ) THEN
+    ALTER TABLE drivers ADD CONSTRAINT drivers_number_range
+      CHECK (driver_number IS NULL OR driver_number BETWEEN 2 AND 999);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'drivers'::regclass AND conname = 'drivers_short_name_len'
+  ) THEN
+    ALTER TABLE drivers ADD CONSTRAINT drivers_short_name_len
+      CHECK (short_name IS NULL OR char_length(short_name) = 3);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'drivers'::regclass AND conname = 'drivers_country_len'
+  ) THEN
+    ALTER TABLE drivers ADD CONSTRAINT drivers_country_len
+      CHECK (country IS NULL OR char_length(country) = 2);
+  END IF;
+END $$;
+
+-- Column-level privilege hardening. RLS is row-level only:
+-- "drivers_update_own" lets a user UPDATE their own row, but says nothing
+-- about which columns. Without this, a user could PATCH is_admin /
+-- division_id / tier / steam_verified / is_sralien on themselves via a direct
+-- Supabase REST call, bypassing the app entirely. Restrict the authenticated
+-- role to the columns a driver is actually meant to self-edit.
+
+REVOKE UPDATE ON drivers FROM authenticated;
+GRANT UPDATE (
+  first_name, last_name, short_name, country, driver_number,
+  steam_id, simgrid_driver_id, display_name
+) ON drivers TO authenticated;

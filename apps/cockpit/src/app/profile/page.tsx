@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import SteamLinkForm from './SteamLinkForm';
+import ProfileDetailsForm from './ProfileDetailsForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,9 @@ export default async function ProfilePage() {
 
   const { data: driver } = await supabase
     .from('drivers')
-    .select('display_name, avatar_url, steam_id, discord_id, is_admin')
+    .select(
+      'display_name, avatar_url, steam_id, discord_id, is_admin, first_name, last_name, short_name, country, driver_number'
+    )
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -35,8 +38,7 @@ export default async function ProfilePage() {
           Admin Panel →
         </Link>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[900px]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1280px] mb-6">
         {/* Discord identity */}
         <div className="border border-line bg-panel px-7 py-6">
           <p className="font-mono text-[11px] tracking-[.35em] uppercase text-gold mb-5">
@@ -84,7 +86,20 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      <div className="mt-10 pt-10 border-t border-line max-w-[900px]">
+      <div className="border border-line bg-panel px-7 py-6 max-w-[1280px]">
+        <p className="font-mono text-[11px] tracking-[.35em] uppercase text-gold mb-5">
+          Driver Profile
+        </p>
+        <ProfileDetailsForm
+          firstName={driver?.first_name ?? null}
+          lastName={driver?.last_name ?? null}
+          shortName={driver?.short_name ?? null}
+          country={driver?.country ?? null}
+          driverNumber={driver?.driver_number ?? null}
+        />
+      </div>
+
+      <div className="mt-10 pt-10 border-t border-line max-w-[1280px]">
         <form action="/auth/signout" method="POST">
           <button
             type="submit"
