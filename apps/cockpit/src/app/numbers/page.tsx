@@ -62,6 +62,12 @@ export default async function NumbersPage() {
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
+      <Link
+        href="/profile"
+        className="inline-block mb-8 font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 hover:text-gold transition-colors"
+      >
+        ← Back to profile
+      </Link>
       <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
         — Driver Numbers
       </span>
