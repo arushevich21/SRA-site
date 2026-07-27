@@ -37,8 +37,8 @@ export type PurgeData =
 
 /**
  * Compute purge candidates: numbered drivers inactive in ≥2 of the last 3
- * team-series seasons. Exempts admins, preserve_driver_number, and the champion
- * (#1 / anyone holding a reserved prior_driver_number). Read-only.
+ * team-series seasons. Exempts admins, preserve_driver_number, and the reigning
+ * champion (is_champion). Read-only.
  */
 export async function getPurgeData(): Promise<PurgeData> {
   const { data: members } = await adminClient
@@ -71,14 +71,13 @@ export async function getPurgeData(): Promise<PurgeData> {
   const { data: drivers } = await adminClient
     .from('drivers')
     .select(
-      'id, first_name, last_name, display_name, driver_number, is_admin, preserve_driver_number, prior_driver_number',
+      'id, first_name, last_name, display_name, driver_number, is_admin, preserve_driver_number, is_champion',
     )
     .not('driver_number', 'is', null);
 
   const candidates: PurgeCandidate[] = [];
   for (const d of drivers ?? []) {
-    if (d.driver_number === 1) continue; // champion #1
-    if (d.prior_driver_number != null) continue; // holds a reserved number
+    if (d.is_champion) continue; // reigning D1 champion's number is preserved
     if (d.is_admin) continue; // admins' numbers are preserved
     if (d.preserve_driver_number === true) continue; // marked immune
     const count = active.get(d.id)?.size ?? 0;

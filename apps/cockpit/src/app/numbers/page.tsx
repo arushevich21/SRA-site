@@ -4,8 +4,9 @@ import NumberChecker, { type TakenEntry } from './NumberChecker';
 
 export const dynamic = 'force-dynamic';
 
-// Drivers pick a permanent number in this range. #1 is reserved for the
-// reigning Division 1 champion and is assigned by an admin, not self-picked.
+// Drivers pick a permanent number in this range. #1 is not stored — it's a
+// derived badge for the reigning D1 champion (drivers.is_champion), who keeps
+// their own number too.
 const MIN = 2;
 const MAX = 999;
 
@@ -14,7 +15,7 @@ type DriverRow = {
   last_name: string | null;
   display_name: string | null;
   driver_number: number | null;
-  prior_driver_number: number | null;
+  is_champion: boolean | null;
 };
 
 // Prefer the structured name; fall back to display_name with the bot's
@@ -22,38 +23,35 @@ type DriverRow = {
 function cleanName(d: DriverRow): string {
   const full = [d.first_name, d.last_name].filter(Boolean).join(' ').trim();
   if (full) return full;
-  const dn = (d.display_name ?? '').split('┊')[0].trim();
-  return dn || '—';
+  return (d.display_name ?? '').split('┊')[0].trim() || '—';
 }
 
-type Entry = { number: number; name: string; reserved: boolean };
+type Entry = { number: number; name: string; champion: boolean };
 
 export default async function NumbersPage() {
   const { data } = await adminClient
     .from('drivers')
-    .select('first_name, last_name, display_name, driver_number, prior_driver_number')
-    .or('driver_number.not.is.null,prior_driver_number.not.is.null')
+    .select('first_name, last_name, display_name, driver_number, is_champion')
+    .or('driver_number.not.is.null,is_champion.is.true')
     .order('driver_number', { ascending: true });
 
   const rows = (data ?? []) as DriverRow[];
 
-  // Every number that's spoken for: active numbers, plus numbers held for a
-  // champion's return (reserved — not pickable by anyone else).
+  // Every number that's spoken for: real driver numbers (2–999), plus a derived
+  // #1 for the champion (who also keeps their own number).
   const entries: Entry[] = [];
   for (const d of rows) {
     const name = cleanName(d);
     if (d.driver_number != null)
-      entries.push({ number: d.driver_number, name, reserved: false });
-    if (d.prior_driver_number != null)
-      entries.push({ number: d.prior_driver_number, name, reserved: true });
+      entries.push({ number: d.driver_number, name, champion: false });
+    if (d.is_champion) entries.push({ number: 1, name, champion: true });
   }
   entries.sort((a, b) => a.number - b.number);
 
   const takenMap: Record<number, TakenEntry> = {};
-  for (const e of entries) takenMap[e.number] = { name: e.name, reserved: e.reserved };
+  for (const e of entries) takenMap[e.number] = { name: e.name, champion: e.champion };
 
-  // Availability is over the 2..999 pool; #1 sits outside it. A number is
-  // unavailable if it's an active number OR held for a champion's return.
+  // Availability is over the 2..999 pool; #1 sits outside it.
   const pickable = MAX - MIN + 1; // 998
   const unavailable = entries.filter(
     (e) => e.number >= MIN && e.number <= MAX,
@@ -76,10 +74,9 @@ export default async function NumbersPage() {
       </h1>
       <p className="font-sans text-[15px] text-txt-2 leading-relaxed max-w-[640px] mb-10">
         Every driver runs a permanent number from{' '}
-        <strong className="text-txt">2–999</strong>. #1 is reserved for the
-        reigning Division 1 champion, who holds it until the title passes — their
-        own number stays reserved for their return. Check whether a number is
-        free below.
+        <strong className="text-txt">2–999</strong>. #1 is the reigning Division
+        1 champion&apos;s badge — they run it while keeping their own number.
+        Check whether a number is free below.
       </p>
 
       <NumberChecker takenMap={takenMap} min={MIN} max={MAX} />
@@ -114,28 +111,15 @@ export default async function NumbersPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
           {entries.map((e) => (
             <div
-              key={`${e.number}-${e.reserved ? 'r' : 'a'}`}
-              className={[
-                'border bg-panel px-3 py-2 flex items-baseline gap-2 min-w-0',
-                e.reserved ? 'border-dashed border-line-2' : 'border-line',
-              ].join(' ')}
+              key={`${e.number}-${e.champion ? 'c' : 'a'}`}
+              className="border border-line bg-panel px-3 py-2 flex items-baseline gap-2 min-w-0"
             >
-              <span
-                className={[
-                  'font-display font-black text-[18px] tabular-nums shrink-0',
-                  e.reserved ? 'text-txt-3' : 'text-gold',
-                ].join(' ')}
-              >
+              <span className="font-display font-black text-[18px] text-gold tabular-nums shrink-0">
                 {e.number}
               </span>
               <span className="font-mono text-[11px] text-txt-2 truncate">
                 {e.name}
-                {e.reserved && (
-                  <span className="text-txt-3"> · held</span>
-                )}
-                {e.number === 1 && (
-                  <span className="text-gold"> · champ</span>
-                )}
+                {e.champion && <span className="text-gold"> · champ</span>}
               </span>
             </div>
           ))}

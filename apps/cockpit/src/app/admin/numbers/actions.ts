@@ -35,15 +35,14 @@ export async function purgeNumbers(
 
   const { data: rows } = await adminClient
     .from('drivers')
-    .select('id, is_admin, preserve_driver_number, prior_driver_number, driver_number')
+    .select('id, is_admin, preserve_driver_number, is_champion, driver_number')
     .in('id', driverIds);
 
   const safe = (rows ?? [])
     .filter(
       (d) =>
         d.driver_number != null &&
-        d.driver_number !== 1 &&
-        d.prior_driver_number == null &&
+        !d.is_champion &&
         !d.is_admin &&
         d.preserve_driver_number !== true,
     )
