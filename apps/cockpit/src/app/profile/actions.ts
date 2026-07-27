@@ -1,6 +1,7 @@
 'use server';
 
 import { createSupabaseServerClient } from '@/lib/supabase-server';
+import { supabase as adminClient } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 import { isValidCountryCode } from '@/lib/countries';
 
@@ -8,6 +9,9 @@ const UNIQUE_VIOLATION = '23505';
 
 export type SteamLinkState = { error?: string; success?: boolean } | null;
 
+// Admin-only manual override. Regular users prove Steam ownership via the
+// verified OpenID flow (see app/auth/steam/*) — they can no longer type a raw
+// SteamID. This exists for edge cases (seeding fixes, locked-out accounts).
 export async function updateSteamId(
   _prev: SteamLinkState,
   formData: FormData,
@@ -23,9 +27,20 @@ export async function updateSteamId(
 
   if (!user) return { error: 'Not authenticated.' };
 
-  const { error } = await supabase
+  // Gate: only admins may set a SteamID manually.
+  const { data: caller } = await supabase
     .from('drivers')
-    .update({ steam_id: steamId })
+    .select('is_admin')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!caller?.is_admin) return { error: 'Admins only.' };
+
+  // Service-role write: manual override counts as verified (an admin vouches),
+  // which also satisfies the Steam gate for that account.
+  const { error } = await adminClient
+    .from('drivers')
+    .update({ steam_id: steamId, steam_verified: true })
     .eq('user_id', user.id);
 
   if (error) {
@@ -72,6 +87,21 @@ export async function updateProfileDetails(
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) return { error: 'Not authenticated.' };
+
+  // Champion reservation: a number held for another driver's return from #1
+  // (drivers.prior_driver_number) is reserved. The DB unique constraint only
+  // covers the active driver_number, so guard the held numbers in code.
+  if (driverNumber !== null) {
+    const { data: held } = await adminClient
+      .from('drivers')
+      .select('user_id')
+      .eq('prior_driver_number', driverNumber)
+      .neq('user_id', user.id)
+      .maybeSingle();
+    if (held) {
+      return { error: `#${driverNumber} is reserved for a returning champion.` };
+    }
+  }
 
   const { error } = await supabase
     .from('drivers')
