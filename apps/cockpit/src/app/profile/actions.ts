@@ -2,6 +2,7 @@
 
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabase as adminClient } from '@/lib/supabase';
+import { getNumbersLocked } from '@/lib/settings';
 import { revalidatePath } from 'next/cache';
 import { isValidCountryCode } from '@/lib/countries';
 
@@ -87,6 +88,21 @@ export async function updateProfileDetails(
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) return { error: 'Not authenticated.' };
+
+  // Mid-season lock: while numbers are locked, non-admins cannot CHANGE their
+  // driver_number (other profile fields stay editable). Admins are exempt.
+  const { data: caller } = await adminClient
+    .from('drivers')
+    .select('is_admin, driver_number')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  const numberChanged = driverNumber !== (caller?.driver_number ?? null);
+  if (!caller?.is_admin && numberChanged && (await getNumbersLocked())) {
+    return {
+      error: 'Driver number changes are locked mid-season. Contact an admin.',
+    };
+  }
 
   // Champion reservation: a number held for another driver's return from #1
   // (drivers.prior_driver_number) is reserved. The DB unique constraint only

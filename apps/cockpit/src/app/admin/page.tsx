@@ -39,6 +39,18 @@ const ADMIN_SECTIONS = [
     ],
   },
   {
+    title: 'Driver Numbers',
+    description: 'Mid-season number lock and inactive-number purge.',
+    tools: [
+      {
+        label: 'Number Management',
+        href: '/admin/numbers',
+        description:
+          'Lock driver-number changes mid-season, purge numbers of drivers inactive across team-series seasons, and mark numbers immune from purging.',
+      },
+    ],
+  },
+  {
     title: 'Custom BoP',
     description: 'Balance of Performance ballast & restrictor settings.',
     tools: [
