@@ -104,20 +104,9 @@ export async function updateProfileDetails(
     };
   }
 
-  // Champion reservation: a number held for another driver's return from #1
-  // (drivers.prior_driver_number) is reserved. The DB unique constraint only
-  // covers the active driver_number, so guard the held numbers in code.
-  if (driverNumber !== null) {
-    const { data: held } = await adminClient
-      .from('drivers')
-      .select('user_id')
-      .eq('prior_driver_number', driverNumber)
-      .neq('user_id', user.id)
-      .maybeSingle();
-    if (held) {
-      return { error: `#${driverNumber} is reserved for a returning champion.` };
-    }
-  }
+  // No champion-reservation guard needed: #1 isn't a stored number (it's the
+  // is_champion badge), and the champion keeps their own number, protected by
+  // the unique constraint like everyone else's.
 
   const { error } = await supabase
     .from('drivers')

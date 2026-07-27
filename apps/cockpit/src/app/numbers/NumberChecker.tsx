@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 
-export type TakenEntry = { name: string; reserved: boolean };
+export type TakenEntry = { name: string; champion: boolean };
 
 type Result =
-  | { kind: 'available' | 'taken' | 'reserved' | 'champion' | 'invalid'; msg: string }
+  | { kind: 'available' | 'taken' | 'champion' | 'invalid'; msg: string }
   | null;
 
 export default function NumberChecker({
@@ -32,13 +32,13 @@ export default function NumberChecker({
       setResult({ kind: 'invalid', msg: 'Enter a whole number.' });
       return;
     }
-    // #1 is the champion's number — never user-pickable.
+    // #1 is the champion's badge — never user-pickable.
     if (n === 1) {
       const holder = takenMap[1];
       setResult({
         kind: 'champion',
         msg: holder
-          ? `#1 is held by ${holder.name}, the reigning Division 1 champion.`
+          ? `#1 is the reigning Division 1 champion, ${holder.name}.`
           : '#1 is reserved for the reigning Division 1 champion.',
       });
       return;
@@ -48,13 +48,6 @@ export default function NumberChecker({
       return;
     }
     const entry = takenMap[n];
-    if (entry?.reserved) {
-      setResult({
-        kind: 'reserved',
-        msg: `#${n} is held for ${entry.name}'s return from #1 — reserved.`,
-      });
-      return;
-    }
     if (entry) {
       setResult({ kind: 'taken', msg: `#${n} is taken by ${entry.name}.` });
       return;
@@ -65,7 +58,7 @@ export default function NumberChecker({
   const color =
     result?.kind === 'available'
       ? 'text-green-400'
-      : result?.kind === 'taken' || result?.kind === 'reserved'
+      : result?.kind === 'taken'
         ? 'text-red-400'
         : 'text-gold';
 
@@ -89,7 +82,7 @@ export default function NumberChecker({
       {result && (
         <p className={`mt-4 font-mono text-[13px] leading-relaxed ${color}`}>
           {result.kind === 'available' && '✓ '}
-          {(result.kind === 'taken' || result.kind === 'reserved') && '✕ '}
+          {result.kind === 'taken' && '✕ '}
           {result.msg}
         </p>
       )}
