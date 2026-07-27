@@ -54,4 +54,10 @@ ALTER TABLE drivers DROP COLUMN IF EXISTS discord_name;
 ALTER TABLE drivers DROP COLUMN IF EXISTS division;
 ALTER TABLE drivers DROP COLUMN IF EXISTS division_split;
 
+-- More redundant/derivable/deprecated columns:
+ALTER TABLE drivers DROP COLUMN IF EXISTS steam_id_sha256;      -- = sha256("S"+steam_id)
+ALTER TABLE drivers DROP COLUMN IF EXISTS discord_avatar;       -- = avatar_url (hash vs URL)
+ALTER TABLE drivers DROP COLUMN IF EXISTS discord_discriminator; -- Discord deprecated these in 2023
+ALTER TABLE drivers DROP COLUMN IF EXISTS country_id;          -- old numeric FK; country (ISO) is used instead
+
 -- prior_driver_number is intentionally KEPT here — see the run-order note above.
