@@ -87,7 +87,7 @@ export async function getSeasonalBoards(): Promise<SeasonalChampBoards[]> {
       );
       continue;
     }
-    const board: AccBoard = { scope: 'seasonal', season, isWet: false };
+    const board: AccBoard = { scope: 'seasonal', season };
 
     const rounds: SeasonalRoundBoard[] = [];
     for (const r of released) {
@@ -128,8 +128,9 @@ export function compareSeasonsDesc(a: string, b: string): number {
 }
 
 // Distinct season codes present on the seasonal hot-lap board, newest first.
-// Dry board only — wet is a separate axis not surfaced here. Pages through the
-// column so a season is never missed to a single-request row cap.
+// Not filtered by is_wet — a season with only wet rows still counts (wet laps
+// show on the board too, just without a reference-time badge). Pages through
+// the column so a season is never missed to a single-request row cap.
 export async function getHotlapSeasons(): Promise<string[]> {
   const seasons = new Set<string>();
   const page = 1000;
@@ -138,7 +139,6 @@ export async function getHotlapSeasons(): Promise<string[]> {
       .from('acc_hotlap_leaderboard')
       .select('season')
       .eq('board_scope', 'seasonal')
-      .eq('is_wet', false)
       .range(from, from + page - 1);
     if (error) {
       console.error('ACC seasonal season list lookup failed:', error);
@@ -167,7 +167,6 @@ export async function hasSeasonalContent(): Promise<boolean> {
     .from('acc_hotlap_leaderboard')
     .select('track_key')
     .eq('board_scope', 'seasonal')
-    .eq('is_wet', false)
     .limit(1);
   if (error) {
     console.error('ACC seasonal existence check failed:', error);
@@ -217,8 +216,7 @@ export async function seasonalTrackKeys(
   let query = supabase
     .from(table)
     .select('track_key')
-    .eq('board_scope', 'seasonal')
-    .eq('is_wet', false);
+    .eq('board_scope', 'seasonal');
   for (const [col, val] of Object.entries(extraEq)) query = query.eq(col, val);
   query = applySeasonFilter(query, season);
 
@@ -233,12 +231,42 @@ export async function seasonalTrackKeys(
   return keys;
 }
 
+// Whether any row exists for this track/season (on the given table) with
+// is_wet=true — i.e. whether that round was run in the wet. Used to suffix
+// " (Wet)" onto the track name while browsing a season (see AccBoard's
+// comment in acc/tracks.ts for why is_wet isn't otherwise a board dimension —
+// wet and dry laps share the same board and this is purely a display label,
+// not a board split). Shared by the hot-lap and hot-stint seasonal views.
+export async function hasWetSessionRows(
+  table: 'acc_hotlap_leaderboard' | 'acc_hotstint_leaderboard',
+  trackKey: string,
+  season: string,
+  extraEq: Record<string, string | boolean> = {},
+): Promise<boolean> {
+  let query = supabase
+    .from(table)
+    .select('track_key', { head: true, count: 'exact' })
+    .eq('board_scope', 'seasonal')
+    .eq('track_key', trackKey)
+    .eq('is_wet', true);
+  for (const [col, val] of Object.entries(extraEq)) query = query.eq(col, val);
+  query = applySeasonFilter(query, season);
+
+  const { count, error } = await query;
+  if (error) {
+    console.error(`Wet-session check failed for "${trackKey}"/"${season}" on ${table}:`, error);
+    return false;
+  }
+  return (count ?? 0) > 0;
+}
+
 // Hot-lap seasonal track list, shaped exactly like the Hot Lap index
 // (TrackWithTopTimes) so it renders through the same TrackList card component.
-// Top-3 and counts are pinned to (seasonal, season, dry).
+// Top-3 and counts are pinned to (seasonal, season); a track run in the wet
+// gets " (Wet)" appended to its displayed name (see hasWetSessionRows).
 export async function getSeasonHotlapTrackList(season: string): Promise<TrackWithTopTimes[]> {
   if (!season) return [];
-  const board: AccBoard = { scope: 'seasonal', season, isWet: false };
+  const board: AccBoard = { scope: 'seasonal', season };
 
   const [keys, tracks] = await Promise.all([
     seasonalTrackKeys('acc_hotlap_leaderboard', season),
@@ -253,14 +281,17 @@ export async function getSeasonHotlapTrackList(season: string): Promise<TrackWit
   return Promise.all(
     sorted.map(async (key) => {
       const meta = metaByKey.get(key);
-      const [topTimes, stats] = await Promise.all([
+      const [topTimes, stats, isWet] = await Promise.all([
         getAccTrackTopTimes(key, 3, board),
         getAccTrackStats(key, board),
+        hasWetSessionRows('acc_hotlap_leaderboard', key, season),
       ]);
+      const summary = meta
+        ? toTrackSummary(meta)
+        : { trackKey: key, displayName: key, splashArtUrl: null, country: null, location: null, mapUrl: null };
       return {
-        ...(meta
-          ? toTrackSummary(meta)
-          : { trackKey: key, displayName: key, splashArtUrl: null, country: null, location: null, mapUrl: null }),
+        ...summary,
+        displayName: isWet ? `${summary.displayName} (Wet)` : summary.displayName,
         topTimes: topTimes.map(toTrackTopEntry),
         ...stats,
       };

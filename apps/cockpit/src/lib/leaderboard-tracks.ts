@@ -119,6 +119,8 @@ export function toTrackTopEntry(entry: {
   driverName: string;
   carModel: string | null;
   bestLap: string;
+  driverNumber: number | null;
+  country: string | null;
 }): TrackTopEntry {
   return {
     rank: entry.rank,
@@ -128,6 +130,8 @@ export function toTrackTopEntry(entry: {
     manufacturerIconName: acEvoManufacturerIconName(entry.carModel),
     manufacturerLogoUrl: acEvoManufacturerLogoUrl(entry.carModel),
     bestLap: entry.bestLap,
+    driverNumber: entry.driverNumber,
+    country: entry.country,
   };
 }
 
