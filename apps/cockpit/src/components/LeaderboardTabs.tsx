@@ -3,13 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-// Hot-lap board tabs for ACC leaderboards:
-//   • Hot Lap            — the always-on per-track community board
-//   • Hot Lap (Seasonal) — admin-released, Team-Series event-tied board (only
-//                          shown once such a championship releases a round)
-//   • Hot Lap (Endurance)— endurance pre-qual board (only shown once an
-//                          endurance championship releases a round)
-// Seasonal and Endurance both hide until their type has a released round.
+// Board tabs for ACC leaderboards, in nav order:
+//   • Hot Lap            — always-on per-track single-lap board
+//   • Hot Lap (Seasonal) — per-season single-lap boards (season dropdown)
+//   • Hot Stint          — always-on per-track best 5-lap-average board
+//   • Hot Stint (Seasonal)— per-season stint boards (season dropdown)
+//   • Hot Lap (Endurance)— endurance pre-qual board (only once an endurance
+//                          championship releases a round)
+// Hot Lap and Hot Stint are always on; the two Seasonal tabs show whenever
+// seasonal data exists (showSeasonal); Endurance is release-gated.
 export function LeaderboardTabs({
   simSlug,
   showSeasonal = false,
@@ -20,12 +22,17 @@ export function LeaderboardTabs({
   showEndurance?: boolean;
 }) {
   const pathname = usePathname();
-  const onEndurance = pathname.endsWith('/leaderboards/endurance');
-  const onSeasonal = pathname.endsWith('/leaderboards/seasonal');
+  const onStintSeasonal = pathname.includes('/leaderboards/hotstint/seasonal');
+  const onStint = pathname.includes('/leaderboards/hotstint') && !onStintSeasonal;
+  const onHotlapSeasonal = pathname.includes('/leaderboards/seasonal');
+  const onEndurance = pathname.includes('/leaderboards/endurance');
+  const onHotLap = !onStint && !onStintSeasonal && !onHotlapSeasonal && !onEndurance;
 
   const tabs = [
-    { label: 'Hot Lap', href: `/${simSlug}/leaderboards`, active: !onEndurance && !onSeasonal, show: true },
-    { label: 'Hot Lap (Seasonal)', href: `/${simSlug}/leaderboards/seasonal`, active: onSeasonal, show: showSeasonal },
+    { label: 'Hot Lap', href: `/${simSlug}/leaderboards`, active: onHotLap, show: true },
+    { label: 'Hot Lap (Seasonal)', href: `/${simSlug}/leaderboards/seasonal`, active: onHotlapSeasonal, show: showSeasonal },
+    { label: 'Hot Stint', href: `/${simSlug}/leaderboards/hotstint`, active: onStint, show: true },
+    { label: 'Hot Stint (Seasonal)', href: `/${simSlug}/leaderboards/hotstint/seasonal`, active: onStintSeasonal, show: showSeasonal },
     { label: 'Hot Lap (Endurance)', href: `/${simSlug}/leaderboards/endurance`, active: onEndurance, show: showEndurance },
   ].filter((t) => t.show);
 

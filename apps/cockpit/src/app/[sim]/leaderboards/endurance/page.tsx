@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import { LeaderboardTabs } from '@/components/LeaderboardTabs';
 import { GameLabel } from '@/components/GameLabel';
-import { hasSeasonalReleased } from '@/lib/seasonal-leaderboard';
+import { hasSeasonalContent } from '@/lib/seasonal-leaderboard';
 // showEndurance is forced true here — you're on the endurance page.
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ export default async function EnduranceLeaderboardsPage({
 
       <LeaderboardTabs
         simSlug={sim.slug}
-        showSeasonal={await hasSeasonalReleased()}
+        showSeasonal={await hasSeasonalContent()}
         showEndurance
       />
 

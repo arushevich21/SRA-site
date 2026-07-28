@@ -36,7 +36,14 @@ export async function getHotLapBoard(
   rawTrackName: string,
   emperorTrack?: string | null,
 ): Promise<HotLapEntry[]> {
-  const layoutKey = buildTrackKey(rawTrackName, parseEmperorTrackLayout(emperorTrack));
+  return getHotLapBoardByLayoutKey(buildTrackKey(rawTrackName, parseEmperorTrackLayout(emperorTrack)));
+}
+
+// Reads the board straight from the layout_key (what the data-driven sim
+// leaderboard list already has from track_layouts) — no raw-name/layout
+// round-trip needed. getHotLapBoard is the round-based wrapper for the
+// championship pages, which only know the "TrackName,Layout" string.
+export async function getHotLapBoardByLayoutKey(layoutKey: string): Promise<HotLapEntry[]> {
   const { data, error } = await supabase
     .from('acevo_hotlap_cache_v2')
     .select('entries')

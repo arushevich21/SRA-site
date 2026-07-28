@@ -29,9 +29,13 @@ function toHotLapEntry(entry: AccHotLapEntry): HotLapBoardEntry {
 export function AccTrackLeaderboard({
   leaderboardByCarGroup,
   currentSteamId,
+  timeLabel,
 }: {
   leaderboardByCarGroup: Record<string, AccHotLapEntry[]>;
   currentSteamId?: string | null;
+  // Forwarded to HotLapBoard's time-column header — "Stint Avg" for the Hot
+  // Stint board, default "Lap Time" otherwise.
+  timeLabel?: string;
 }) {
   const classes = useMemo(() => Object.keys(leaderboardByCarGroup).sort(), [leaderboardByCarGroup]);
   const [selectedClass, setSelectedClass] = useState<string>(ALL_CLASSES);
@@ -58,6 +62,7 @@ export function AccTrackLeaderboard({
     <HotLapBoard
       entries={entries.map(toHotLapEntry)}
       currentSteamId={currentSteamId}
+      timeLabel={timeLabel}
       classFilter={{ options: [ALL_CLASSES, ...classes], selected: selectedClass, onChange: setSelectedClass }}
     />
   );

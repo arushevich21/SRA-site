@@ -4,17 +4,14 @@ import { LeaderboardTabs } from '@/components/LeaderboardTabs';
 import { TrackList } from '@/components/TrackList';
 import { SeasonSelect } from '@/components/SeasonSelect';
 import { GameLabel } from '@/components/GameLabel';
-import {
-  getHotlapSeasons,
-  getSeasonHotlapTrackList,
-  hasEnduranceReleased,
-} from '@/lib/seasonal-leaderboard';
+import { hasEnduranceReleased } from '@/lib/seasonal-leaderboard';
+import { getHotStintSeasons, getSeasonStintTrackList } from '@/lib/acc/hotstint';
 
 export const dynamic = 'force-dynamic';
 
-// Hot Lap (Seasonal) — a season dropdown over a Hot-Lap-style track list. Each
-// card opens that season's per-track board. Seasonal is ACC-only.
-export default async function SeasonalLeaderboardsPage({
+// Hot Stint (Seasonal) — season dropdown over a Hot-Stint-style track list.
+// Each card opens that season's per-track stint board. ACC-only.
+export default async function SeasonalHotStintPage({
   params,
   searchParams,
 }: {
@@ -27,10 +24,10 @@ export default async function SeasonalLeaderboardsPage({
   if (!sim) notFound();
   if (sim.game !== 'ACC') notFound();
 
-  const seasons = await getHotlapSeasons();
+  const seasons = await getHotStintSeasons();
   const selectedSeason =
     seasonParam && seasons.includes(seasonParam) ? seasonParam : (seasons[0] ?? null);
-  const tracks = selectedSeason ? await getSeasonHotlapTrackList(selectedSeason) : [];
+  const tracks = selectedSeason ? await getSeasonStintTrackList(selectedSeason) : [];
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -56,7 +53,7 @@ export default async function SeasonalLeaderboardsPage({
             Nothing Released Yet
           </p>
           <p className="font-sans text-[15px] text-txt-2 leading-relaxed max-w-[560px] mx-auto">
-            Seasonal hot-lap boards are published per race by the admins. Check
+            Seasonal hot-stint boards are published per race by the admins. Check
             back on race week.
           </p>
         </div>
@@ -66,7 +63,7 @@ export default async function SeasonalLeaderboardsPage({
             <SeasonSelect
               seasons={seasons}
               selected={selectedSeason}
-              basePath={`/${sim.slug}/leaderboards/seasonal`}
+              basePath={`/${sim.slug}/leaderboards/hotstint/seasonal`}
             />
           </div>
 
@@ -80,7 +77,7 @@ export default async function SeasonalLeaderboardsPage({
             <TrackList
               tracks={tracks}
               simSlug={sim.slug}
-              basePath={`/${sim.slug}/leaderboards/seasonal`}
+              basePath={`/${sim.slug}/leaderboards/hotstint/seasonal`}
               linkQuery={`season=${selectedSeason}`}
             />
           )}

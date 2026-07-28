@@ -1,6 +1,6 @@
 import type { ChampionshipContent } from '@/content/championships';
 import { getHotLapBoard } from '@/lib/acevo-hotlaps';
-import { acEvoManufacturerIconName } from '@/lib/leaderboard-tracks';
+import { acEvoManufacturerIconName, acEvoManufacturerLogoUrl } from '@/lib/leaderboard-tracks';
 import { getCurrentSteamId } from '@/lib/current-driver';
 import { HotLapBoard } from './HotLapBoard';
 import { Collapsible } from './Collapsible';
@@ -59,6 +59,7 @@ export async function ChampionshipLeaderboardsBody({
               entries={(boards.get(round.round) ?? []).map((entry) => ({
                 ...entry,
                 manufacturerIconName: acEvoManufacturerIconName(entry.carModel),
+                manufacturerLogoUrl: acEvoManufacturerLogoUrl(entry.carModel),
               }))}
               currentSteamId={currentSteamId}
             />

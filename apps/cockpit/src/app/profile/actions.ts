@@ -5,6 +5,7 @@ import { supabase as adminClient } from '@/lib/supabase';
 import { getNumbersLocked } from '@/lib/settings';
 import { revalidatePath } from 'next/cache';
 import { isValidCountryCode } from '@/lib/countries';
+import { computeDriverDisplayName } from '@/lib/driver-display-name';
 
 const UNIQUE_VIOLATION = '23505';
 
@@ -80,10 +81,6 @@ export async function updateProfileDetails(
     }
   }
 
-  const displayName = driverNumber !== null
-    ? `${firstName} ${lastName} ┊${driverNumber}`
-    : `${firstName} ${lastName}`;
-
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -93,7 +90,7 @@ export async function updateProfileDetails(
   // driver_number (other profile fields stay editable). Admins are exempt.
   const { data: caller } = await adminClient
     .from('drivers')
-    .select('is_admin, driver_number')
+    .select('is_admin, driver_number, is_champion')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -107,6 +104,16 @@ export async function updateProfileDetails(
   // No champion-reservation guard needed: #1 isn't a stored number (it's the
   // is_champion badge), and the champion keeps their own number, protected by
   // the unique constraint like everyone else's.
+
+  // The reigning D1 champion always displays #1 (see computeDriverDisplayName)
+  // — driver_number below still stores their real permanent number.
+  const displayName = computeDriverDisplayName({
+    firstName,
+    lastName,
+    driverNumber,
+    isChampion: caller?.is_champion ?? false,
+    fallback: `${firstName} ${lastName}`,
+  });
 
   const { error } = await supabase
     .from('drivers')

@@ -93,10 +93,14 @@ export function HotLapBoard({
   entries,
   currentSteamId,
   classFilter,
+  timeLabel = 'Lap Time',
 }: {
   entries: HotLapBoardEntry[];
   currentSteamId?: string | null;
   classFilter?: ClassFilter;
+  // Header for the time column. Defaults to "Lap Time"; the Hot Stint board
+  // passes "Stint Avg" since the value is a 5-lap average, not one lap.
+  timeLabel?: string;
 }) {
   const [uniqueOnly, setUniqueOnly] = useState(false);
   const [mineOnly, setMineOnly] = useState(false);
@@ -172,7 +176,7 @@ export function HotLapBoard({
                   </th>
                 ))}
                 <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-5 w-28 text-right">
-                  Lap Time
+                  {timeLabel}
                 </th>
               </tr>
             </thead>
