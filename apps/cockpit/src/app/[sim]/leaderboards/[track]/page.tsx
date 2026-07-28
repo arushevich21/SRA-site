@@ -6,8 +6,9 @@ import {
   toTrackSummary,
   toTrackTopEntry,
   acEvoManufacturerIconName,
+  acEvoManufacturerLogoUrl,
 } from '@/lib/leaderboard-tracks';
-import { getHotLapBoard } from '@/lib/acevo-hotlaps';
+import { getHotLapBoardByLayoutKey } from '@/lib/acevo-hotlaps';
 import { getCurrentSteamId } from '@/lib/current-driver';
 import { HotLapBoard } from '@/components/HotLapBoard';
 import { TrackHeader } from '@/components/TrackHeader';
@@ -68,17 +69,18 @@ export default async function TrackLeaderboardPage({
     );
   }
 
-  const track = findLeaderboardTrack(sim.game, trackSlugParam);
+  const track = await findLeaderboardTrack(sim.game, trackSlugParam);
   if (!track) notFound();
 
   const [entries, summary, currentSteamId] = await Promise.all([
-    getHotLapBoard(track.rawTrackName, track.emperorTrack),
+    getHotLapBoardByLayoutKey(track.layoutKey),
     toTrackSummary(track),
     getCurrentSteamId(),
   ]);
   const boardEntries = entries.map((entry) => ({
     ...entry,
     manufacturerIconName: acEvoManufacturerIconName(entry.carModel),
+    manufacturerLogoUrl: acEvoManufacturerLogoUrl(entry.carModel),
   }));
 
   return (

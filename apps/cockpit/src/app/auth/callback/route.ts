@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabase as adminClient } from '@/lib/supabase';
+import { computeDriverDisplayName } from '@/lib/driver-display-name';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -40,19 +41,35 @@ export async function GET(request: Request) {
     (user.user_metadata?.avatar_url as string | undefined) ?? null;
 
   if (discordId) {
-    // Check for an existing row (seeded or prior sign-in)
+    // Check for an existing row (seeded or prior sign-in) — pull the fields
+    // computeDriverDisplayName needs so a re-login recomputes from the
+    // driver's own structured name/number/champion status instead of
+    // blindly overwriting with Discord's raw name (which used to wipe out
+    // the "┊<number>" suffix and the champion's #1 on every sign-in).
     const { data: existing } = await adminClient
       .from('drivers')
-      .select('id')
+      .select('id, first_name, last_name, driver_number, is_champion')
       .eq('discord_id', discordId)
       .maybeSingle();
 
     if (existing) {
-      // Claim the seeded row: attach user_id, refresh display name + avatar.
-      // Does NOT touch steam_id — preserves pre-seeded value.
+      // Claim the seeded row: attach user_id, refresh avatar, recompute
+      // display name from the driver's own profile data (Discord's name is
+      // only the fallback for a driver who hasn't filled out first/last name
+      // yet). Does NOT touch steam_id — preserves pre-seeded value.
       const { error: updateErr } = await adminClient
         .from('drivers')
-        .update({ user_id: user.id, display_name: displayName, avatar_url: avatarUrl })
+        .update({
+          user_id: user.id,
+          display_name: computeDriverDisplayName({
+            firstName: existing.first_name,
+            lastName: existing.last_name,
+            driverNumber: existing.driver_number,
+            isChampion: existing.is_champion ?? false,
+            fallback: displayName,
+          }),
+          avatar_url: avatarUrl,
+        })
         .eq('discord_id', discordId);
 
       if (updateErr) {
