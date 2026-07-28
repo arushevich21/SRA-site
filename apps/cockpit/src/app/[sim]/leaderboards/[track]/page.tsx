@@ -9,7 +9,7 @@ import {
   acEvoManufacturerLogoUrl,
 } from '@/lib/leaderboard-tracks';
 import { getHotLapBoardByLayoutKey } from '@/lib/acevo-hotlaps';
-import { getCurrentSteamId } from '@/lib/current-driver';
+import { getCurrentDriverContext } from '@/lib/current-driver';
 import { HotLapBoard } from '@/components/HotLapBoard';
 import { TrackHeader } from '@/components/TrackHeader';
 import {
@@ -41,10 +41,10 @@ export default async function TrackLeaderboardPage({
     const track = await getAccTrack(trackSlugParam);
     if (!track) notFound();
 
-    const [leaderboardByCarGroup, topEntries, currentSteamId] = await Promise.all([
+    const [leaderboardByCarGroup, topEntries, currentDriver] = await Promise.all([
       getAccTrackLeaderboard(trackSlugParam),
       getAccTrackTopTimes(trackSlugParam, 1),
-      getCurrentSteamId(),
+      getCurrentDriverContext(),
     ]);
 
     return (
@@ -63,7 +63,10 @@ export default async function TrackLeaderboardPage({
 
         <AccTrackLeaderboard
           leaderboardByCarGroup={leaderboardByCarGroup}
-          currentSteamId={currentSteamId}
+          currentSteamId={currentDriver.steamId}
+          currentDivision={currentDriver.division}
+          trackKey={trackSlugParam}
+          variant="lap"
         />
       </section>
     );
@@ -72,10 +75,10 @@ export default async function TrackLeaderboardPage({
   const track = await findLeaderboardTrack(sim.game, trackSlugParam);
   if (!track) notFound();
 
-  const [entries, summary, currentSteamId] = await Promise.all([
+  const [entries, summary, currentDriver] = await Promise.all([
     getHotLapBoardByLayoutKey(track.layoutKey),
     toTrackSummary(track),
-    getCurrentSteamId(),
+    getCurrentDriverContext(),
   ]);
   const boardEntries = entries.map((entry) => ({
     ...entry,
@@ -97,7 +100,11 @@ export default async function TrackLeaderboardPage({
         fastestLap={entries[0] ? toTrackTopEntry(entries[0]) : null}
       />
 
-      <HotLapBoard entries={boardEntries} currentSteamId={currentSteamId} />
+      <HotLapBoard
+        entries={boardEntries}
+        currentSteamId={currentDriver.steamId}
+        currentDivision={currentDriver.division}
+      />
     </section>
   );
 }

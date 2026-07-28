@@ -17,6 +17,11 @@ export function computeDriverDisplayName(input: {
   // The reigning champion always displays #1, regardless of the real number
   // on file (driver_number stays their permanent number for standings/
   // registration — see supabase/migrations/20260730_driver_schema_cleanup.sql).
+  //
+  // No space anywhere around ┊ — matches the Discord bot's own convention
+  // exactly (confirmed against every bot-written display_name in the table,
+  // e.g. "Elyazid Boulahia┊877"). Adding a space here would only diverge from
+  // what the bot writes on its own next nickname sync.
   const number = input.isChampion ? 1 : input.driverNumber;
-  return number != null ? `${full} ┊${number}` : full;
+  return number != null ? `${full}┊${number}` : full;
 }

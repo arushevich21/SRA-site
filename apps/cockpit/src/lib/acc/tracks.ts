@@ -8,6 +8,18 @@ import type { AccHotLapEntry } from '@sra/shared-types';
 import type { TrackSummary, TrackTopEntry } from '../track-summary';
 import { supabase } from '../supabase';
 import { applySeasonFilter } from './seasons';
+import { getDriverInfoBySteamIds, driverInfoFor, stripSteamIdPrefix, type DriverInfo } from '../driver-lookup';
+import { classifyLapTier, type LapTier } from './reference-times';
+
+// AccHotLapEntry enriched with the driver's registered SRA number/nationality
+// (see lib/driver-lookup.ts) and its reference-time tier (see
+// lib/acc/reference-times.ts) — the app-layer read functions below populate
+// these from the drivers table and the curated GT3 reference times; the pure
+// aggregateAccHotLapLeaderboard in packages/domain (which also builds
+// AccHotLapEntry, from parsed sessions, with no DB/content access) never sees
+// them, so AccHotLapEntry itself stays a pure data-contract type. lapTier is
+// null for a non-GT3 car or a wet lap (no reference data for either).
+export type EnrichedAccHotLapEntry = AccHotLapEntry & DriverInfo & { lapTier: LapTier | null };
 
 export type AccTrack = {
   trackKey: string;
@@ -109,24 +121,27 @@ export function resolveCarGroup(carModelId: number | null): string {
   return (carModelId != null ? accCarClassName(carModelId) : null) ?? 'Other';
 }
 
-// A single "board" is one combination of the board-defining dimensions the
-// ingest keys on: board_scope + season + is_wet (see
+// A single "board" is one combination of board_scope + season (see
 // acc_hotlap_leaderboard's composite PK in
 // supabase/migrations/20260725b_acc_hotlap_drop_car_group.sql). The table
 // holds many boards per track; a query that pins only track_key silently
-// merges them and takes the fastest lap across every board — mixing seasons,
-// and mixing wet with dry. Every read MUST pin all three or it reports a
-// "best" that doesn't belong to the board being shown.
+// merges them and takes the fastest lap across every board — mixing seasons
+// together. Every read MUST pin both dimensions or it reports a "best" that
+// doesn't belong to the board being shown.
+//
+// is_wet is NOT filtered on: wet and dry laps appear together on the same
+// board, each driver's fastest time in a car winning regardless of
+// conditions (a wet lap only surfaces if it's their only time in that car —
+// see the dedup loops below).
 export type AccBoard = {
   scope: 'persistent' | 'seasonal';
   season: string; // '' for the persistent board; e.g. 'S19' for a seasonal one
-  isWet: boolean;
 };
 
-// The all-time, dry board — what the public track pages show. Ingest is
-// currently dry-only, and the persistent scope holds the backfilled all-time
-// bests (season='' by the migration's backfill default).
-export const PERSISTENT_DRY: AccBoard = { scope: 'persistent', season: '', isWet: false };
+// The all-time board — what the public track pages show (persistent scope
+// holds the backfilled all-time bests, season='' by the migration's backfill
+// default).
+export const PERSISTENT_DRY: AccBoard = { scope: 'persistent', season: '' };
 
 // Grouped by class since ACC times aren't comparable across classes. rank
 // isn't stored in the DB — it's derived here from the sorted position
@@ -135,14 +150,13 @@ export const PERSISTENT_DRY: AccBoard = { scope: 'persistent', season: '', isWet
 export async function getAccTrackLeaderboard(
   trackKey: string,
   board: AccBoard = PERSISTENT_DRY,
-): Promise<Record<string, AccHotLapEntry[]>> {
+): Promise<Record<string, EnrichedAccHotLapEntry[]>> {
   const { data, error } = await applySeasonFilter(
     supabase
       .from('acc_hotlap_leaderboard')
-      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
+      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms, is_wet')
       .eq('track_key', trackKey)
-      .eq('board_scope', board.scope)
-      .eq('is_wet', board.isWet),
+      .eq('board_scope', board.scope),
     board.season,
   ).order('best_lap_ms', { ascending: true });
 
@@ -151,12 +165,19 @@ export async function getAccTrackLeaderboard(
     return {};
   }
 
-  const byCarGroup: Record<string, AccHotLapEntry[]> = {};
-  // A merged season (e.g. S14 = S14 + S14-2) can hold two rows for the same
-  // (driver, car) — one per half. Rows arrive best-first, so keep the first
-  // seen per (steam_id, car_model_id) and drop the slower duplicate.
+  const rows = data ?? [];
+  const driverInfo = await getDriverInfoBySteamIds(
+    rows.map((row) => stripSteamIdPrefix(row.steam_id as string)),
+  );
+
+  const byCarGroup: Record<string, EnrichedAccHotLapEntry[]> = {};
+  // Wet and dry laps share one dedup key (steam_id, car_model_id) — rows
+  // arrive best-first, so a driver's fastest lap in a car wins regardless of
+  // conditions, and a merged season's (S14 = S14 + S14-2) duplicate half is
+  // dropped the same way. A wet lap only surfaces if it's the only lap that
+  // driver has in that car.
   const seen = new Set<string>();
-  for (const row of data ?? []) {
+  for (const row of rows) {
     const carModelId = row.car_model_id as number | null;
     const dedupKey = `${row.steam_id}:${carModelId}`;
     if (seen.has(dedupKey)) continue;
@@ -174,6 +195,10 @@ export async function getAccTrackLeaderboard(
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,
       sectorsMs: row.sectors_ms as number[] | null,
+      ...driverInfoFor(driverInfo, stripSteamIdPrefix(row.steam_id as string)),
+      // Reference times are GT3-only and dry-only — a wet lap still shows on
+      // the board, just without a tier badge.
+      lapTier: carGroup === 'GT3' && !row.is_wet ? classifyLapTier(bestLapMs, trackKey, 'lap') : null,
     });
   }
   return byCarGroup;
@@ -186,17 +211,16 @@ export async function getAccTrackTopTimes(
   trackKey: string,
   limit = 3,
   board: AccBoard = PERSISTENT_DRY,
-): Promise<AccHotLapEntry[]> {
+): Promise<EnrichedAccHotLapEntry[]> {
   // Over-fetch so that, after collapsing a merged season's (driver, car)
   // duplicates (see getAccTrackLeaderboard), we still have `limit` unique
   // entries to show. Harmless for unmerged boards (no dupes to drop).
   const { data, error } = await applySeasonFilter(
     supabase
       .from('acc_hotlap_leaderboard')
-      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
+      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms, is_wet')
       .eq('track_key', trackKey)
-      .eq('board_scope', board.scope)
-      .eq('is_wet', board.isWet),
+      .eq('board_scope', board.scope),
     board.season,
   )
     .order('best_lap_ms', { ascending: true })
@@ -207,24 +231,32 @@ export async function getAccTrackTopTimes(
     return [];
   }
 
+  const rows = data ?? [];
+  const driverInfo = await getDriverInfoBySteamIds(
+    rows.map((row) => stripSteamIdPrefix(row.steam_id as string)),
+  );
+
   const seen = new Set<string>();
-  const out: AccHotLapEntry[] = [];
-  for (const row of data ?? []) {
+  const out: EnrichedAccHotLapEntry[] = [];
+  for (const row of rows) {
     const carModelId = row.car_model_id as number | null;
     const dedupKey = `${row.steam_id}:${carModelId}`;
     if (seen.has(dedupKey)) continue;
     seen.add(dedupKey);
     const bestLapMs = row.best_lap_ms as number;
+    const carGroup = resolveCarGroup(carModelId);
     out.push({
       rank: out.length + 1,
       steamId: row.steam_id as string,
       driverName: row.driver_name as string,
-      carGroup: resolveCarGroup(carModelId),
+      carGroup,
       carModel: carModelId,
       carModelName: row.car_model as string | null,
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,
       sectorsMs: row.sectors_ms as number[] | null,
+      ...driverInfoFor(driverInfo, stripSteamIdPrefix(row.steam_id as string)),
+      lapTier: carGroup === 'GT3' && !row.is_wet ? classifyLapTier(bestLapMs, trackKey, 'lap') : null,
     });
     if (out.length >= limit) break;
   }
@@ -249,8 +281,7 @@ export async function getAccTrackStats(
         .from('acc_hotlap_leaderboard')
         .select('*', { count: 'exact', head: true })
         .eq('track_key', trackKey)
-        .eq('board_scope', board.scope)
-        .eq('is_wet', board.isWet),
+        .eq('board_scope', board.scope),
       board.season,
     ),
     applySeasonFilter(
@@ -258,8 +289,7 @@ export async function getAccTrackStats(
         .from('acc_hotlap_leaderboard')
         .select('updated_at')
         .eq('track_key', trackKey)
-        .eq('board_scope', board.scope)
-        .eq('is_wet', board.isWet),
+        .eq('board_scope', board.scope),
       board.season,
     )
       .order('updated_at', { ascending: false })
@@ -294,7 +324,7 @@ export function toTrackSummary(track: AccTrack): TrackSummary {
   };
 }
 
-export function toTrackTopEntry(entry: AccHotLapEntry): TrackTopEntry {
+export function toTrackTopEntry(entry: EnrichedAccHotLapEntry): TrackTopEntry {
   const iconName = entry.carModel != null ? accCarManufacturerIconName(entry.carModel) : null;
   return {
     rank: entry.rank,
@@ -307,5 +337,7 @@ export function toTrackTopEntry(entry: AccHotLapEntry): TrackTopEntry {
     manufacturerLogoUrl:
       !iconName && entry.carModel != null ? accCarManufacturerLogoUrl(entry.carModel) : null,
     bestLap: entry.bestLap,
+    driverNumber: entry.driverNumber,
+    country: entry.country,
   };
 }

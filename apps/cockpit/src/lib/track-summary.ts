@@ -21,4 +21,6 @@ export type TrackTopEntry = {
   manufacturerIconName: string | null; // an @cardog-icons/react IconName, pre-resolved by the caller
   manufacturerLogoUrl: string | null; // CDN fallback for manufacturers cardog-icons doesn't cover — null when manufacturerIconName is set
   bestLap: string;
+  driverNumber: number | null; // the driver's registered SRA number, from drivers.driver_number — null if unregistered/unlinked
+  country: string | null; // ISO 3166-1 alpha-2 nationality, from drivers.country — null if unset
 };

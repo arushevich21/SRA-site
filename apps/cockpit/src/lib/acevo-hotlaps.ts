@@ -11,6 +11,13 @@ import type { HotLapEntry, AcEvoSessionResult } from '@sra/shared-types';
 import { supabase } from './supabase';
 import { EMPEROR_ACEVO_BASE_URL } from './emperor';
 import { trackSlug, buildTrackKey, parseEmperorTrackLayout } from './track-slug';
+import { getDriverInfoBySteamIds, driverInfoFor, type DriverInfo } from './driver-lookup';
+
+// HotLapEntry enriched with the driver's registered SRA number/nationality
+// (see lib/driver-lookup.ts) — populated here, at the read boundary, not in
+// the pure aggregateHotLapLeaderboard (packages/domain, no DB access) that
+// originally builds the cached entries this function reads back.
+export type EnrichedHotLapEntry = HotLapEntry & DriverInfo;
 
 const STALE_MS = 10 * 60 * 1000;
 const LOCK_RECLAIM_MS = 5 * 60 * 1000;
@@ -35,7 +42,7 @@ export type IncrementalRefreshResult = {
 export async function getHotLapBoard(
   rawTrackName: string,
   emperorTrack?: string | null,
-): Promise<HotLapEntry[]> {
+): Promise<EnrichedHotLapEntry[]> {
   return getHotLapBoardByLayoutKey(buildTrackKey(rawTrackName, parseEmperorTrackLayout(emperorTrack)));
 }
 
@@ -43,7 +50,7 @@ export async function getHotLapBoard(
 // leaderboard list already has from track_layouts) — no raw-name/layout
 // round-trip needed. getHotLapBoard is the round-based wrapper for the
 // championship pages, which only know the "TrackName,Layout" string.
-export async function getHotLapBoardByLayoutKey(layoutKey: string): Promise<HotLapEntry[]> {
+export async function getHotLapBoardByLayoutKey(layoutKey: string): Promise<EnrichedHotLapEntry[]> {
   const { data, error } = await supabase
     .from('acevo_hotlap_cache_v2')
     .select('entries')
@@ -56,7 +63,11 @@ export async function getHotLapBoardByLayoutKey(layoutKey: string): Promise<HotL
 
   after(() => maybeRefresh());
 
-  return (data?.entries as HotLapEntry[] | undefined) ?? [];
+  const entries = (data?.entries as HotLapEntry[] | undefined) ?? [];
+  // AC Evo's cache already stores bare SteamID64 (no "S" prefix — unlike
+  // ACC's leaderboard tables), so no stripping needed before lookup.
+  const driverInfo = await getDriverInfoBySteamIds(entries.map((e) => e.steamId));
+  return entries.map((e) => ({ ...e, ...driverInfoFor(driverInfo, e.steamId) }));
 }
 
 export async function getRoundPoints(

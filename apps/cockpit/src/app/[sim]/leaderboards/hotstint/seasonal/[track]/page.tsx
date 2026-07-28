@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { getCurrentSteamId } from '@/lib/current-driver';
+import { getCurrentDriverContext } from '@/lib/current-driver';
 import { TrackHeader } from '@/components/TrackHeader';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
 import {
@@ -15,6 +15,7 @@ import {
   getHotStintSeasons,
   type AccStintBoard,
 } from '@/lib/acc/hotstint';
+import { hasWetSessionRows } from '@/lib/seasonal-leaderboard';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,13 +41,15 @@ export default async function SeasonalHotStintTrackPage({
     seasonParam && seasons.includes(seasonParam) ? seasonParam : (seasons[0] ?? null);
   if (!season) notFound();
 
-  const board: AccStintBoard = { scope: 'seasonal', season, isWet: false, qualifying: false };
+  const board: AccStintBoard = { scope: 'seasonal', season, qualifying: false };
 
-  const [leaderboardByCarGroup, topEntries, currentSteamId] = await Promise.all([
+  const [leaderboardByCarGroup, topEntries, currentDriver, isWet] = await Promise.all([
     getAccTrackHotStint(trackSlugParam, board),
     getAccTrackTopStints(trackSlugParam, 1, board),
-    getCurrentSteamId(),
+    getCurrentDriverContext(),
+    hasWetSessionRows('acc_hotstint_leaderboard', trackSlugParam, season, { qualifying: false }),
   ]);
+  const trackSummary = toAccTrackSummary(track);
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -58,14 +61,17 @@ export default async function SeasonalHotStintTrackPage({
       </Link>
 
       <TrackHeader
-        track={toAccTrackSummary(track)}
+        track={isWet ? { ...trackSummary, displayName: `${trackSummary.displayName} (Wet)` } : trackSummary}
         fastestLap={topEntries[0] ? toAccTrackTopEntry(topEntries[0]) : null}
       />
 
       <AccTrackLeaderboard
         leaderboardByCarGroup={leaderboardByCarGroup}
-        currentSteamId={currentSteamId}
+        currentSteamId={currentDriver.steamId}
+        currentDivision={currentDriver.division}
         timeLabel="Stint Avg"
+        trackKey={trackSlugParam}
+        variant="stint"
       />
     </section>
   );

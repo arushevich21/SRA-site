@@ -2,13 +2,7 @@ import Image from 'next/image';
 import { Icon, type IconName } from '@cardog-icons/react';
 import { FallbackLogoImage } from './FallbackLogoImage';
 import type { TrackSummary, TrackTopEntry } from '@/lib/track-summary';
-
-// Regional-indicator flag emoji render unreliably on Windows/Chrome (often
-// just the letters, or nothing) — an actual image is more portable. flagcdn.com
-// is a free public CDN keyed by ISO 3166-1 alpha-2 code.
-function countryFlagUrl(countryCode: string): string {
-  return `https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`;
-}
+import { countryFlagUrl } from '@/lib/country-flag';
 
 export function TrackHeader({
   track,
@@ -55,8 +49,28 @@ export function TrackHeader({
                 🏁 Fastest lap
               </span>
               <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
-                <span className="font-display font-bold text-[24px] sm:text-[32px] uppercase text-white leading-none truncate min-w-0">
-                  {fastestLap.driverName}
+                <span className="flex items-center gap-2 min-w-0">
+                  {fastestLap.driverNumber != null && (
+                    <span
+                      className="font-mono font-bold text-[16px] sm:text-[20px] shrink-0"
+                      style={{ color: 'var(--sim-accent)' }}
+                    >
+                      #{fastestLap.driverNumber}
+                    </span>
+                  )}
+                  {fastestLap.country && (
+                    <span className="relative w-5 h-[14px] sm:w-6 sm:h-[16px] shrink-0 overflow-hidden">
+                      <Image
+                        src={countryFlagUrl(fastestLap.country)}
+                        alt={fastestLap.country}
+                        fill
+                        className="object-cover"
+                      />
+                    </span>
+                  )}
+                  <span className="font-display font-bold text-[24px] sm:text-[32px] uppercase text-white leading-none truncate min-w-0">
+                    {fastestLap.driverName}
+                  </span>
                 </span>
                 <span
                   className="font-mono text-[26px] sm:text-[32px] tabular-nums leading-none shrink-0"

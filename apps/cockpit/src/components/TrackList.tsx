@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Icon, type IconName } from '@cardog-icons/react';
 import { FallbackLogoImage } from './FallbackLogoImage';
 import type { TrackSummary, TrackTopEntry } from '@/lib/track-summary';
+import { countryFlagUrl } from '@/lib/country-flag';
 
 export type TrackWithTopTimes = TrackSummary & {
   topTimes: TrackTopEntry[];
@@ -102,10 +103,31 @@ export function TrackList({
                   >
                     #{entry.rank}
                   </span>
-                  <span className="font-display font-semibold text-[14px] uppercase text-white truncate flex-1 min-w-0">
+                  {/* No driver number here — this card is already tight on
+                      width; the number still shows on the full board (see
+                      HotLapBoard). Flag stays, in its own fixed-width slot so
+                      rows still line up regardless of which ones have one. */}
+                  <span className="relative w-4 h-[11px] shrink-0 overflow-hidden">
+                    {entry.country && (
+                      <Image
+                        src={countryFlagUrl(entry.country)}
+                        alt={entry.country}
+                        fill
+                        className="object-cover"
+                      />
+                    )}
+                  </span>
+                  <span className="font-display font-semibold text-[14px] uppercase text-white truncate flex-1 min-w-[70px]">
                     {entry.driverName}
                   </span>
-                  <span className="hidden sm:flex relative w-5 h-5 shrink-0 items-center justify-center">
+                  {/* Logo only, no car-name text — this card is too tight to
+                      fit both a full car name and the driver name; the logo
+                      already identifies the manufacturer, and the full name
+                      is one click away on the track's own board. */}
+                  <span
+                    className="hidden sm:flex relative w-5 h-5 shrink-0 items-center justify-center"
+                    title={entry.carLabel ?? undefined}
+                  >
                     {entry.manufacturerIconName ? (
                       <Icon name={entry.manufacturerIconName as IconName} size={20} color="white" />
                     ) : (
@@ -113,9 +135,6 @@ export function TrackList({
                         <FallbackLogoImage src={entry.manufacturerLogoUrl} alt={entry.carLabel ?? ''} />
                       )
                     )}
-                  </span>
-                  <span className="hidden sm:block font-sans text-[12px] text-white/70 truncate w-[130px] shrink-0">
-                    {entry.carLabel ?? '—'}
                   </span>
                   <span
                     className="font-mono text-[13px] tabular-nums shrink-0"
