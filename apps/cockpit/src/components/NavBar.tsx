@@ -100,15 +100,14 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
     (c) => c.registrationKey && c.registrationOpen,
   );
 
-  // ACC leaderboards split into Hot Lap / (Seasonal) / (Endurance). The
-  // "Leaderboards" word opens the always-on Hot Lap board. Seasonal and
-  // Endurance each appear only once a championship of that type has released a
-  // round (endurance = formatTag "Endurance"). Other sims keep the champ list.
+  // ACC leaderboards split into four boards: Hot Lap, Hot Lap (Seasonal),
+  // Hot Stint, Hot Stint (Seasonal). The "Leaderboards" word opens the
+  // always-on Hot Lap board. The two Seasonal entries are always present for
+  // ACC (there's a deep history of seasonal boards, S7–S18); Endurance appears
+  // only once an endurance championship (formatTag "Endurance") releases a
+  // round. Other sims keep the per-championship list.
   const isEndurance = (c: ChampionshipContent) =>
     (c.formatTag ?? '').trim().toLowerCase() === 'endurance';
-  const hasSeasonal = champsForSim.some(
-    (c) => !isEndurance(c) && c.schedule.some((r) => r.hotlapReleased),
-  );
   const hasEndurance = champsForSim.some(
     (c) => isEndurance(c) && c.schedule.some((r) => r.hotlapReleased),
   );
@@ -120,9 +119,9 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
           clickParent: true,
           drop: [
             { label: 'Hot Lap', href: `/${sim.slug}/leaderboards` },
-            ...(hasSeasonal
-              ? [{ label: 'Hot Lap (Seasonal)', href: `/${sim.slug}/leaderboards/seasonal` }]
-              : []),
+            { label: 'Hot Lap (Seasonal)', href: `/${sim.slug}/leaderboards/seasonal` },
+            { label: 'Hot Stint', href: `/${sim.slug}/leaderboards/hotstint` },
+            { label: 'Hot Stint (Seasonal)', href: `/${sim.slug}/leaderboards/hotstint/seasonal` },
             ...(hasEndurance
               ? [{ label: 'Hot Lap (Endurance)', href: `/${sim.slug}/leaderboards/endurance` }]
               : []),

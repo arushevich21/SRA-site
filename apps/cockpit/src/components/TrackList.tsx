@@ -14,10 +14,21 @@ export type TrackWithTopTimes = TrackSummary & {
 export function TrackList({
   tracks,
   simSlug,
+  basePath,
+  linkQuery,
 }: {
   tracks: TrackWithTopTimes[];
   simSlug: string;
+  // Where each track card links. Defaults to the sim's Hot Lap track pages;
+  // the Hot Stint list passes `/${simSlug}/leaderboards/hotstint` so its cards
+  // open the stint detail page instead.
+  basePath?: string;
+  // Optional query string (without `?`) appended to each card href — the
+  // seasonal lists pass `season=S18` so the detail page knows which board.
+  linkQuery?: string;
 }) {
+  const hrefBase = basePath ?? `/${simSlug}/leaderboards`;
+  const suffix = linkQuery ? `?${linkQuery}` : '';
   if (tracks.length === 0) {
     return (
       <div className="border border-line/50 bg-carbon-2 px-8 py-12 text-center">
@@ -33,7 +44,7 @@ export function TrackList({
       {tracks.map((track) => (
         <Link
           key={track.trackKey}
-          href={`/${simSlug}/leaderboards/${track.trackKey}`}
+          href={`${hrefBase}/${track.trackKey}${suffix}`}
           className="group relative flex flex-col sm:flex-row sm:items-center min-h-[130px] px-4 sm:px-6 py-4 sm:py-5 gap-3 sm:gap-6 overflow-hidden border border-line hover:bg-carbon-2/60 transition-colors"
         >
           {/* Full-bleed darkened splash art */}

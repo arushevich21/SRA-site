@@ -7,6 +7,7 @@ import {
 import type { AccHotLapEntry } from '@sra/shared-types';
 import type { TrackSummary, TrackTopEntry } from '../track-summary';
 import { supabase } from '../supabase';
+import { applySeasonFilter } from './seasons';
 
 export type AccTrack = {
   trackKey: string;
@@ -17,51 +18,78 @@ export type AccTrack = {
   mapUrl: string | null; // track_layouts.map_url — curated, null until set
 };
 
-// Cut over to the shared tracks/track_layouts schema (see
-// supabase/migrations/20260722_shared_tracks_and_acevo_v2_cache.sql and
-// scripts/backfill-tracks-v2.ts) — acc_hotlap_leaderboard itself is
-// untouched (its track_key didn't change; ACC has no layout, so
-// layout_key === the same string acc_tracks used).
-type TrackLayoutRow = {
-  layout_key: string;
+// Track metadata is sourced from acc_tracks — the table the ingest actually
+// maintains, with a row and a working splash-art URL for every track that has
+// lap data (25+). An earlier cutover pointed these reads at the shared
+// track_layouts table, but that migration only backfilled 7 ACC tracks and
+// populated image URLs that 404 — so most tracks vanished from the list and
+// the few that showed had broken art. We keep track_layouts solely for its
+// curated display names (nicer than acc_tracks' raw placeholder for a handful
+// of tracks), overlaid on top.
+type AccTrackRow = {
+  track_key: string;
   display_name: string;
-  map_url: string | null;
-  tracks: { splash_art_url: string | null; country: string | null; location: string | null } | null;
+  splash_art_url: string | null;
+  country: string | null;
+  location: string | null;
 };
 
-function toAccTrack(row: TrackLayoutRow): AccTrack {
+// track_key -> curated display name, for the few tracks named in track_layouts.
+// Small (a handful of rows); used only to prettify names.
+async function getCuratedTrackNames(): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from('track_layouts')
+    .select('layout_key, display_name')
+    .eq('game', 'ACC');
+  if (error) {
+    console.error('ACC curated track-name lookup failed:', error);
+    return new Map();
+  }
+  return new Map((data ?? []).map((r) => [r.layout_key as string, r.display_name as string]));
+}
+
+// The track preview PHOTOS (photo_*.jpg) were lost when the old website's
+// static host was taken down — they 404 now and aren't coming back on their
+// own, so there's no background image. What survives on the CDN is the track
+// MAP graphic (map_*.png), which acc_tracks.splash_art_url currently holds; we
+// render it in the card's centered map slot (mapUrl), not as a stretched
+// background. Leaving splashArtUrl null until real photos are re-hosted.
+function toAccTrack(row: AccTrackRow, curatedNames: Map<string, string>): AccTrack {
   return {
-    trackKey: row.layout_key,
-    displayName: row.display_name,
-    splashArtUrl: row.tracks?.splash_art_url ?? null,
-    country: row.tracks?.country ?? null,
-    location: row.tracks?.location ?? null,
-    mapUrl: row.map_url ?? null,
+    trackKey: row.track_key,
+    displayName: curatedNames.get(row.track_key) ?? row.display_name,
+    splashArtUrl: null,
+    country: row.country ?? null,
+    location: row.location ?? null,
+    mapUrl: row.splash_art_url ?? null,
   };
 }
 
 export async function getAccTracks(): Promise<AccTrack[]> {
-  const { data, error } = await supabase
-    .from('track_layouts')
-    .select('layout_key, display_name, map_url, tracks(splash_art_url, country, location)')
-    .eq('game', 'ACC')
-    .order('display_name', { ascending: true });
+  const [{ data, error }, curatedNames] = await Promise.all([
+    supabase.from('acc_tracks').select('track_key, display_name, splash_art_url, country, location'),
+    getCuratedTrackNames(),
+  ]);
 
   if (error) {
     console.error('ACC tracks lookup failed:', error);
     return [];
   }
 
-  return ((data ?? []) as unknown as TrackLayoutRow[]).map(toAccTrack);
+  return ((data ?? []) as AccTrackRow[])
+    .map((row) => toAccTrack(row, curatedNames))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
 export async function getAccTrack(trackKey: string): Promise<AccTrack | null> {
-  const { data, error } = await supabase
-    .from('track_layouts')
-    .select('layout_key, display_name, map_url, tracks(splash_art_url, country, location)')
-    .eq('game', 'ACC')
-    .eq('layout_key', trackKey)
-    .maybeSingle();
+  const [{ data, error }, curatedNames] = await Promise.all([
+    supabase
+      .from('acc_tracks')
+      .select('track_key, display_name, splash_art_url, country, location')
+      .eq('track_key', trackKey)
+      .maybeSingle(),
+    getCuratedTrackNames(),
+  ]);
 
   if (error) {
     console.error(`ACC track lookup failed for "${trackKey}":`, error);
@@ -69,7 +97,7 @@ export async function getAccTrack(trackKey: string): Promise<AccTrack | null> {
   }
   if (!data) return null;
 
-  return toAccTrack(data as unknown as TrackLayoutRow);
+  return toAccTrack(data as AccTrackRow, curatedNames);
 }
 
 // Class (GT3/GT4/TCX/etc.) is never stored on acc_hotlap_leaderboard — it's
@@ -77,9 +105,28 @@ export async function getAccTrack(trackKey: string): Promise<AccTrack | null> {
 // packages/domain/src/acc/acc-constants.ts), derived fresh here rather than
 // trusted from a persisted column, so a future correction to that lookup
 // table takes effect immediately with no stale data anywhere to reconcile.
-function resolveCarGroup(carModelId: number | null): string {
+export function resolveCarGroup(carModelId: number | null): string {
   return (carModelId != null ? accCarClassName(carModelId) : null) ?? 'Other';
 }
+
+// A single "board" is one combination of the board-defining dimensions the
+// ingest keys on: board_scope + season + is_wet (see
+// acc_hotlap_leaderboard's composite PK in
+// supabase/migrations/20260725b_acc_hotlap_drop_car_group.sql). The table
+// holds many boards per track; a query that pins only track_key silently
+// merges them and takes the fastest lap across every board — mixing seasons,
+// and mixing wet with dry. Every read MUST pin all three or it reports a
+// "best" that doesn't belong to the board being shown.
+export type AccBoard = {
+  scope: 'persistent' | 'seasonal';
+  season: string; // '' for the persistent board; e.g. 'S19' for a seasonal one
+  isWet: boolean;
+};
+
+// The all-time, dry board — what the public track pages show. Ingest is
+// currently dry-only, and the persistent scope holds the backfilled all-time
+// bests (season='' by the migration's backfill default).
+export const PERSISTENT_DRY: AccBoard = { scope: 'persistent', season: '', isWet: false };
 
 // Grouped by class since ACC times aren't comparable across classes. rank
 // isn't stored in the DB — it's derived here from the sorted position
@@ -87,12 +134,17 @@ function resolveCarGroup(carModelId: number | null): string {
 // preserves that order per group).
 export async function getAccTrackLeaderboard(
   trackKey: string,
+  board: AccBoard = PERSISTENT_DRY,
 ): Promise<Record<string, AccHotLapEntry[]>> {
-  const { data, error } = await supabase
-    .from('acc_hotlap_leaderboard')
-    .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
-    .eq('track_key', trackKey)
-    .order('best_lap_ms', { ascending: true });
+  const { data, error } = await applySeasonFilter(
+    supabase
+      .from('acc_hotlap_leaderboard')
+      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
+      .eq('track_key', trackKey)
+      .eq('board_scope', board.scope)
+      .eq('is_wet', board.isWet),
+    board.season,
+  ).order('best_lap_ms', { ascending: true });
 
   if (error) {
     console.error(`ACC hot-lap leaderboard lookup failed for "${trackKey}":`, error);
@@ -100,8 +152,15 @@ export async function getAccTrackLeaderboard(
   }
 
   const byCarGroup: Record<string, AccHotLapEntry[]> = {};
+  // A merged season (e.g. S14 = S14 + S14-2) can hold two rows for the same
+  // (driver, car) — one per half. Rows arrive best-first, so keep the first
+  // seen per (steam_id, car_model_id) and drop the slower duplicate.
+  const seen = new Set<string>();
   for (const row of data ?? []) {
     const carModelId = row.car_model_id as number | null;
+    const dedupKey = `${row.steam_id}:${carModelId}`;
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
     const carGroup = resolveCarGroup(carModelId);
     const entries = byCarGroup[carGroup] ?? (byCarGroup[carGroup] = []);
     const bestLapMs = row.best_lap_ms as number;
@@ -126,24 +185,38 @@ export async function getAccTrackLeaderboard(
 export async function getAccTrackTopTimes(
   trackKey: string,
   limit = 3,
+  board: AccBoard = PERSISTENT_DRY,
 ): Promise<AccHotLapEntry[]> {
-  const { data, error } = await supabase
-    .from('acc_hotlap_leaderboard')
-    .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
-    .eq('track_key', trackKey)
+  // Over-fetch so that, after collapsing a merged season's (driver, car)
+  // duplicates (see getAccTrackLeaderboard), we still have `limit` unique
+  // entries to show. Harmless for unmerged boards (no dupes to drop).
+  const { data, error } = await applySeasonFilter(
+    supabase
+      .from('acc_hotlap_leaderboard')
+      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
+      .eq('track_key', trackKey)
+      .eq('board_scope', board.scope)
+      .eq('is_wet', board.isWet),
+    board.season,
+  )
     .order('best_lap_ms', { ascending: true })
-    .limit(limit);
+    .limit(limit * 2 + 6);
 
   if (error) {
     console.error(`ACC top-times lookup failed for "${trackKey}":`, error);
     return [];
   }
 
-  return (data ?? []).map((row, i) => {
+  const seen = new Set<string>();
+  const out: AccHotLapEntry[] = [];
+  for (const row of data ?? []) {
     const carModelId = row.car_model_id as number | null;
+    const dedupKey = `${row.steam_id}:${carModelId}`;
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
     const bestLapMs = row.best_lap_ms as number;
-    return {
-      rank: i + 1,
+    out.push({
+      rank: out.length + 1,
       steamId: row.steam_id as string,
       driverName: row.driver_name as string,
       carGroup: resolveCarGroup(carModelId),
@@ -152,8 +225,10 @@ export async function getAccTrackTopTimes(
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,
       sectorsMs: row.sectors_ms as number[] | null,
-    };
-  });
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
 }
 
 export type AccTrackStats = {
@@ -164,16 +239,29 @@ export type AccTrackStats = {
 // entriesCount = number of driver rows recorded at this track (across all
 // classes) — a proxy for "entries", not a distinct count of raw sessions.
 // lastUpdated = most recent updated_at across those rows.
-export async function getAccTrackStats(trackKey: string): Promise<AccTrackStats> {
+export async function getAccTrackStats(
+  trackKey: string,
+  board: AccBoard = PERSISTENT_DRY,
+): Promise<AccTrackStats> {
   const [countRes, latestRes] = await Promise.all([
-    supabase
-      .from('acc_hotlap_leaderboard')
-      .select('*', { count: 'exact', head: true })
-      .eq('track_key', trackKey),
-    supabase
-      .from('acc_hotlap_leaderboard')
-      .select('updated_at')
-      .eq('track_key', trackKey)
+    applySeasonFilter(
+      supabase
+        .from('acc_hotlap_leaderboard')
+        .select('*', { count: 'exact', head: true })
+        .eq('track_key', trackKey)
+        .eq('board_scope', board.scope)
+        .eq('is_wet', board.isWet),
+      board.season,
+    ),
+    applySeasonFilter(
+      supabase
+        .from('acc_hotlap_leaderboard')
+        .select('updated_at')
+        .eq('track_key', trackKey)
+        .eq('board_scope', board.scope)
+        .eq('is_wet', board.isWet),
+      board.season,
+    )
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
