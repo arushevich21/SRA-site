@@ -41,13 +41,17 @@ function Text({
 }
 
 function Area({
-  label, value, onChange, placeholder, rows = 3,
+  label, value, onChange, placeholder, rows = 3, action,
 }: {
   label: string; value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+  action?: React.ReactNode;
 }) {
   return (
     <label className={labelCls}>
-      {label}
+      <span className="flex items-center justify-between gap-3">
+        <span>{label}</span>
+        {action}
+      </span>
       <textarea className={`${inputCls} resize-y`} rows={rows} value={value} placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)} />
     </label>
@@ -85,6 +89,19 @@ function parseDiscord(s: string): { label: string; url: string }[] {
 }
 const discordToLines = (d: { label: string; url: string }[]) => d.map((x) => `${x.label} | ${x.url}`).join('\n');
 
+// Default link set for a new event. All three are site-relative so the block
+// renders them as <Link> (same tab); an absolute URL would open a new tab.
+// Schedule/Registration need the slug, so they only appear once one is typed.
+function defaultDiscordLines(game: string, slug: string): string {
+  const lines = ['Series Rules | /about/rules'];
+  const simSlug = SIMS.find((s) => s.game === game)?.slug;
+  if (simSlug && slug.trim()) {
+    const base = `/${simSlug}/championships/${slug.trim()}`;
+    lines.push(`Schedule | ${base}/calendar`, `Registration | ${base}/register`);
+  }
+  return lines.join('\n');
+}
+
 export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isEdit: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -96,12 +113,17 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
   // Raw text mirrors for the free-text list fields (rules/discord stay textareas)
   const [rulesRaw, setRulesRaw] = useState(arrToLines(initial.rulesBullets));
   const [discordRaw, setDiscordRaw] = useState(discordToLines(initial.discordLinks));
+  // Until the admin touches the discord field on a *new* event, it mirrors the
+  // defaults — so the slug/game they type upstream keeps the links correct.
+  const [discordEdited, setDiscordEdited] = useState(isEdit);
 
-  const set = <K extends keyof ChampionshipInput>(k: K, v: ChampionshipInput[K]) =>
+  const set =<K extends keyof ChampionshipInput>(k: K, v: ChampionshipInput[K]) =>
     setF((prev) => ({ ...prev, [k]: v }));
 
   // Game-scoped pick lists — recomputed when the selected game changes.
   const catalog = getGameCatalog(f.game);
+
+  const discordValue = discordEdited ? discordRaw : defaultDiscordLines(f.game, f.slug);
 
   function updateRound(i: number, patch: Partial<ChampionshipRoundInput>) {
     setF((prev) => ({ ...prev, rounds: prev.rounds.map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
@@ -147,7 +169,7 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
     const payload: ChampionshipInput = {
       ...f,
       rulesBullets: linesToArr(rulesRaw),
-      discordLinks: parseDiscord(discordRaw),
+      discordLinks: parseDiscord(discordValue),
     };
     startTransition(async () => {
       const res = await saveChampionship(payload);
@@ -220,8 +242,24 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
           placeholder="Saturdays" />
         <Area label="Rules bullets (one per line)" value={rulesRaw} onChange={setRulesRaw} rows={5}
           placeholder={'1–4 drivers per team\n3 divisions: Open, Silver, Bronze'} />
-        <Area label="Discord links (one per line: Label | https://url)" value={discordRaw} onChange={setDiscordRaw}
-          placeholder={'Series Rules | https://discord.com/...\nSchedule | /acc/championships/.../calendar'} />
+        <Area
+          label="Discord links (one per line: Label | https://url)"
+          value={discordValue}
+          onChange={(v) => { setDiscordEdited(true); setDiscordRaw(v); }}
+          rows={4}
+          placeholder={'Series Rules | https://discord.com/...\nSchedule | /acc/championships/.../calendar'}
+          action={
+            <button type="button"
+              onClick={() => { setDiscordEdited(false); setDiscordRaw(''); }}
+              className="font-mono text-[10px] tracking-[.15em] uppercase text-txt-3 hover:text-gold cursor-pointer">
+              Use defaults
+            </button>
+          }
+        />
+        <p className="font-sans text-[12px] text-txt-3 -mt-3">
+          Defaults follow the slug &amp; game above until you edit this field. Site-relative
+          paths (<code>/about/rules</code>) open in the same tab; full URLs open in a new one.
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <Text label="Results URL" value={f.resultsUrl} onChange={(v) => set('resultsUrl', v)}
             placeholder="https://thesimgrid.com/championships/22872" />

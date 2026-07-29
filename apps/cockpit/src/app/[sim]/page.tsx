@@ -80,7 +80,7 @@ export default async function SimOverviewPage({
         <div className="absolute inset-0 bg-gradient-to-t from-carbon via-carbon/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-carbon/60 to-transparent" />
 
-        <div className="relative z-10 h-full flex flex-col justify-end max-w-[1280px] mx-auto px-7 pb-12">
+        <div className="relative z-10 h-full flex flex-col justify-end max-w-[1280px] mx-auto px-5 sm:px-7 pb-12">
           <span
             className="font-mono text-[12px] tracking-[.3em] uppercase mb-3"
             style={{ color: simAccent }}
@@ -90,7 +90,10 @@ export default async function SimOverviewPage({
           <h1 className="font-display font-black text-[clamp(40px,6vw,72px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-3">
             <GameLabel game={sim.displayName} />
           </h1>
-          <p className="font-sans text-[16px] text-txt-2 leading-relaxed whitespace-nowrap">
+          {/* Single line on desktop by design; on narrow screens it must wrap
+              rather than run off the edge (body is overflow-x-hidden, so an
+              unwrapped line is silently clipped). */}
+          <p className="font-sans text-[15px] sm:text-[16px] text-txt-2 leading-relaxed sm:whitespace-nowrap">
             {sim.tagline}
           </p>
         </div>
@@ -99,7 +102,7 @@ export default async function SimOverviewPage({
       {/* ── EVENTS ─────────────────────────────────────────────────── */}
       {allChamps.length > 0 && (
         <section className="border-t border-line">
-          <div className="max-w-[1280px] mx-auto px-7 py-24">
+          <div className="max-w-[1280px] mx-auto px-5 sm:px-7 py-24">
             <span
               className="block font-mono text-[11px] tracking-[.35em] uppercase mb-3"
               style={{ color: simAccent }}
@@ -124,7 +127,7 @@ export default async function SimOverviewPage({
                       className="absolute left-0 top-0 bottom-0 w-[3px] transition-all group-hover:w-[5px]"
                       style={{ backgroundColor: simAccent }}
                     />
-                    <div className="px-7 py-6 flex gap-6 items-center flex-1">
+                    <div className="px-5 sm:px-7 py-6 flex gap-4 sm:gap-6 items-center flex-1">
                       {champ.logo && (
                         <Image
                           src={champ.logo}
@@ -139,10 +142,12 @@ export default async function SimOverviewPage({
                             truncated or wrapped): its wrapper is a container
                             and the font scales down from 20px only when the
                             card is too narrow for the longest titles. Status
-                            stays pinned right on the same line; the tag row
-                            sits on its own line beneath. */}
+                            is pinned right on the same line from `sm` up; on
+                            phones it drops below so the title keeps the full
+                            card width instead of scaling down to nothing. The
+                            tag row sits on its own line beneath and wraps. */}
                         <div className="mb-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
                             <div className="flex-1 min-w-0 @container">
                               <h3 className="font-display font-bold text-[min(20px,5.8cqw)] uppercase leading-tight text-txt whitespace-nowrap">
                                 {champ.title}
@@ -158,9 +163,9 @@ export default async function SimOverviewPage({
                               </span>
                             </span>
                           </div>
-                          <span className="mt-2 flex items-center gap-2 whitespace-nowrap">
+                          <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
                             <span
-                              className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[1px] border"
+                              className="font-mono text-[11px] tracking-[.25em] uppercase px-2 py-[1px] border whitespace-nowrap"
                               style={{
                                 color: simAccent,
                                 borderColor: `${simAccent}40`,
@@ -169,12 +174,12 @@ export default async function SimOverviewPage({
                               {champ.classTag}
                             </span>
                             {champ.formatTag && (
-                              <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line">
+                              <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line whitespace-nowrap">
                                 {champ.formatTag}
                               </span>
                             )}
                             {champ.eventType === 'exhibition' && (
-                              <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line">
+                              <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 px-2 py-[1px] border border-line whitespace-nowrap">
                                 Exhibition
                               </span>
                             )}
@@ -187,7 +192,7 @@ export default async function SimOverviewPage({
                         </p>
                       </div>
                     </div>
-                    <div className="px-7 py-3 border-t border-line/60 flex items-center justify-end">
+                    <div className="px-5 sm:px-7 py-3 border-t border-line/60 flex items-center justify-end">
                       <span className="font-mono text-[11px] tracking-[.2em] uppercase text-gold group-hover:text-gold-soft transition-colors flex items-center gap-2">
                         View Event →
                       </span>
