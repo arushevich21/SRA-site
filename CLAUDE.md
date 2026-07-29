@@ -118,7 +118,8 @@ Build order: (1) auth + identity, (2) division admin UI, (3) registration flow.
   is git-ignored. **gitleaks** runs as a pre-commit hook and in CI.
 - **Env vars** (in `.env.local` + Vercel, both Production and Preview):
   `GRIDOS_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`,
-  `SUPABASE_SERVICE_ROLE_KEY`. [VERIFY full current list.]
+  `SUPABASE_SERVICE_ROLE_KEY`, `DISCORD_INTEGRATION_WEBHOOK_URL` (optional —
+  unset disables the SRA-Bot nick/role resync nudge). [VERIFY full current list.]
 - **Windows/WSL:** avoid committing `*Zone.Identifier` NTFS metadata files
   (they break Windows checkouts — gitignored). Some pnpm/dev commands must run
   with `--filter cockpit` rather than from root.

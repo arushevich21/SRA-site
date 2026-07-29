@@ -6,6 +6,7 @@ import { getNumbersLocked } from '@/lib/settings';
 import { revalidatePath } from 'next/cache';
 import { isValidCountryCode } from '@/lib/countries';
 import { computeDriverDisplayName } from '@/lib/driver-display-name';
+import { notifyDiscordProfileUpdated } from '@/lib/discord-notify';
 
 const UNIQUE_VIOLATION = '23505';
 
@@ -90,7 +91,7 @@ export async function updateProfileDetails(
   // driver_number (other profile fields stay editable). Admins are exempt.
   const { data: caller } = await adminClient
     .from('drivers')
-    .select('is_admin, driver_number, is_champion')
+    .select('is_admin, driver_number, is_champion, discord_id')
     .eq('user_id', user.id)
     .maybeSingle();
 
@@ -133,6 +134,12 @@ export async function updateProfileDetails(
     }
     return { error: 'Failed to save. Please try again.' };
   }
+
+  // Name/number are exactly what the bot builds a Discord nickname from, so
+  // poke it to resync now rather than leaving the nick stale until the member
+  // happens to change something in the guild. Deliberately non-fatal: the row
+  // is already saved and a Discord outage must not fail the save.
+  await notifyDiscordProfileUpdated(caller?.discord_id);
 
   revalidatePath('/profile');
   return { success: true };
