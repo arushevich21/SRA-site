@@ -86,14 +86,21 @@ export function CalendarGrid({ events }: { events: CalendarGridEvent[] }) {
     const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
     const totalCells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
 
+    // Grid cells span the full visible range, including leading/trailing days
+    // from adjacent months — not just the current month — so events landing
+    // on those cells (e.g. Aug 1 shown in July's trailing row) still render.
     return Array.from({ length: totalCells }, (_, i) => {
-      const dayNum = i - firstWeekday + 1;
-      if (dayNum < 1 || dayNum > daysInMonth) return null;
+      const offset = i - firstWeekday + 1;
+      const cellDate = new Date(month.getFullYear(), month.getMonth(), offset);
+      const isCurrentMonth = offset >= 1 && offset <= daysInMonth;
       return {
-        day: dayNum,
+        day: cellDate.getDate(),
+        isCurrentMonth,
         dayEvents: placed.filter(
           ({ at }) =>
-            at.y === month.getFullYear() && at.m === month.getMonth() && at.d === dayNum,
+            at.y === cellDate.getFullYear() &&
+            at.m === cellDate.getMonth() &&
+            at.d === cellDate.getDate(),
         ),
       };
     });
@@ -153,7 +160,8 @@ export function CalendarGrid({ events }: { events: CalendarGridEvent[] }) {
       }
     >
       {cells.map((cell, i) => {
-        const isToday = cell != null && isCurrentMonth && cell.day === today.getDate();
+        const isToday =
+          cell.isCurrentMonth && isCurrentMonth && cell.day === today.getDate();
         return (
           <div
             key={i}
@@ -161,40 +169,40 @@ export function CalendarGrid({ events }: { events: CalendarGridEvent[] }) {
               'min-h-[92px] border-b border-r border-line/40 px-2 py-2',
               (i + 1) % 7 === 0 ? 'border-r-0' : '',
               isToday ? 'bg-gold/10' : '',
+              !cell.isCurrentMonth ? 'opacity-40' : '',
             ].join(' ')}
           >
-            {cell && (
-              <>
-                <span
+            <span
+              className={[
+                'font-mono text-[11px]',
+                isToday ? 'text-gold font-bold' : 'text-txt-3',
+              ].join(' ')}
+            >
+              {cell.day}
+            </span>
+            <div className="mt-1 flex flex-col gap-1">
+              {cell.dayEvents.map(({ event, at }, j) => (
+                <Link
+                  key={j}
+                  href={event.href}
+                  title={at.time ? `${event.title} · ${at.time}` : event.title}
                   className={[
-                    'font-mono text-[11px]',
-                    isToday ? 'text-gold font-bold' : 'text-txt-3',
+                    'block border-l-2 bg-panel-2 px-1.5 py-[3px] hover:bg-panel transition-colors',
+                    !cell.isCurrentMonth ? 'grayscale' : '',
                   ].join(' ')}
+                  style={{ borderColor: event.color ?? 'var(--color-gold)' }}
                 >
-                  {cell.day}
-                </span>
-                <div className="mt-1 flex flex-col gap-1">
-                  {cell.dayEvents.map(({ event, at }, j) => (
-                    <Link
-                      key={j}
-                      href={event.href}
-                      title={at.time ? `${event.title} · ${at.time}` : event.title}
-                      className="block border-l-2 bg-panel-2 px-1.5 py-[3px] hover:bg-panel transition-colors"
-                      style={{ borderColor: event.color ?? 'var(--color-gold)' }}
-                    >
-                      <span className="block truncate font-mono text-[10px] tracking-[.05em] uppercase text-txt-2 hover:text-gold">
-                        {event.title}
-                      </span>
-                      {at.time && (
-                        <span className="block truncate font-mono text-[9px] tracking-[.05em] text-txt-3">
-                          {at.time}
-                        </span>
-                      )}
-                    </Link>
-                  ))}
-                </div>
-              </>
-            )}
+                  <span className="block truncate font-mono text-[10px] tracking-[.05em] uppercase text-txt-2 hover:text-gold">
+                    {event.title}
+                  </span>
+                  {at.time && (
+                    <span className="block truncate font-mono text-[9px] tracking-[.05em] text-txt-3">
+                      {at.time}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
           </div>
         );
       })}
