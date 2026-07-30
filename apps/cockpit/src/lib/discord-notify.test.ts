@@ -49,6 +49,26 @@ describe('notifyDiscordProfileUpdated', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  // The easy misconfiguration: pasting the webhook id instead of its URL.
+  it('reports a non-URL value instead of attempting a request', async () => {
+    process.env.DISCORD_INTEGRATION_WEBHOOK_URL = '1021527577724190800';
+
+    await notifyDiscordProfileUpdated('123456789012345678');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalled();
+  });
+
+  it('warns when pointed at a webhook the bot ignores', async () => {
+    process.env.DISCORD_INTEGRATION_WEBHOOK_URL =
+      'https://discord.com/api/webhooks/999999999999999999/token';
+
+    await notifyDiscordProfileUpdated('123456789012345678');
+
+    expect(console.warn).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1); // still sent — the id may have changed
+  });
+
   // A Discord outage must never fail the profile save that triggered the nudge.
   it('swallows transport errors', async () => {
     process.env.DISCORD_INTEGRATION_WEBHOOK_URL = WEBHOOK;

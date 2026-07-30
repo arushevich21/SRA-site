@@ -28,6 +28,27 @@ const EXPECTED_WEBHOOK_ID = '1021527577724190800';
 const TIMEOUT_MS = 3000;
 
 /**
+ * Returns the webhook id if `raw` is a real Discord webhook URL, else null.
+ *
+ * Exists because the natural misconfiguration here — setting the var to the
+ * webhook *id* instead of its full URL — otherwise surfaces only as a generic
+ * "Invalid URL" from fetch, swallowed by the catch below, leaving no clue why
+ * Discord never updates.
+ */
+function webhookId(raw: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:') return null;
+  if (!/^(discord|discordapp)\.com$/.test(parsed.hostname)) return null;
+  const m = /^\/api(?:\/v\d+)?\/webhooks\/(\d+)\/[\w-]+$/.exec(parsed.pathname);
+  return m ? m[1] : null;
+}
+
+/**
  * Ask the bot to resync a member's nickname and division role.
  *
  * Never throws and never blocks longer than {@link TIMEOUT_MS}: a Discord
@@ -49,10 +70,18 @@ export async function notifyDiscordProfileUpdated(
     return;
   }
 
-  if (!url.includes(`/webhooks/${EXPECTED_WEBHOOK_ID}/`)) {
+  const configuredId = webhookId(url);
+  if (!configuredId) {
+    console.error(
+      '[discord-notify] DISCORD_INTEGRATION_WEBHOOK_URL is not a Discord webhook URL. ' +
+        'Expected https://discord.com/api/webhooks/<id>/<token> — the full URL, not just the id.',
+    );
+    return;
+  }
+  if (configuredId !== EXPECTED_WEBHOOK_ID) {
     console.warn(
-      `[discord-notify] DISCORD_INTEGRATION_WEBHOOK_URL is not webhook ${EXPECTED_WEBHOOK_ID}; ` +
-        'the bot will ignore this message.',
+      `[discord-notify] configured webhook is ${configuredId}, but the bot only reacts to ` +
+        `${EXPECTED_WEBHOOK_ID} (INTEGRATION_WH_ID); this message will be ignored.`,
     );
   }
 
