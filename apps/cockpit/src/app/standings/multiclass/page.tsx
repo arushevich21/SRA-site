@@ -1,7 +1,9 @@
 import Image from 'next/image';
 import { readStandings } from '../../../lib/standings-store';
 import { ClassStandingsTabs } from '../../../components/ClassStandingsTabs';
-export const dynamic = 'force-dynamic';
+
+// Purely admin-upload-backed (no live API) — static, busted on-demand by
+// revalidatePath in admin/standings/actions.ts when new standings are uploaded.
 
 const STANDINGS_KEY = '22872';
 

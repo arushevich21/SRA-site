@@ -1,7 +1,9 @@
 import Image from 'next/image';
 import { readStandings } from '../../lib/standings-store';
 import { GT3TeamStandings } from '../../components/GT3TeamStandings';
-export const dynamic = 'force-dynamic';
+
+// Purely admin-upload-backed (no live API) — static, busted on-demand by
+// revalidatePath in admin/standings/actions.ts when new standings are uploaded.
 
 const DIVISIONS = [1, 2, 3, 4] as const;
 

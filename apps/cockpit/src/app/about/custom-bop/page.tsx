@@ -2,7 +2,8 @@ import Image from 'next/image';
 import { Collapsible } from '@/components/Collapsible';
 import { getPublicBop, type PublicBopCar } from '@/lib/public-bop';
 
-export const dynamic = 'force-dynamic';
+// BoP table only changes via the admin BoP editor — static, busted on-demand
+// by revalidatePath in admin/bop/actions.ts.
 
 function cellColor(value: number | null): string {
   if (value === null || value === 0) return 'text-txt-3';

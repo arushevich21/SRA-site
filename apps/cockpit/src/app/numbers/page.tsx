@@ -2,7 +2,8 @@ import { supabase as adminClient } from '@/lib/supabase';
 import Link from 'next/link';
 import NumberChecker, { type TakenEntry } from './NumberChecker';
 
-export const dynamic = 'force-dynamic';
+// Registry only changes via admin actions — static, busted on-demand by
+// revalidatePath in admin/numbers/actions.ts.
 
 // Drivers pick a permanent number in this range. #1 is not stored — it's a
 // derived badge for the reigning D1 champion (drivers.is_champion), who keeps

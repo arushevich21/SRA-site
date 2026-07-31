@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 import { Hanken_Grotesk, Saira_Condensed, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
-import NavBar, { type NavUser } from '@/components/NavBar';
+import NavBar from '@/components/NavBar';
 import { SponsorsCarousel } from '@/components/SponsorsCarousel';
 import { Footer } from '@/components/Footer';
-import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getChampionships } from '@/lib/championships-store';
 
 const hanken = Hanken_Grotesk({
@@ -36,25 +35,6 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  let navUser: NavUser | null = null;
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (user) {
-      const { data: driver } = await supabase
-        .from('drivers')
-        .select('display_name, avatar_url')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (driver) navUser = driver;
-    }
-  } catch {
-    // Supabase env vars may be absent in preview/test builds — degrade gracefully.
-  }
-
   // Powers the per-sim championship dropdowns in the nav. Falls back to seed
   // content if the DB is unreachable/unseeded (see championships-store.ts).
   const championships = await getChampionships();
@@ -65,7 +45,7 @@ export default async function RootLayout({
       className={`${hanken.variable} ${saira.variable} ${mono.variable}`}
     >
       <body className="bg-carbon text-txt font-sans antialiased overflow-x-hidden min-h-screen flex flex-col">
-        <NavBar user={navUser} championships={championships} />
+        <NavBar championships={championships} />
         <main className="pt-[76px] flex-1">{children}</main>
         <SponsorsCarousel />
         <Footer />
