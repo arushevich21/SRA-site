@@ -249,6 +249,7 @@ export default function PrivacyPage() {
       <p className={BODY_TEXT}>The SRA website may use cookies and similar technologies to support:</p>
       <ul className={LIST}>
         <li>Account authentication</li>
+        <li>Email ID</li>
         <li>Website security</li>
         <li>Session management</li>
         <li>Website functionality</li>
