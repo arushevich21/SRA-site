@@ -3,6 +3,7 @@ import { Hanken_Grotesk, Saira_Condensed, JetBrains_Mono } from 'next/font/googl
 import './globals.css';
 import NavBar, { type NavUser } from '@/components/NavBar';
 import { SponsorsCarousel } from '@/components/SponsorsCarousel';
+import { Footer } from '@/components/Footer';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { getChampionships } from '@/lib/championships-store';
 
@@ -67,6 +68,7 @@ export default async function RootLayout({
         <NavBar user={navUser} championships={championships} />
         <main className="pt-[76px] flex-1">{children}</main>
         <SponsorsCarousel />
+        <Footer />
       </body>
     </html>
   );
