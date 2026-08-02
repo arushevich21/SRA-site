@@ -331,6 +331,19 @@ describe('aggregateAccHotLapLeaderboard', () => {
   it('returns empty array for no sessions', () => {
     expect(aggregateAccHotLapLeaderboard([])).toEqual([]);
   });
+
+  it('keeps a wet-session best and a dry-session best in the same car as separate entries', () => {
+    const sessions = [
+      { ...session([driverResult({ currentDriverSteamId: 'A', carModel: 1, bestLapMs: 120000, drivers: [{ firstName: 'Alice', lastName: null, steamId: 'A', shortName: null }] })]), isWetSession: true },
+      { ...session([driverResult({ currentDriverSteamId: 'A', carModel: 1, bestLapMs: 115000, drivers: [{ firstName: 'Alice', lastName: null, steamId: 'A', shortName: null }] })]), isWetSession: false },
+    ];
+    const board = aggregateAccHotLapLeaderboard(sessions);
+    expect(board).toHaveLength(2);
+    expect(board.map((e) => ({ isWetSession: e.isWetSession, bestLapMs: e.bestLapMs })).sort((a, b) => a.bestLapMs - b.bestLapMs)).toEqual([
+      { isWetSession: false, bestLapMs: 115000 },
+      { isWetSession: true, bestLapMs: 120000 },
+    ]);
+  });
 });
 
 describe('parseAccSession — average clean lap and metaDataRaw (260617 fixtures)', () => {

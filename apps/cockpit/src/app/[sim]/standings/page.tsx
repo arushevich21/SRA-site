@@ -5,7 +5,13 @@ import { getChampionships } from '@/lib/championships-store';
 import { ChampionshipStandingsBody } from '@/components/ChampionshipStandingsBody';
 import { GameLabel } from '@/components/GameLabel';
 
-export const dynamic = 'force-dynamic';
+// Standings change only when Emperor posts new race results or an admin
+// uploads standings (a few times a week at most) — a 5-minute ceiling keeps
+// pages cheap while admin uploads still bust the cache instantly via
+// revalidatePath (see admin/standings/actions.ts). Must be a literal — Next's
+// route segment config is statically extracted, not executed, so this can't
+// read from process.env/CACHE_REVALIDATE or any named constant.
+export const revalidate = 300;
 
 export default async function SimStandingsPage({
   params,

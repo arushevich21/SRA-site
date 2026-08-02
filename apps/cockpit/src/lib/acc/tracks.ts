@@ -195,6 +195,7 @@ export async function getAccTrackLeaderboard(
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,
       sectorsMs: row.sectors_ms as number[] | null,
+      isWetSession: row.is_wet as boolean,
       ...driverInfoFor(driverInfo, stripSteamIdPrefix(row.steam_id as string)),
       // Reference times are GT3-only and dry-only — a wet lap still shows on
       // the board, just without a tier badge.
@@ -255,6 +256,7 @@ export async function getAccTrackTopTimes(
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,
       sectorsMs: row.sectors_ms as number[] | null,
+      isWetSession: row.is_wet as boolean,
       ...driverInfoFor(driverInfo, stripSteamIdPrefix(row.steam_id as string)),
       lapTier: carGroup === 'GT3' && !row.is_wet ? classifyLapTier(bestLapMs, trackKey, 'lap') : null,
     });

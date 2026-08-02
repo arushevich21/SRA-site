@@ -3,7 +3,8 @@ import { getSimBySlug } from '@/content/sims';
 import { getChampionships } from '@/lib/championships-store';
 import { ChampionshipStandingsBody } from '@/components/ChampionshipStandingsBody';
 
-export const dynamic = 'force-dynamic';
+// See [sim]/standings/page.tsx — same mixed Emperor/admin-upload data source.
+export const revalidate = 300;
 
 export default async function ChampionshipStandingsPage({
   params,

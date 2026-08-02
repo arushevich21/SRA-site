@@ -5,7 +5,8 @@ import { GameLabel } from '@/components/GameLabel';
 import { hasSeasonalContent } from '@/lib/seasonal-leaderboard';
 // showEndurance is forced true here — you're on the endurance page.
 
-export const dynamic = 'force-dynamic';
+// See [sim]/leaderboards/page.tsx — same cron-driven refresh cadence.
+export const revalidate = 300;
 
 export default async function EnduranceLeaderboardsPage({
   params,

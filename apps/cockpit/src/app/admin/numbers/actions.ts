@@ -9,6 +9,7 @@ export async function setLock(locked: boolean): Promise<void> {
   await requireAdmin();
   await setNumbersLocked(locked);
   revalidatePath('/admin/numbers');
+  revalidatePath('/numbers');
 }
 
 // Toggle a driver's number immunity from purging (preserve_driver_number).
@@ -23,6 +24,7 @@ export async function setPreserve(
     .eq('id', driverId);
   if (error) throw new Error(error.message);
   revalidatePath('/admin/numbers');
+  revalidatePath('/numbers');
 }
 
 // Null the driver_number for the given drivers, re-verifying exemptions
@@ -57,5 +59,6 @@ export async function purgeNumbers(
   if (error) throw new Error(error.message);
 
   revalidatePath('/admin/numbers');
+  revalidatePath('/numbers');
   return { purged: safe.length };
 }

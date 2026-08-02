@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { getSimBySlug, SIMS, type SimConfig } from '@/content/sims';
 import { getStandingsKey, type ChampionshipContent } from '@/content/championships';
 import { GameLabel } from '@/components/GameLabel';
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 export type NavUser = {
   display_name: string | null;
@@ -182,20 +183,50 @@ function HamburgerIcon({ open }: { open: boolean }) {
 }
 
 export default function NavBar({
-  user,
   championships = [],
 }: {
-  user?: NavUser | null;
   championships?: ChampionshipContent[];
 }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [user, setUser] = useState<NavUser | null>(null);
   const pathname = usePathname();
   const { sim } = useSimContext();
   const nav = sim ? buildSimNav(sim, championships) : MAIN_NAV;
 
   // Close mobile menu on navigation
   useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  // Fetched client-side (not in the root server layout) so the auth cookie
+  // read doesn't force every public page into dynamic rendering — see
+  // layout.tsx. Re-runs on login/logout via onAuthStateChange so the chip
+  // updates without a full page reload.
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    let active = true;
+
+    async function loadUser() {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        if (active) setUser(null);
+        return;
+      }
+      const { data: driver } = await supabase
+        .from('drivers')
+        .select('display_name, avatar_url')
+        .eq('user_id', authUser.id)
+        .maybeSingle();
+      if (active) setUser(driver ?? null);
+    }
+
+    loadUser();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => loadUser());
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);

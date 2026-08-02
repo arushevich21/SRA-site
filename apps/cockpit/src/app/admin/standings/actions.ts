@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/require-admin';
 import { validateStandingsExport } from '../../../lib/standings-types';
 import { writeStandings, isValidStandingsKey } from '../../../lib/standings-store';
@@ -46,6 +47,11 @@ export async function uploadStandingsAction(formData: FormData): Promise<never> 
     const msg = err instanceof Error ? err.message : 'Unknown write error';
     redirectWithResult('error', `Failed to write file: ${msg}`);
   }
+
+  // Public standings pages are now static/ISR (see e.g. app/standings/page.tsx) —
+  // bust them immediately rather than waiting out the revalidate window. Keys
+  // don't map 1:1 to routes, so invalidate broadly like admin/events/actions.ts does.
+  revalidatePath('/', 'layout');
 
   redirectWithResult(
     'success',

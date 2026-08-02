@@ -247,12 +247,15 @@ export function aggregateAccHotLapLeaderboard(sessions: AccSessionResult[]): Acc
     for (const r of session.results) {
       const steamId = r.currentDriverSteamId;
       if (!steamId || r.bestLapMs == null || !r.carGroup) continue;
-      // Keyed by (steamId, carModel) — carGroup is a pure function of
-      // carModel (see accCarClassName), so including it in the key would be
-      // redundant; a driver's fastest lap in each car is tracked
-      // independently, so switching cars doesn't discard their best time in
-      // the one they left.
-      const key = `${steamId}:${r.carModel}`;
+      // Keyed by (steamId, carModel, isWetSession) — carGroup is a pure
+      // function of carModel (see accCarClassName), so including it in the
+      // key would be redundant; a driver's fastest lap in each car is
+      // tracked independently, so switching cars doesn't discard their best
+      // time in the one they left. Wet and dry bests are likewise kept
+      // independent — a wet-session lap shouldn't discard (or be discarded
+      // by) a driver's dry best in the same car (see
+      // acc_hotlap_leaderboard's composite PK).
+      const key = `${steamId}:${r.carModel}:${session.isWetSession}`;
       const existing = bestByKey.get(key);
       if (!existing || r.bestLapMs < existing.bestLapMs) {
         const driver = r.drivers.find((d) => d.steamId === steamId);
@@ -269,6 +272,7 @@ export function aggregateAccHotLapLeaderboard(sessions: AccSessionResult[]): Acc
           bestLapMs: r.bestLapMs,
           bestLap: msToLaptime(r.bestLapMs)!,
           sectorsMs: r.sectorsMs,
+          isWetSession: session.isWetSession,
         });
       }
     }

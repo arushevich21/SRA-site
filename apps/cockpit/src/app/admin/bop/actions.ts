@@ -50,5 +50,6 @@ export async function saveBop(entries: BopEntry[]): Promise<SaveBopResult> {
     .eq('id', 'default');
 
   revalidatePath('/admin/bop');
+  revalidatePath('/about/custom-bop');
   return { ok: true };
 }
