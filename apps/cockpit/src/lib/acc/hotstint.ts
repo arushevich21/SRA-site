@@ -71,6 +71,7 @@ function toStintEntry(
     bestLapMs: bestStintMs,
     bestLap: msToLaptime(bestStintMs)!,
     sectorsMs: row.sectors_ms,
+    isWetSession: row.is_wet,
     ...driverInfoFor(driverInfo, stripSteamIdPrefix(row.steam_id)),
     // Reference times are GT3-only and dry-only — a wet stint still shows,
     // just without a tier badge.

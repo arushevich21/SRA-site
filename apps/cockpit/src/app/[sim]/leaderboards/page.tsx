@@ -7,7 +7,11 @@ import { hasSeasonalContent, hasEnduranceReleased } from '@/lib/seasonal-leaderb
 import { getAccTracks, getAccTrackTopTimes, getAccTrackStats, toTrackSummary, toTrackTopEntry } from '@/lib/acc/tracks';
 import { getLeaderboardTracksWithTopTimes } from '@/lib/leaderboard-tracks';
 
-export const dynamic = 'force-dynamic';
+// Hotlaps refresh via a cron job every ~10 min (see api/cron/refresh-*-leaderboard) —
+// ISR ceiling here as a safety net; the cron busts this on-demand via revalidatePath.
+// Must be a literal — see [sim]/standings/page.tsx for why this can't read
+// CACHE_REVALIDATE from the environment.
+export const revalidate = 300;
 
 export default async function SimLeaderboardsPage({
   params,

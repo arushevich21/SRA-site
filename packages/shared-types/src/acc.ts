@@ -62,4 +62,5 @@ export type AccHotLapEntry = {
   bestLapMs: number;
   bestLap: string;
   sectorsMs: number[] | null;
+  isWetSession: boolean;
 };

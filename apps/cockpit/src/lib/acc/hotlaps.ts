@@ -262,17 +262,23 @@ async function upsertTrackAndLeaderboard(track: string, session: AccSessionResul
 
   const fresh = aggregateAccHotLapLeaderboard([session]);
 
+  // Cron only ever writes the persistent/dry-vs-wet board (season='') — never
+  // touch seasonal rows (those come from the one-time historical backfill),
+  // or a same-track seasonal row could be silently overwritten by this merge.
   const { data: existing, error: readErr } = await supabase
     .from('acc_hotlap_leaderboard')
-    .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms')
-    .eq('track_key', track);
+    .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms, is_wet')
+    .eq('track_key', track)
+    .eq('board_scope', 'persistent')
+    .eq('season', '');
   if (readErr) throw readErr;
 
-  // Keyed by (steamId, carModelId) — a driver's fastest lap in each car is
-  // tracked independently (see acc_hotlap_leaderboard's composite PK).
+  // Keyed by (steamId, carModelId, isWet) — a driver's fastest lap in each
+  // car is tracked independently, and their wet/dry bests in the same car are
+  // tracked independently too (see acc_hotlap_leaderboard's composite PK).
   const bestByKey = new Map(
     (existing ?? []).map((r) => [
-      `${r.steam_id}:${r.car_model_id}`,
+      `${r.steam_id}:${r.car_model_id}:${r.is_wet}`,
       {
         steamId: r.steam_id as string,
         driverName: r.driver_name as string,
@@ -280,12 +286,13 @@ async function upsertTrackAndLeaderboard(track: string, session: AccSessionResul
         carModelId: r.car_model_id as number | null,
         bestLapMs: r.best_lap_ms as number,
         sectorsMs: r.sectors_ms as number[] | null,
+        isWet: r.is_wet as boolean,
       },
     ]),
   );
 
   for (const entry of fresh) {
-    const key = `${entry.steamId}:${entry.carModel}`;
+    const key = `${entry.steamId}:${entry.carModel}:${entry.isWetSession}`;
     const prev = bestByKey.get(key);
     if (!prev || entry.bestLapMs < prev.bestLapMs) {
       bestByKey.set(key, {
@@ -295,6 +302,7 @@ async function upsertTrackAndLeaderboard(track: string, session: AccSessionResul
         carModelId: entry.carModel,
         bestLapMs: entry.bestLapMs,
         sectorsMs: entry.sectorsMs,
+        isWet: entry.isWetSession,
       });
     }
   }
@@ -307,12 +315,15 @@ async function upsertTrackAndLeaderboard(track: string, session: AccSessionResul
     car_model_id: e.carModelId,
     best_lap_ms: e.bestLapMs,
     sectors_ms: e.sectorsMs,
+    is_wet: e.isWet,
+    board_scope: 'persistent',
+    season: '',
     updated_at: new Date().toISOString(),
   }));
 
   const { error: writeErr } = await supabase
     .from('acc_hotlap_leaderboard')
-    .upsert(rows, { onConflict: 'track_key,steam_id,car_model_id' });
+    .upsert(rows, { onConflict: 'track_key,car_model_id,steam_id,board_scope,season,is_wet' });
   if (writeErr) throw writeErr;
 }
 

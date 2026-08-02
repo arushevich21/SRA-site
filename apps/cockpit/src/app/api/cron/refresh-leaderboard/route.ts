@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { refreshWithLock } from '@/lib/acevo-hotlaps';
 
 // Called by an external scheduler (e.g. cron-job.org) every ~10 minutes.
@@ -24,6 +25,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (result === null) {
     return NextResponse.json({ skipped: true, reason: 'refresh already in progress' }, { status: 200 });
   }
+
+  // Leaderboard pages are cached (revalidate = 300, see [sim]/leaderboards/*)
+  // — bust them now rather than waiting out the window.
+  if (result.processed > 0) revalidatePath('/', 'layout');
 
   return NextResponse.json({
     processed: result.processed,

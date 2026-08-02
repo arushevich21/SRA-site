@@ -7,7 +7,8 @@ import { hasSeasonalContent, hasEnduranceReleased } from '@/lib/seasonal-leaderb
 import { getAccTracks, toTrackSummary, toTrackTopEntry } from '@/lib/acc/tracks';
 import { getAccTrackTopStints, getAccStintTrackStats } from '@/lib/acc/hotstint';
 
-export const dynamic = 'force-dynamic';
+// See [sim]/leaderboards/page.tsx — same cron-driven refresh cadence.
+export const revalidate = 300;
 
 // Hot Stint track list — same track metadata and card layout as the Hot Lap
 // list, but the top-3 and entry counts come from acc_hotstint_leaderboard
