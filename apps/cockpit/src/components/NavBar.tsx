@@ -200,7 +200,12 @@ export default function NavBar({
   // Fetched client-side (not in the root server layout) so the auth cookie
   // read doesn't force every public page into dynamic rendering — see
   // layout.tsx. Re-runs on login/logout via onAuthStateChange so the chip
-  // updates without a full page reload.
+  // updates without a full page reload — but NavBar lives in the root layout
+  // and persists across client-side navigations, so a login/logout completed
+  // via a redirect chain that doesn't fire a SIGNED_IN/SIGNED_OUT event in
+  // *this* mounted instance (e.g. the tab was already on this page from
+  // before) would otherwise never be picked up. Re-checking on focus covers
+  // that case, same as SWR/React Query's revalidate-on-focus default.
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     let active = true;
@@ -221,10 +226,15 @@ export default function NavBar({
 
     loadUser();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => loadUser());
+    const onFocus = () => { if (document.visibilityState === 'visible') loadUser(); };
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
 
     return () => {
       active = false;
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
     };
   }, []);
 
@@ -398,11 +408,12 @@ export default function NavBar({
                 </form>
               </div>
             ) : (
-              <Link href="/auth/login" className="nav-signin">
+              // eslint-disable-next-line @next/next/no-html-link-for-pages
+              <a href="/auth/login" className="nav-signin">
                 <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
                   Sign In
                 </span>
-              </Link>
+              </a>
             )}
           </nav>
 
@@ -597,11 +608,12 @@ export default function NavBar({
               </form>
             </div>
           ) : (
-            <Link href="/auth/login" className="nav-signin self-start" onClick={close}>
+            // eslint-disable-next-line @next/next/no-html-link-for-pages
+            <a href="/auth/login" className="nav-signin self-start" onClick={close}>
               <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
                 Sign In
               </span>
-            </Link>
+            </a>
           )}
         </div>
       </div>
