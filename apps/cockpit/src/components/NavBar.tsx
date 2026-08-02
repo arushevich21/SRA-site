@@ -199,34 +199,51 @@ export default function NavBar({
 
   // Fetched client-side (not in the root server layout) so the auth cookie
   // read doesn't force every public page into dynamic rendering — see
-  // layout.tsx. Re-runs on login/logout via onAuthStateChange so the chip
-  // updates without a full page reload — but NavBar lives in the root layout
-  // and persists across client-side navigations, so a login/logout completed
-  // via a redirect chain that doesn't fire a SIGNED_IN/SIGNED_OUT event in
-  // *this* mounted instance (e.g. the tab was already on this page from
-  // before) would otherwise never be picked up. Re-checking on focus covers
-  // that case, same as SWR/React Query's revalidate-on-focus default.
+  // layout.tsx. onAuthStateChange fires an INITIAL_SESSION event immediately
+  // on subscribe (with the current session already resolved), so that alone
+  // covers the initial load and login/logout updates without a full page
+  // reload — deliberately NOT also calling supabase.auth.getUser() here:
+  // GoTrueClient serializes session calls behind an internal lock, and a
+  // getUser() call racing onAuthStateChange's own dispatch (which holds that
+  // lock while it runs) deadlocks the client permanently — confirmed via
+  // [navdebug] logging, which showed loadUser() entered twice and neither
+  // call ever resolved, no error, no network request even issued.
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     let active = true;
 
-    async function loadUser() {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        if (active) setUser(null);
-        return;
-      }
+    async function loadDriver(userId: string) {
       const { data: driver } = await supabase
         .from('drivers')
         .select('display_name, avatar_url')
-        .eq('user_id', authUser.id)
+        .eq('user_id', userId)
         .maybeSingle();
       if (active) setUser(driver ?? null);
     }
 
-    loadUser();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => loadUser());
-    const onFocus = () => { if (document.visibilityState === 'visible') loadUser(); };
+    function handleSession(session: { user: { id: string } } | null) {
+      if (!session?.user) {
+        if (active) setUser(null);
+        return;
+      }
+      loadDriver(session.user.id);
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleSession(session);
+    });
+
+    // NavBar lives in the root layout and persists across client-side
+    // navigations, so a login/logout that doesn't fire an auth event in
+    // *this* mounted instance (e.g. the tab was already open from before)
+    // would otherwise never be picked up. Re-checking on focus covers that,
+    // same as SWR/React Query's revalidate-on-focus default. Uses
+    // getSession() (local, no forced revalidation) rather than getUser() —
+    // see the lock note above.
+    const onFocus = () => {
+      if (document.visibilityState !== 'visible') return;
+      supabase.auth.getSession().then(({ data: { session } }) => handleSession(session));
+    };
     document.addEventListener('visibilitychange', onFocus);
     window.addEventListener('focus', onFocus);
 
