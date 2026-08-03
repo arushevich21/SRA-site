@@ -29,6 +29,12 @@ const CRON_REQUEST_INTERVAL_MS = 2_000;
 export type IncrementalRefreshResult = {
   processed: number;
   tracks: string[];
+  // layout_key values touched (the [sim]/leaderboards/[track] route param) —
+  // distinct from `tracks` (Emperor's raw track key, used by the legacy
+  // cache), since a raw track can map to more than one layout. Lets callers
+  // revalidate exactly the pages that changed instead of guessing from
+  // `tracks`. See dualWriteV2Cache.
+  layoutKeys: string[];
   durationMs: number;
   needsBackfill?: boolean;
 };
@@ -147,7 +153,7 @@ export async function refreshWithLock(): Promise<IncrementalRefreshResult | null
     return await runIncrementalRefresh();
   } catch (err) {
     console.error('AC Evo hot-lap incremental refresh failed:', err);
-    return { processed: 0, tracks: [], durationMs: 0 };
+    return { processed: 0, tracks: [], layoutKeys: [], durationMs: 0 };
   } finally {
     await releaseLock();
   }
@@ -186,7 +192,7 @@ async function runIncrementalRefresh(): Promise<IncrementalRefreshResult> {
 
   if (newEntries.length === 0) {
     console.log('AC Evo hot-lap refresh: nothing new');
-    return { processed: 0, tracks: [], durationMs: Date.now() - startedAt };
+    return { processed: 0, tracks: [], layoutKeys: [], durationMs: Date.now() - startedAt };
   }
 
   // Safety: if the entire page is new AND there are more pages, we're looking
@@ -197,10 +203,11 @@ async function runIncrementalRefresh(): Promise<IncrementalRefreshResult> {
       'AC Evo hot-lap refresh: entire page 0 is unprocessed with multiple pages — ' +
       'run scripts/backfill-acevo-hotlaps.ts locally to catch up.',
     );
-    return { processed: 0, tracks: [], durationMs: Date.now() - startedAt, needsBackfill: true };
+    return { processed: 0, tracks: [], layoutKeys: [], durationMs: Date.now() - startedAt, needsBackfill: true };
   }
 
   const processedTracks = new Set<string>();
+  const processedLayoutKeys = new Set<string>();
 
   for (const entry of newEntries) {
     try {
@@ -237,7 +244,7 @@ async function runIncrementalRefresh(): Promise<IncrementalRefreshResult> {
       // legacy path above. Never allowed to break the legacy write — a
       // failure here is logged and skipped, not thrown.
       try {
-        await dualWriteV2Cache(session, entry.date);
+        processedLayoutKeys.add(await dualWriteV2Cache(session, entry.date));
       } catch (v2Err) {
         console.error(`AC Evo v2 dual-write failed for "${entry.track}":`, v2Err);
       }
@@ -263,7 +270,12 @@ async function runIncrementalRefresh(): Promise<IncrementalRefreshResult> {
 
   const durationMs = Date.now() - startedAt;
   console.log(`AC Evo hot-lap refresh: done — ${newEntries.length} session(s) in ${Math.round(durationMs / 1000)}s`);
-  return { processed: newEntries.length, tracks: [...processedTracks], durationMs };
+  return {
+    processed: newEntries.length,
+    tracks: [...processedTracks],
+    layoutKeys: [...processedLayoutKeys],
+    durationMs,
+  };
 }
 
 // Keyed by (steamId, carModel) — same rationale as aggregateHotLapLeaderboard
@@ -379,7 +391,7 @@ async function updateRoundPointsCache(
 // never overwriting curated data — same ignoreDuplicates pattern as ACC's
 // upsertTrackAndLeaderboard), then writes the hot-lap cache and round-points
 // cache under the new layout_key.
-async function dualWriteV2Cache(session: AcEvoSessionResult, sessionDate: string): Promise<void> {
+async function dualWriteV2Cache(session: AcEvoSessionResult, sessionDate: string): Promise<string> {
   const baseTrackKey = trackSlug(session.track);
   const layoutKey = buildTrackKey(session.track, session.trackLayout);
   const displayName = session.trackLayout ? `${session.track} ${session.trackLayout}` : session.track;
@@ -425,4 +437,5 @@ async function dualWriteV2Cache(session: AcEvoSessionResult, sessionDate: string
   if (cacheErr) throw cacheErr;
 
   await updateRoundPointsCache('acevo_round_points_cache_v2', 'layout_key', layoutKey, [session]);
+  return layoutKey;
 }

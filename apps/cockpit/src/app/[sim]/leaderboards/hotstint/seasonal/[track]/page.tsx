@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { getCurrentDriverContext } from '@/lib/current-driver';
 import { TrackHeader } from '@/components/TrackHeader';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
 import {
@@ -43,10 +42,9 @@ export default async function SeasonalHotStintTrackPage({
 
   const board: AccStintBoard = { scope: 'seasonal', season, qualifying: false };
 
-  const [leaderboardByCarGroup, topEntries, currentDriver, isWet] = await Promise.all([
+  const [leaderboardByCarGroup, topEntries, isWet] = await Promise.all([
     getAccTrackHotStint(trackSlugParam, board),
     getAccTrackTopStints(trackSlugParam, 1, board),
-    getCurrentDriverContext(),
     hasWetSessionRows('acc_hotstint_leaderboard', trackSlugParam, season, { qualifying: false }),
   ]);
   const trackSummary = toAccTrackSummary(track);
@@ -67,8 +65,6 @@ export default async function SeasonalHotStintTrackPage({
 
       <AccTrackLeaderboard
         leaderboardByCarGroup={leaderboardByCarGroup}
-        currentSteamId={currentDriver.steamId}
-        currentDivision={currentDriver.division}
         timeLabel="Stint Avg"
         trackKey={trackSlugParam}
         variant="stint"

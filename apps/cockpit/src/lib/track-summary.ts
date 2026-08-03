@@ -24,3 +24,18 @@ export type TrackTopEntry = {
   driverNumber: number | null; // the driver's registered SRA number, from drivers.driver_number — null if unregistered/unlinked
   country: string | null; // ISO 3166-1 alpha-2 nationality, from drivers.country — null if unset
 };
+
+// The outright-fastest entry across every class-group bucket, for the
+// track-detail header's fastestLap. Each group already arrives sorted
+// (fastest first), so this is just a min over each group's own leader —
+// no separate query needed when the caller already fetched the full board.
+export function outrightFastest<T extends { bestLapMs: number }>(
+  byGroup: Record<string, T[]>,
+): T | null {
+  let best: T | null = null;
+  for (const group of Object.values(byGroup)) {
+    const first = group[0];
+    if (first && (!best || first.bestLapMs < best.bestLapMs)) best = first;
+  }
+  return best;
+}

@@ -26,13 +26,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ skipped: true, reason: 'refresh already in progress' }, { status: 200 });
   }
 
-  // Leaderboard pages are cached (revalidate = 300, see [sim]/leaderboards/*)
-  // — bust them now rather than waiting out the window.
-  if (result.processed > 0) revalidatePath('/', 'layout');
+  // Leaderboard pages are cached (see [sim]/leaderboards/*, [sim]/leaderboards/[track])
+  // — bust exactly what changed rather than the whole site or waiting out the
+  // window. layoutKeys (not `tracks`, Emperor's raw key) matches the actual
+  // [track] route param — see IncrementalRefreshResult in acevo-hotlaps.ts.
+  if (result.layoutKeys.length > 0) {
+    revalidatePath('/acevo/leaderboards');
+    for (const layoutKey of result.layoutKeys) {
+      revalidatePath(`/acevo/leaderboards/${layoutKey}`);
+    }
+  }
 
   return NextResponse.json({
     processed: result.processed,
     tracks: result.tracks,
+    layoutKeys: result.layoutKeys,
     durationMs: result.durationMs,
     ...(result.needsBackfill ? { needsBackfill: true } : {}),
   });

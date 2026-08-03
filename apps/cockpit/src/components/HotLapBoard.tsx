@@ -9,6 +9,7 @@ import { countryFlagUrl } from '@/lib/country-flag';
 import { LAP_TIER_BADGE, type LapTier, type ReferenceLegendEntry } from '@/lib/acc/reference-times';
 import { getDriverTierBadge, type DriverTier } from '@/lib/driver-tier-badge';
 import { stripSteamIdPrefix } from '@/lib/steam-id';
+import { useCurrentDriverContext } from '@/hooks/useCurrentDriverContext';
 
 const DIVISIONS = [1, 2, 3, 4] as const;
 
@@ -124,19 +125,11 @@ export type ClassFilter = {
 
 export function HotLapBoard({
   entries,
-  currentSteamId,
-  currentDivision,
   classFilter,
   timeLabel = 'Lap Time',
   referenceLegend,
 }: {
   entries: HotLapBoardEntry[];
-  currentSteamId?: string | null;
-  // The signed-in user's own registered division (drivers.division_id, via
-  // getCurrentDriverContext) — powers the "My Division" filter button.
-  // undefined/null (signed out, or no division assigned) disables that button
-  // but leaves the D1-D4 buttons usable by anyone.
-  currentDivision?: number | null;
   classFilter?: ClassFilter;
   // Header for the time column. Defaults to "Lap Time"; the Hot Stint board
   // passes "Stint Avg" since the value is a 5-lap average, not one lap.
@@ -149,6 +142,9 @@ export function HotLapBoard({
   // track/layout the GT3 sheet doesn't cover).
   referenceLegend?: ReferenceLegendEntry[] | null;
 }) {
+  // Fetched client-side (not passed down from a server-side cookie read) so
+  // this board can render on a static/ISR page — see useCurrentDriverContext.
+  const { steamId: currentSteamId, division: currentDivision } = useCurrentDriverContext();
   const [uniqueOnly, setUniqueOnly] = useState(false);
   const [mineOnly, setMineOnly] = useState(false);
   const [divisionFilter, setDivisionFilter] = useState<number | null>(null);

@@ -1,17 +1,28 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { getCurrentDriverContext } from '@/lib/current-driver';
 import { TrackHeader } from '@/components/TrackHeader';
 import {
   getAccTrack,
+  getAccTracks,
   toTrackSummary as toAccTrackSummary,
   toTrackTopEntry as toAccTrackTopEntry,
 } from '@/lib/acc/tracks';
-import { getAccTrackHotStint, getAccTrackTopStints } from '@/lib/acc/hotstint';
+import { getAccTrackHotStint } from '@/lib/acc/hotstint';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
+import { outrightFastest } from '@/lib/track-summary';
 
-export const dynamic = 'force-dynamic';
+// Hot Stint has no in-repo write path (populated externally, likely the
+// Discord bot) — no on-demand revalidation hook is possible here, so this
+// window is the actual freshness mechanism, not just a safety net.
+export const revalidate = 300;
+
+// See [sim]/leaderboards/[track]/page.tsx — same reasoning for pre-declaring
+// known tracks rather than relying on unverified on-demand ISR. ACC-only.
+export async function generateStaticParams(): Promise<{ sim: string; track: string }[]> {
+  const accTracks = await getAccTracks();
+  return accTracks.map((t) => ({ sim: 'acc', track: t.trackKey }));
+}
 
 // Per-track Hot Stint board (best 5-lap average, class-grouped). Mirrors the
 // Hot Lap track detail page but sources acc_hotstint_leaderboard and labels the
@@ -29,11 +40,8 @@ export default async function TrackHotStintPage({
   const track = await getAccTrack(trackSlugParam);
   if (!track) notFound();
 
-  const [leaderboardByCarGroup, topEntries, currentDriver] = await Promise.all([
-    getAccTrackHotStint(trackSlugParam),
-    getAccTrackTopStints(trackSlugParam, 1),
-    getCurrentDriverContext(),
-  ]);
+  const leaderboardByCarGroup = await getAccTrackHotStint(trackSlugParam);
+  const fastest = outrightFastest(leaderboardByCarGroup);
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -46,13 +54,11 @@ export default async function TrackHotStintPage({
 
       <TrackHeader
         track={toAccTrackSummary(track)}
-        fastestLap={topEntries[0] ? toAccTrackTopEntry(topEntries[0]) : null}
+        fastestLap={fastest ? toAccTrackTopEntry(fastest) : null}
       />
 
       <AccTrackLeaderboard
         leaderboardByCarGroup={leaderboardByCarGroup}
-        currentSteamId={currentDriver.steamId}
-        currentDivision={currentDriver.division}
         timeLabel="Stint Avg"
         trackKey={trackSlugParam}
         variant="stint"

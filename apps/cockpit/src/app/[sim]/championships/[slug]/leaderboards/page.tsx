@@ -3,7 +3,10 @@ import { getSimBySlug } from '@/content/sims';
 import { getChampionships } from '@/lib/championships-store';
 import { ChampionshipLeaderboardsBody } from '@/components/ChampionshipLeaderboardsBody';
 
-export const dynamic = 'force-dynamic';
+// AC Evo hot laps refresh via cron (see api/cron/refresh-leaderboard), which
+// revalidates the matching [sim]/leaderboards/[track] paths on-demand — this
+// ceiling is a safety net, not the primary freshness mechanism.
+export const revalidate = 3600;
 
 export default async function ChampionshipLeaderboardsPage({
   params,
