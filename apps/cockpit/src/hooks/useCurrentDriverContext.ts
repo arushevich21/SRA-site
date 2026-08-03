@@ -16,6 +16,14 @@ const SIGNED_OUT: CurrentDriverContext = { steamId: null, division: null };
 // static/ISR instead of being forced dynamic by an auth cookie read. Same
 // pattern as NavBar's signed-in chip. Re-fetches on login/logout via
 // onAuthStateChange.
+//
+// Uses getSession() (trusts the local session, no round-trip to Supabase's
+// Auth server) rather than getUser() (always revalidates server-side) —
+// deliberately, since this only drives cosmetic personalization (row
+// highlight, filter buttons), not an authorization decision. The one real
+// data access here (the drivers row) stays safe regardless, via RLS
+// (drivers_select_own: auth.uid() = user_id) — a stale/wrong id from here
+// can never read another driver's row, just fail to match one.
 export function useCurrentDriverContext(): CurrentDriverContext {
   const [context, setContext] = useState<CurrentDriverContext>(SIGNED_OUT);
 
@@ -25,8 +33,9 @@ export function useCurrentDriverContext(): CurrentDriverContext {
 
     async function load() {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) {
         if (active) setContext(SIGNED_OUT);
         return;
