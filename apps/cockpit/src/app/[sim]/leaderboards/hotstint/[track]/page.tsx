@@ -4,7 +4,6 @@ import { getSimBySlug } from '@/content/sims';
 import { TrackHeader } from '@/components/TrackHeader';
 import {
   getAccTrack,
-  getAccTracks,
   toTrackSummary as toAccTrackSummary,
   toTrackTopEntry as toAccTrackTopEntry,
 } from '@/lib/acc/tracks';
@@ -12,17 +11,9 @@ import { getAccTrackHotStint } from '@/lib/acc/hotstint';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
 import { outrightFastest } from '@/lib/track-summary';
 
-// Hot Stint has no in-repo write path (populated externally, likely the
-// Discord bot) — no on-demand revalidation hook is possible here, so this
-// window is the actual freshness mechanism, not just a safety net.
-export const revalidate = 300;
-
-// See [sim]/leaderboards/[track]/page.tsx — same reasoning for pre-declaring
-// known tracks rather than relying on unverified on-demand ISR. ACC-only.
-export async function generateStaticParams(): Promise<{ sim: string; track: string }[]> {
-  const accTracks = await getAccTracks();
-  return accTracks.map((t) => ({ sim: 'acc', track: t.trackKey }));
-}
+// See [sim]/leaderboards/[track]/page.tsx — reverted to force-dynamic for the
+// same reason (ISR page-size limit forced capping entries, stopgap only).
+export const dynamic = 'force-dynamic';
 
 // Per-track Hot Stint board (best 5-lap average, class-grouped). Mirrors the
 // Hot Lap track detail page but sources acc_hotstint_leaderboard and labels the

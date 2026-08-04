@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import {
   findLeaderboardTrack,
-  getLeaderboardTracks,
   toTrackSummary,
   toTrackTopEntry,
   acEvoManufacturerIconName,
@@ -14,7 +13,6 @@ import { HotLapBoard } from '@/components/HotLapBoard';
 import { TrackHeader } from '@/components/TrackHeader';
 import {
   getAccTrack,
-  getAccTracks,
   getAccTrackLeaderboard,
   toTrackSummary as toAccTrackSummary,
   toTrackTopEntry as toAccTrackTopEntry,
@@ -22,29 +20,15 @@ import {
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
 import { outrightFastest } from '@/lib/track-summary';
 
-// Hot-lap data refreshes via cron (see api/cron/refresh-*-leaderboard), which
-// revalidates this exact path on-demand for whichever track(s) it touched —
-// this ceiling is just a safety net, not the primary freshness mechanism.
-export const revalidate = 300;
-
-// Pre-declared so these paths are genuinely prerendered/ISR-cached rather than
-// relying on on-demand generation for a segment with dynamicParams left at
-// its default (true) — verified locally that on-demand generation for an
-// unenumerated dynamic segment doesn't show up as cached under `next start`,
-// and there was no reliable way to confirm from here whether that's just a
-// local-server limitation or also true on Vercel. Explicitly listing every
-// known track removes that uncertainty; dynamicParams stays true by default,
-// so a track added after a deploy still renders (uncached) rather than 404s.
-export async function generateStaticParams(): Promise<{ sim: string; track: string }[]> {
-  const [accTracks, acevoTracks] = await Promise.all([
-    getAccTracks(),
-    getLeaderboardTracks('AC Evo'),
-  ]);
-  return [
-    ...accTracks.map((t) => ({ sim: 'acc', track: t.trackKey })),
-    ...acevoTracks.map((t) => ({ sim: 'acevo', track: t.slug })),
-  ];
-}
+// Reverted to force-dynamic: caching this route (ISR + generateStaticParams)
+// required capping entries per class to stay under Vercel's ISR page-size
+// limit (a busy track's full history serializes way past 19.07MB — see git
+// history for the numbers). Un-caching removes the build-time size check so
+// the site deploys again with every lap time shown, uncapped. This is a
+// stopgap, not a fix — a real solution (e.g. capped+cached initial render
+// with a "load more" fetched client-side) is still needed; see conversation/
+// PR notes.
+export const dynamic = 'force-dynamic';
 
 export default async function TrackLeaderboardPage({
   params,
