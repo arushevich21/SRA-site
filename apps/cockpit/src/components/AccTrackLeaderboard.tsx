@@ -42,17 +42,11 @@ function toHotLapEntry(entry: AccBoardEntry): HotLapBoardEntry {
 
 export function AccTrackLeaderboard({
   leaderboardByCarGroup,
-  currentSteamId,
-  currentDivision,
   timeLabel,
   trackKey,
   variant,
 }: {
   leaderboardByCarGroup: Record<string, AccBoardEntry[]>;
-  currentSteamId?: string | null;
-  // The signed-in user's own division — powers HotLapBoard's "My Division"
-  // filter button. See getCurrentDriverContext in lib/current-driver.ts.
-  currentDivision?: number | null;
   // Forwarded to HotLapBoard's time-column header — "Stint Avg" for the Hot
   // Stint board, default "Lap Time" otherwise.
   timeLabel?: string;
@@ -87,8 +81,6 @@ export function AccTrackLeaderboard({
   return (
     <HotLapBoard
       entries={entries.map(toHotLapEntry)}
-      currentSteamId={currentSteamId}
-      currentDivision={currentDivision}
       timeLabel={timeLabel}
       referenceLegend={referenceLegend}
       classFilter={{ options: [ALL_CLASSES, ...classes], selected: selectedClass, onChange: setSelectedClass }}

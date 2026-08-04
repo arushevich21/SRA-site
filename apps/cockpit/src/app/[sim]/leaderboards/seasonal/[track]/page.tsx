@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { getCurrentDriverContext } from '@/lib/current-driver';
 import { TrackHeader } from '@/components/TrackHeader';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
 import {
@@ -40,10 +39,9 @@ export default async function SeasonalTrackPage({
 
   const board: AccBoard = { scope: 'seasonal', season };
 
-  const [leaderboardByCarGroup, topEntries, currentDriver, isWet] = await Promise.all([
+  const [leaderboardByCarGroup, topEntries, isWet] = await Promise.all([
     getAccTrackLeaderboard(trackSlugParam, board),
     getAccTrackTopTimes(trackSlugParam, 1, board),
-    getCurrentDriverContext(),
     hasWetSessionRows('acc_hotlap_leaderboard', trackSlugParam, season),
   ]);
   const trackSummary = toAccTrackSummary(track);
@@ -64,8 +62,6 @@ export default async function SeasonalTrackPage({
 
       <AccTrackLeaderboard
         leaderboardByCarGroup={leaderboardByCarGroup}
-        currentSteamId={currentDriver.steamId}
-        currentDivision={currentDriver.division}
         trackKey={trackSlugParam}
         variant="lap"
       />

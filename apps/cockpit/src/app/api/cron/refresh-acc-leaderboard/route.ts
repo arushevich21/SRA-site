@@ -42,9 +42,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ skipped: true, reason: 'refresh already in progress' }, { status: 200 });
   }
 
-  // Leaderboard pages are cached (revalidate = 300, see [sim]/leaderboards/*)
-  // — bust them now rather than waiting out the window.
-  if (result.processed > 0) revalidatePath('/', 'layout');
+  // Leaderboard pages are cached (see [sim]/leaderboards/*, [sim]/leaderboards/[track])
+  // — bust exactly what changed rather than the whole site or waiting out the
+  // window. This only touches acc_hotlap_leaderboard, not hot-stint (that's
+  // written externally — see [sim]/leaderboards/hotstint/[track]/page.tsx).
+  if (result.tracks.length > 0) {
+    revalidatePath('/acc/leaderboards');
+    for (const track of result.tracks) {
+      revalidatePath(`/acc/leaderboards/${track}`);
+    }
+  }
 
   return NextResponse.json({
     processed: result.processed,

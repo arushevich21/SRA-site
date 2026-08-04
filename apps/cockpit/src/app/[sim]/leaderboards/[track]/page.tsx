@@ -9,18 +9,25 @@ import {
   acEvoManufacturerLogoUrl,
 } from '@/lib/leaderboard-tracks';
 import { getHotLapBoardByLayoutKey } from '@/lib/acevo-hotlaps';
-import { getCurrentDriverContext } from '@/lib/current-driver';
 import { HotLapBoard } from '@/components/HotLapBoard';
 import { TrackHeader } from '@/components/TrackHeader';
 import {
   getAccTrack,
   getAccTrackLeaderboard,
-  getAccTrackTopTimes,
   toTrackSummary as toAccTrackSummary,
   toTrackTopEntry as toAccTrackTopEntry,
 } from '@/lib/acc/tracks';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
+import { outrightFastest } from '@/lib/track-summary';
 
+// Reverted to force-dynamic: caching this route (ISR + generateStaticParams)
+// required capping entries per class to stay under Vercel's ISR page-size
+// limit (a busy track's full history serializes way past 19.07MB — see git
+// history for the numbers). Un-caching removes the build-time size check so
+// the site deploys again with every lap time shown, uncapped. This is a
+// stopgap, not a fix — a real solution (e.g. capped+cached initial render
+// with a "load more" fetched client-side) is still needed; see conversation/
+// PR notes.
 export const dynamic = 'force-dynamic';
 
 export default async function TrackLeaderboardPage({
@@ -41,11 +48,8 @@ export default async function TrackLeaderboardPage({
     const track = await getAccTrack(trackSlugParam);
     if (!track) notFound();
 
-    const [leaderboardByCarGroup, topEntries, currentDriver] = await Promise.all([
-      getAccTrackLeaderboard(trackSlugParam),
-      getAccTrackTopTimes(trackSlugParam, 1),
-      getCurrentDriverContext(),
-    ]);
+    const leaderboardByCarGroup = await getAccTrackLeaderboard(trackSlugParam);
+    const fastest = outrightFastest(leaderboardByCarGroup);
 
     return (
       <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -58,13 +62,11 @@ export default async function TrackLeaderboardPage({
 
         <TrackHeader
           track={toAccTrackSummary(track)}
-          fastestLap={topEntries[0] ? toAccTrackTopEntry(topEntries[0]) : null}
+          fastestLap={fastest ? toAccTrackTopEntry(fastest) : null}
         />
 
         <AccTrackLeaderboard
           leaderboardByCarGroup={leaderboardByCarGroup}
-          currentSteamId={currentDriver.steamId}
-          currentDivision={currentDriver.division}
           trackKey={trackSlugParam}
           variant="lap"
         />
@@ -75,10 +77,9 @@ export default async function TrackLeaderboardPage({
   const track = await findLeaderboardTrack(sim.game, trackSlugParam);
   if (!track) notFound();
 
-  const [entries, summary, currentDriver] = await Promise.all([
+  const [entries, summary] = await Promise.all([
     getHotLapBoardByLayoutKey(track.layoutKey),
     toTrackSummary(track),
-    getCurrentDriverContext(),
   ]);
   const boardEntries = entries.map((entry) => ({
     ...entry,
@@ -100,11 +101,7 @@ export default async function TrackLeaderboardPage({
         fastestLap={entries[0] ? toTrackTopEntry(entries[0]) : null}
       />
 
-      <HotLapBoard
-        entries={boardEntries}
-        currentSteamId={currentDriver.steamId}
-        currentDivision={currentDriver.division}
-      />
+      <HotLapBoard entries={boardEntries} />
     </section>
   );
 }

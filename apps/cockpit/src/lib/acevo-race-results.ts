@@ -2,6 +2,7 @@ import { EmperorClient } from '@sra/emperor-client';
 import { parseAcEvoSession } from '@sra/domain';
 import type { AcEvoSessionResult, AcEvoSessionType } from '@sra/shared-types';
 import { EMPEROR_ACEVO_BASE_URL } from './emperor';
+import { supabase } from './supabase';
 
 const FETCH_TIMEOUT_MS = 15000;
 // Newest-first pages (confirmed in scripts/check-emperor-page-order.ts). A
@@ -35,6 +36,42 @@ export type AcEvoSessionFetchResult =
   | { ok: true; data: AcEvoSessionResult | null }
   | { ok: false; error: string };
 
+// A completed round's results never change once posted, so this is a pure
+// cache-aside read: a hit skips Emperor entirely, and only a genuine miss (no
+// cached row) falls through to the live scan below. A round with no results
+// yet is never written here, so it keeps getting checked until one exists —
+// see supabase/migrations/20260802_acevo_race_results_cache.sql.
+async function getCachedSessionResult(
+  trackKey: string,
+  sessionType: AcEvoSessionType,
+): Promise<AcEvoSessionResult | undefined> {
+  const { data, error } = await supabase
+    .from('acevo_race_results_cache')
+    .select('session_result')
+    .eq('track_key', trackKey)
+    .eq('session_type', sessionType)
+    .maybeSingle();
+  if (error) {
+    console.error(`AC Evo results cache read failed for "${trackKey}"/${sessionType}:`, error);
+    return undefined;
+  }
+  return (data?.session_result as AcEvoSessionResult | undefined) ?? undefined;
+}
+
+async function cacheSessionResult(
+  trackKey: string,
+  sessionType: AcEvoSessionType,
+  result: AcEvoSessionResult,
+): Promise<void> {
+  const { error } = await supabase
+    .from('acevo_race_results_cache')
+    .upsert(
+      { track_key: trackKey, session_type: sessionType, session_result: result },
+      { onConflict: 'track_key,session_type' },
+    );
+  if (error) console.error(`AC Evo results cache write failed for "${trackKey}"/${sessionType}:`, error);
+}
+
 // Finds and parses the most recent completed session of the given type for a
 // given Emperor track key. Results come back in finishing order via
 // driver_standings — see parseAcEvoSession / CLAUDE.md ("lap-count-first").
@@ -48,6 +85,9 @@ async function getAcEvoSessionResult(
   trackKey: string,
   sessionType: AcEvoSessionType,
 ): Promise<AcEvoSessionFetchResult> {
+  const cached = await getCachedSessionResult(trackKey, sessionType);
+  if (cached) return { ok: true, data: cached };
+
   const client = new EmperorClient(EMPEROR_ACEVO_BASE_URL, { minRequestIntervalMs: 1500 });
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('Emperor request timed out')), FETCH_TIMEOUT_MS),
@@ -58,6 +98,7 @@ async function getAcEvoSessionResult(
       fetchLatestSession(client, trackKey, sessionType),
       timeout,
     ]);
+    if (data) await cacheSessionResult(trackKey, sessionType, data);
     return { ok: true, data };
   } catch (err) {
     console.error(`AC Evo ${sessionType} result fetch failed for "${trackKey}":`, err);
