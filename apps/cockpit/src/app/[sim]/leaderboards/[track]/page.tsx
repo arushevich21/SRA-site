@@ -18,16 +18,14 @@ import {
   toTrackTopEntry as toAccTrackTopEntry,
 } from '@/lib/acc/tracks';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
-import { outrightFastest } from '@/lib/track-summary';
 
 // Reverted to force-dynamic: caching this route (ISR + generateStaticParams)
 // required capping entries per class to stay under Vercel's ISR page-size
 // limit (a busy track's full history serializes way past 19.07MB — see git
 // history for the numbers). Un-caching removes the build-time size check so
-// the site deploys again with every lap time shown, uncapped. This is a
-// stopgap, not a fix — a real solution (e.g. capped+cached initial render
-// with a "load more" fetched client-side) is still needed; see conversation/
-// PR notes.
+// the site deploys again. The board itself is now query-level paginated (see
+// getAccTrackLeaderboard) rather than capped, so full history is still
+// reachable — just 300 rows at a time instead of one giant table.
 export const dynamic = 'force-dynamic';
 
 export default async function TrackLeaderboardPage({
@@ -48,8 +46,11 @@ export default async function TrackLeaderboardPage({
     const track = await getAccTrack(trackSlugParam);
     if (!track) notFound();
 
-    const leaderboardByCarGroup = await getAccTrackLeaderboard(trackSlugParam);
-    const fastest = outrightFastest(leaderboardByCarGroup);
+    // Page 1, all classes — sorted best_lap_ms ascending, so entries[0] is
+    // already the outright fastest across every class combined (no separate
+    // query needed, unlike the old getAccTrackTopTimes call this replaced).
+    const board = await getAccTrackLeaderboard(trackSlugParam);
+    const fastest = board.entries[0];
 
     return (
       <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -66,9 +67,12 @@ export default async function TrackLeaderboardPage({
         />
 
         <AccTrackLeaderboard
-          leaderboardByCarGroup={leaderboardByCarGroup}
+          initialEntries={board.entries}
+          initialTotalCount={board.totalCount}
           trackKey={trackSlugParam}
           variant="lap"
+          scope="persistent"
+          season=""
         />
       </section>
     );

@@ -64,10 +64,14 @@ export default async function SeasonalHotStintTrackPage({
       />
 
       <AccTrackLeaderboard
-        leaderboardByCarGroup={leaderboardByCarGroup}
+        initialEntries={leaderboardByCarGroup.entries}
+        initialTotalCount={leaderboardByCarGroup.totalCount}
         timeLabel="Stint Avg"
         trackKey={trackSlugParam}
         variant="stint"
+        scope="seasonal"
+        season={season}
+        qualifying={false}
       />
     </section>
   );

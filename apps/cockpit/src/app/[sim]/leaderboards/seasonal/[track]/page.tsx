@@ -61,9 +61,12 @@ export default async function SeasonalTrackPage({
       />
 
       <AccTrackLeaderboard
-        leaderboardByCarGroup={leaderboardByCarGroup}
+        initialEntries={leaderboardByCarGroup.entries}
+        initialTotalCount={leaderboardByCarGroup.totalCount}
         trackKey={trackSlugParam}
         variant="lap"
+        scope="seasonal"
+        season={season}
       />
     </section>
   );

@@ -93,11 +93,20 @@ export async function getSeasonalBoards(): Promise<SeasonalChampBoards[]> {
     for (const r of released) {
       const trackKey = accTrackKeyForDisplay(r.track);
       if (!trackKey) continue; // custom/unmapped track — no board to pull
+      // Unused anywhere in the app (confirmed — see codebase notes); kept
+      // compiling against getAccTrackLeaderboard's paginated return shape by
+      // re-bucketing page 1's entries back into the old grouped-by-class
+      // shape this function's own (also unused) type still expects.
+      const page1 = await getAccTrackLeaderboard(trackKey, board);
+      const leaderboardByCarGroup: Record<string, AccHotLapEntry[]> = {};
+      for (const entry of page1.entries) {
+        (leaderboardByCarGroup[entry.carGroup] ??= []).push(entry);
+      }
       rounds.push({
         round: r.round,
         trackDisplay: r.track,
         trackKey,
-        leaderboardByCarGroup: await getAccTrackLeaderboard(trackKey, board),
+        leaderboardByCarGroup,
       });
     }
 

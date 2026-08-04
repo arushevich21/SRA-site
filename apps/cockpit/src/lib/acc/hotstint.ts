@@ -7,7 +7,10 @@ import {
   toTrackSummary,
   toTrackTopEntry,
   type AccBoard,
+  type PaginatedLeaderboard,
   PERSISTENT_DRY,
+  LEADERBOARD_PAGE_SIZE,
+  carModelIdsForClass,
 } from './tracks';
 import { compareSeasonsDesc, seasonalTrackKeys, hasWetSessionRows } from '../seasonal-leaderboard';
 import { applySeasonFilter, displaySeason } from './seasons';
@@ -19,7 +22,7 @@ import type { TrackWithTopTimes } from '@/components/TrackList';
 // SRA number/nationality and its reference-time tier — see lib/driver-lookup.ts,
 // lib/acc/reference-times.ts, and lib/acc/tracks.ts's matching
 // EnrichedAccHotLapEntry.
-type EnrichedStintEntry = AccHotLapEntry & DriverInfo & { lapTier: LapTier | null };
+export type EnrichedStintEntry = AccHotLapEntry & DriverInfo & { lapTier: LapTier | null };
 
 // The hot-stint board: a driver's best average over 5 consecutive valid laps,
 // ingested by the bot into acc_hotstint_leaderboard. Its board-defining key is
@@ -81,24 +84,38 @@ function toStintEntry(
 
 const STINT_COLS = 'steam_id, driver_name, car_model, car_model_id, best_stint_ms, sectors_ms, is_wet';
 
-// Class-grouped stint board for one track, best stint first within each class.
+// Class-grouped stint board for one track, best stint first within each
+// class — but only within one page/class query at a time now. See the
+// matching function comment on getAccTrackLeaderboard in tracks.ts for the
+// pagination rationale and the dedup-across-pages trade-off, which applies
+// identically here.
 export async function getAccTrackHotStint(
   trackKey: string,
   board: AccStintBoard = PERSISTENT_STINT,
-): Promise<Record<string, EnrichedStintEntry[]>> {
-  const { data, error } = await applySeasonFilter(
+  opts: { page?: number; classFilter?: string } = {},
+): Promise<PaginatedLeaderboard<EnrichedStintEntry>> {
+  const page = Math.max(1, opts.page ?? 1);
+  const from = (page - 1) * LEADERBOARD_PAGE_SIZE;
+  const to = from + LEADERBOARD_PAGE_SIZE - 1;
+
+  const base = applySeasonFilter(
     supabase
       .from('acc_hotstint_leaderboard')
-      .select(STINT_COLS)
+      .select(STINT_COLS, { count: 'exact' })
       .eq('track_key', trackKey)
       .eq('board_scope', board.scope)
       .eq('qualifying', board.qualifying),
     board.season,
-  ).order('best_stint_ms', { ascending: true });
+  );
+  const filtered = opts.classFilter ? base.in('car_model_id', carModelIdsForClass(opts.classFilter)) : base;
+
+  const { data, error, count } = await filtered
+    .order('best_stint_ms', { ascending: true })
+    .range(from, to);
 
   if (error) {
     console.error(`ACC hot-stint leaderboard lookup failed for "${trackKey}":`, error);
-    return {};
+    return { entries: [], totalCount: 0, page, pageSize: LEADERBOARD_PAGE_SIZE };
   }
 
   const rows = (data ?? []) as StintRow[];
@@ -106,20 +123,19 @@ export async function getAccTrackHotStint(
     rows.map((row) => stripSteamIdPrefix(row.steam_id)),
   );
 
-  const byCarGroup: Record<string, EnrichedStintEntry[]> = {};
   // Wet and dry stints share one dedup key (steam_id, car_model_id) — rows
   // arrive best-first, so a driver's fastest stint in a car wins regardless
   // of conditions; this also collapses a merged season's duplicate half.
+  // Only dedups within this page — see tracks.ts.
   const seen = new Set<string>();
+  const entries: EnrichedStintEntry[] = [];
   for (const row of rows) {
     const dedupKey = `${row.steam_id}:${row.car_model_id}`;
     if (seen.has(dedupKey)) continue;
     seen.add(dedupKey);
-    const carGroup = resolveCarGroup(row.car_model_id);
-    const entries = byCarGroup[carGroup] ?? (byCarGroup[carGroup] = []);
-    entries.push(toStintEntry(row, entries.length + 1, driverInfo, trackKey));
+    entries.push(toStintEntry(row, from + entries.length + 1, driverInfo, trackKey));
   }
-  return byCarGroup;
+  return { entries, totalCount: count ?? 0, page, pageSize: LEADERBOARD_PAGE_SIZE };
 }
 
 // Outright fastest N stint averages across every class combined — for the
