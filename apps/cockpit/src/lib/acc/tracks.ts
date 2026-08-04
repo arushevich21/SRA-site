@@ -10,6 +10,9 @@ import { supabase } from '../supabase';
 import { applySeasonFilter } from './seasons';
 import { getDriverInfoBySteamIds, driverInfoFor, stripSteamIdPrefix, type DriverInfo } from '../driver-lookup';
 import { classifyLapTier, type LapTier } from './reference-times';
+import { LEADERBOARD_PAGE_SIZE, carModelIdsForClass } from './leaderboard-constants';
+
+export { ACC_CLASSES, LEADERBOARD_PAGE_SIZE, carModelIdsForClass } from './leaderboard-constants';
 
 // AccHotLapEntry enriched with the driver's registered SRA number/nationality
 // (see lib/driver-lookup.ts) and its reference-time tier (see
@@ -143,26 +146,61 @@ export type AccBoard = {
 // default).
 export const PERSISTENT_DRY: AccBoard = { scope: 'persistent', season: '' };
 
-// Grouped by class since ACC times aren't comparable across classes. rank
-// isn't stored in the DB — it's derived here from the sorted position
-// within each group (rows already arrive best_lap_ms-ascending, so bucketing
-// preserves that order per group).
+// ACC_CLASSES, LEADERBOARD_PAGE_SIZE, and carModelIdsForClass live in
+// ./leaderboard-constants (imported/re-exported above) — split out because
+// AccTrackLeaderboard ('use client') needs them too, and importing them from
+// this file directly would pull its server-only supabase client into the
+// client bundle.
+
+export type PaginatedLeaderboard<T> = {
+  entries: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+};
+
+// Grouped by class since ACC times aren't comparable across classes — but
+// only within ONE page/class query at a time now, not across the whole
+// board. rank is the row's position in the full sorted (server-side) result,
+// not just within this page, so page 2's first entry correctly shows as rank
+// 301 rather than restarting at 1. One accuracy trade-off from paginating at
+// the query level rather than fetching everything first: dedup (a driver's
+// wet lap only shows if they have no dry lap in that car — see below) can
+// only see rows within the current page, so rank near a page boundary can be
+// off by however many duplicate rows fall on that page. Narrow edge case —
+// only matters for a driver with both a wet and dry lap in the same car,
+// split across a page boundary — accepted for now; the fully correct fix is
+// a DB-side DISTINCT ON view that dedups before pagination.
 export async function getAccTrackLeaderboard(
   trackKey: string,
   board: AccBoard = PERSISTENT_DRY,
-): Promise<Record<string, EnrichedAccHotLapEntry[]>> {
-  const { data, error } = await applySeasonFilter(
+  opts: { page?: number; classFilter?: string } = {},
+): Promise<PaginatedLeaderboard<EnrichedAccHotLapEntry>> {
+  const page = Math.max(1, opts.page ?? 1);
+  const from = (page - 1) * LEADERBOARD_PAGE_SIZE;
+  const to = from + LEADERBOARD_PAGE_SIZE - 1;
+
+  const base = applySeasonFilter(
     supabase
       .from('acc_hotlap_leaderboard')
-      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms, is_wet')
+      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms, is_wet', {
+        count: 'exact',
+      })
       .eq('track_key', trackKey)
       .eq('board_scope', board.scope),
     board.season,
-  ).order('best_lap_ms', { ascending: true });
+  );
+  const filtered = opts.classFilter
+    ? base.in('car_model_id', carModelIdsForClass(opts.classFilter))
+    : base;
+
+  const { data, error, count } = await filtered
+    .order('best_lap_ms', { ascending: true })
+    .range(from, to);
 
   if (error) {
     console.error(`ACC hot-lap leaderboard lookup failed for "${trackKey}":`, error);
-    return {};
+    return { entries: [], totalCount: 0, page, pageSize: LEADERBOARD_PAGE_SIZE };
   }
 
   const rows = data ?? [];
@@ -170,23 +208,23 @@ export async function getAccTrackLeaderboard(
     rows.map((row) => stripSteamIdPrefix(row.steam_id as string)),
   );
 
-  const byCarGroup: Record<string, EnrichedAccHotLapEntry[]> = {};
   // Wet and dry laps share one dedup key (steam_id, car_model_id) — rows
   // arrive best-first, so a driver's fastest lap in a car wins regardless of
   // conditions, and a merged season's (S14 = S14 + S14-2) duplicate half is
   // dropped the same way. A wet lap only surfaces if it's the only lap that
-  // driver has in that car.
+  // driver has in that car. Only dedups within this page — see the function
+  // comment above.
   const seen = new Set<string>();
+  const entries: EnrichedAccHotLapEntry[] = [];
   for (const row of rows) {
     const carModelId = row.car_model_id as number | null;
     const dedupKey = `${row.steam_id}:${carModelId}`;
     if (seen.has(dedupKey)) continue;
     seen.add(dedupKey);
     const carGroup = resolveCarGroup(carModelId);
-    const entries = byCarGroup[carGroup] ?? (byCarGroup[carGroup] = []);
     const bestLapMs = row.best_lap_ms as number;
     entries.push({
-      rank: entries.length + 1,
+      rank: from + entries.length + 1,
       steamId: row.steam_id as string,
       driverName: row.driver_name as string,
       carGroup,
@@ -202,7 +240,7 @@ export async function getAccTrackLeaderboard(
       lapTier: carGroup === 'GT3' && !row.is_wet ? classifyLapTier(bestLapMs, trackKey, 'lap') : null,
     });
   }
-  return byCarGroup;
+  return { entries, totalCount: count ?? 0, page, pageSize: LEADERBOARD_PAGE_SIZE };
 }
 
 // Outright fastest N times at this track across every class combined — for

@@ -9,10 +9,9 @@ import {
 } from '@/lib/acc/tracks';
 import { getAccTrackHotStint } from '@/lib/acc/hotstint';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
-import { outrightFastest } from '@/lib/track-summary';
 
 // See [sim]/leaderboards/[track]/page.tsx — reverted to force-dynamic for the
-// same reason (ISR page-size limit forced capping entries, stopgap only).
+// same reason (ISR page-size limit); board is query-level paginated now.
 export const dynamic = 'force-dynamic';
 
 // Per-track Hot Stint board (best 5-lap average, class-grouped). Mirrors the
@@ -31,8 +30,10 @@ export default async function TrackHotStintPage({
   const track = await getAccTrack(trackSlugParam);
   if (!track) notFound();
 
-  const leaderboardByCarGroup = await getAccTrackHotStint(trackSlugParam);
-  const fastest = outrightFastest(leaderboardByCarGroup);
+  // Page 1, all classes — already sorted best_stint_ms ascending, so
+  // entries[0] is the outright fastest across every class.
+  const board = await getAccTrackHotStint(trackSlugParam);
+  const fastest = board.entries[0];
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -49,10 +50,14 @@ export default async function TrackHotStintPage({
       />
 
       <AccTrackLeaderboard
-        leaderboardByCarGroup={leaderboardByCarGroup}
+        initialEntries={board.entries}
+        initialTotalCount={board.totalCount}
         timeLabel="Stint Avg"
         trackKey={trackSlugParam}
         variant="stint"
+        scope="persistent"
+        season=""
+        qualifying={false}
       />
     </section>
   );
