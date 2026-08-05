@@ -50,10 +50,12 @@ export async function findLeaderboardTrack(
 // choices — see ACC_CAR_MANUFACTURER_ICON_NAMES in
 // packages/domain/src/acc/acc-constants.ts); manufacturers @cardog-icons has
 // no icon for at all carry a `slug` instead, resolved against our own
-// manufacturer-logos Supabase bucket (see scripts/upload-manufacturer-logos.ts
-// — upload the source badge from the game's content/cars/<car>/ui/badge.png
-// under that slug and it picks up automatically, same FallbackLogoImage
-// pattern ACC uses). A manufacturer with neither shows just the car name.
+// manufacturer-logos Supabase bucket as an .svg (see
+// scripts/upload-manufacturer-logos.ts — sourced from the manufacturer's own
+// brand-kit vector logo, NOT the game's raster badge.png, which can't be
+// losslessly converted to SVG — upload under that slug and it picks up
+// automatically, same FallbackLogoImage pattern ACC uses). A manufacturer
+// with neither shows just the car name.
 // Longer/more-specific patterns are listed first so "Mercedes-AMG" and "Aston
 // Martin" match before a bare word could.
 const ACEVO_MANUFACTURERS: ReadonlyArray<
@@ -109,7 +111,7 @@ export function acEvoManufacturerLogoUrl(carModel: string | null): string | null
   if (!entry || entry.icon || !entry.slug) return null;
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!base) return null;
-  return `${base}/storage/v1/object/public/manufacturer-logos/${entry.slug}.png`;
+  return `${base}/storage/v1/object/public/manufacturer-logos/${entry.slug}.svg`;
 }
 
 // Adapters into the sim-neutral shapes TrackList/TrackHeader consume.

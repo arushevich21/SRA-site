@@ -1,24 +1,28 @@
-// Uploads manufacturer badge/logo images to the manufacturer-logos Supabase
+// Uploads manufacturer logo images to the manufacturer-logos Supabase
 // Storage bucket (see supabase/migrations/20260728_manufacturer_logos_bucket.sql),
 // for the manufacturers @cardog-icons/react has no icon for at all — currently
 // KTM, Alpine, Ginetta (see ACEVO_MANUFACTURERS in
 // apps/cockpit/src/lib/leaderboard-tracks.ts). The old site's CDN that used to
 // host these fallback logos died with the site itself; this bucket replaces it.
 //
-// SOURCING THE IMAGES: AC Evo (and Assetto Corsa generally) ships a UI badge
-// per car in its own install:
-//   <AC Evo install>/content/cars/<car_folder>/ui/badge.png
-// Pull the badge for any KTM/Alpine/Ginetta car and rename it to the
-// manufacturer slug before running this (see EXPECTED_SLUGS below) — the game
-// files aren't reachable from here, so this script only handles the upload
-// once you have the images locally.
+// SOURCING THE IMAGES: use each manufacturer's own vector logo (brand-kit /
+// press-kit SVG from their site, or a clean vector trace) — NOT the game's UI
+// badge. AC Evo/AC ship a raster PNG badge per car
+// (<AC Evo install>/content/cars/<car_folder>/ui/badge.png) but a PNG's pixel
+// data can't be losslessly turned into an SVG, so that path only works if you
+// vectorize it yourself (e.g. trace it), which is lossy and not recommended
+// when a real vector logo is available instead. Save each as
+// <manufacturer-slug>.svg (see EXPECTED_SLUGS below) before running this —
+// this script only handles the upload once the files exist locally.
 //
 // Usage:
 //   pnpm exec tsx scripts/upload-manufacturer-logos.ts [source-dir]
 // source-dir defaults to assets/manufacturer-logos/ at the repo root. Each
-// image file's name (minus extension) becomes its slug — e.g. ktm.png is
-// served at manufacturer-logos/ktm.png. Re-running overwrites (upsert), so
-// updating a logo is just replacing the file and running again.
+// image file's name (minus extension) becomes its slug — e.g. ktm.svg is
+// served at manufacturer-logos/ktm.svg. Re-running overwrites (upsert), so
+// updating a logo is just replacing the file and running again. Other raster
+// formats (png/webp/jpeg) are still accepted by the bucket/script for
+// one-off exceptions, but .svg is the intended format going forward.
 //
 // Safe to re-run: every upload is an upsert.
 
@@ -58,9 +62,9 @@ async function main(): Promise<void> {
   if (!existsSync(sourceDir)) {
     console.error(`Source directory not found: ${sourceDir}`);
     console.error('\nDrop manufacturer logo images there first, named by slug, e.g.:');
-    for (const slug of EXPECTED_SLUGS) console.error(`  ${slug}.png`);
+    for (const slug of EXPECTED_SLUGS) console.error(`  ${slug}.svg`);
     console.error(
-      '\nSource: <AC Evo install>/content/cars/<car_folder>/ui/badge.png for a car of that manufacturer.',
+      '\nSource: the manufacturer\'s own brand-kit vector logo (SVG) — not the game\'s raster ui/badge.png, which can\'t be losslessly converted.',
     );
     process.exit(1);
   }
