@@ -10,7 +10,6 @@ import {
 } from '@/lib/acc/tracks';
 import {
   getAccTrackHotStint,
-  getAccTrackTopStints,
   getHotStintSeasons,
   type AccStintBoard,
 } from '@/lib/acc/hotstint';
@@ -42,11 +41,14 @@ export default async function SeasonalHotStintTrackPage({
 
   const board: AccStintBoard = { scope: 'seasonal', season, qualifying: false };
 
-  const [leaderboardByCarGroup, topEntries, isWet] = await Promise.all([
+  // entries[0] is already the outright fastest stint across every class
+  // (page 1, no class filter, sorted ascending) — no separate
+  // getAccTrackTopStints call needed, mirroring the hot-lap seasonal fix.
+  const [leaderboardByCarGroup, isWet] = await Promise.all([
     getAccTrackHotStint(trackSlugParam, board),
-    getAccTrackTopStints(trackSlugParam, 1, board),
     hasWetSessionRows('acc_hotstint_leaderboard', trackSlugParam, season, { qualifying: false }),
   ]);
+  const fastest = leaderboardByCarGroup.entries[0];
   const trackSummary = toAccTrackSummary(track);
 
   return (
@@ -60,7 +62,7 @@ export default async function SeasonalHotStintTrackPage({
 
       <TrackHeader
         track={isWet ? { ...trackSummary, displayName: `${trackSummary.displayName} (Wet)` } : trackSummary}
-        fastestLap={topEntries[0] ? toAccTrackTopEntry(topEntries[0]) : null}
+        fastestLap={fastest ? toAccTrackTopEntry(fastest) : null}
       />
 
       <AccTrackLeaderboard

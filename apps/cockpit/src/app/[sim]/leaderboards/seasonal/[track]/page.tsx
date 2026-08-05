@@ -6,7 +6,6 @@ import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
 import {
   getAccTrack,
   getAccTrackLeaderboard,
-  getAccTrackTopTimes,
   toTrackSummary as toAccTrackSummary,
   toTrackTopEntry as toAccTrackTopEntry,
   type AccBoard,
@@ -39,11 +38,16 @@ export default async function SeasonalTrackPage({
 
   const board: AccBoard = { scope: 'seasonal', season };
 
-  const [leaderboardByCarGroup, topEntries, isWet] = await Promise.all([
+  // Page 1, all classes — sorted best_lap_ms ascending, so entries[0] is
+  // already the outright fastest across every class combined. No separate
+  // getAccTrackTopTimes call needed, same fix already applied to the regular
+  // (persistent) track page — this page previously still ran that as a
+  // redundant second query on every load.
+  const [leaderboardByCarGroup, isWet] = await Promise.all([
     getAccTrackLeaderboard(trackSlugParam, board),
-    getAccTrackTopTimes(trackSlugParam, 1, board),
     hasWetSessionRows('acc_hotlap_leaderboard', trackSlugParam, season),
   ]);
+  const fastest = leaderboardByCarGroup.entries[0];
   const trackSummary = toAccTrackSummary(track);
 
   return (
@@ -57,7 +61,7 @@ export default async function SeasonalTrackPage({
 
       <TrackHeader
         track={isWet ? { ...trackSummary, displayName: `${trackSummary.displayName} (Wet)` } : trackSummary}
-        fastestLap={topEntries[0] ? toAccTrackTopEntry(topEntries[0]) : null}
+        fastestLap={fastest ? toAccTrackTopEntry(fastest) : null}
       />
 
       <AccTrackLeaderboard
