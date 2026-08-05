@@ -242,5 +242,5 @@ export const ACC_CAR_MANUFACTURER_CDN_SLUGS: Readonly<Record<number, string>> = 
 
 export function accCarManufacturerLogoUrl(carModel: number): string | null {
   const slug = ACC_CAR_MANUFACTURER_CDN_SLUGS[carModel];
-  return slug ? `${MANUFACTURER_LOGO_BASE_URL}/${slug}.png` : null;
+  return slug ? `${MANUFACTURER_LOGO_BASE_URL}/${slug}.svg` : null;
 }

@@ -6,7 +6,9 @@
 -- ACC_CAR_MANUFACTURER_CDN_SLUGS in packages/domain/src/acc/acc-constants.ts).
 -- The old site's CDN that used to host these died with the site itself, so
 -- this is our own replacement, uploaded via scripts/upload-manufacturer-logos.ts
--- from the game's own content/cars/<car>/ui/badge.png source files.
+-- as .svg files sourced from each manufacturer's own brand-kit vector logo —
+-- NOT the game's content/cars/<car>/ui/badge.png, which is a raster PNG and
+-- can't be losslessly converted to SVG.
 --
 -- Public read so <Image>/FallbackLogoImage can serve them directly; uploads
 -- happen via the service-role client (bypasses RLS) run locally by an admin,
