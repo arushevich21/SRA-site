@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { msToLaptime } from '@sra/domain';
 import type { AccHotLapEntry } from '@sra/shared-types';
 import { supabase } from '../supabase';
@@ -89,12 +90,15 @@ const STINT_COLS = 'steam_id, driver_name, car_model, car_model_id, best_stint_m
 // matching function comment on getAccTrackLeaderboard in tracks.ts for the
 // pagination rationale and the dedup-across-pages trade-off, which applies
 // identically here.
-export async function getAccTrackHotStint(
+// Internal implementation, cached below — see fetchAccTrackLeaderboard in
+// tracks.ts for why the exported wrapper pre-normalizes page/classFilter
+// before this runs.
+async function fetchAccTrackHotStint(
   trackKey: string,
-  board: AccStintBoard = PERSISTENT_STINT,
-  opts: { page?: number; classFilter?: string } = {},
+  board: AccStintBoard,
+  page: number,
+  classFilter: string | null,
 ): Promise<PaginatedLeaderboard<EnrichedStintEntry>> {
-  const page = Math.max(1, opts.page ?? 1);
   const from = (page - 1) * LEADERBOARD_PAGE_SIZE;
   const to = from + LEADERBOARD_PAGE_SIZE - 1;
 
@@ -107,7 +111,7 @@ export async function getAccTrackHotStint(
       .eq('qualifying', board.qualifying),
     board.season,
   );
-  const filtered = opts.classFilter ? base.in('car_model_id', carModelIdsForClass(opts.classFilter)) : base;
+  const filtered = classFilter ? base.in('car_model_id', carModelIdsForClass(classFilter)) : base;
 
   const { data, error, count } = await filtered
     .order('best_stint_ms', { ascending: true })
@@ -136,6 +140,28 @@ export async function getAccTrackHotStint(
     entries.push(toStintEntry(row, from + entries.length + 1, driverInfo, trackKey));
   }
   return { entries, totalCount: count ?? 0, page, pageSize: LEADERBOARD_PAGE_SIZE };
+}
+
+// Cached entry point — see getAccTrackLeaderboard in tracks.ts for why
+// caching lives here (covers the Server Action page/class-switch path, not
+// just initial SSR) and how the 300s revalidate is a safety-net ceiling.
+//
+// Unlike the hot-lap board, there is no cron route in this repo that writes
+// acc_hotstint_leaderboard — it's populated externally (see the comment in
+// refresh-acc-leaderboard/route.ts) — so there's no revalidateTag call site
+// to bust this on write. This board relies solely on the 300s time-based
+// revalidate; a stint just posted can take up to that long to appear.
+export function getAccTrackHotStint(
+  trackKey: string,
+  board: AccStintBoard = PERSISTENT_STINT,
+  opts: { page?: number; classFilter?: string } = {},
+): Promise<PaginatedLeaderboard<EnrichedStintEntry>> {
+  const page = Math.max(1, opts.page ?? 1);
+  const classFilter = opts.classFilter ?? null;
+  return unstable_cache(fetchAccTrackHotStint, ['acc-hotstint-leaderboard'], {
+    revalidate: 300,
+    tags: [`acc-hotstint:${trackKey}`],
+  })(trackKey, board, page, classFilter);
 }
 
 // Outright fastest N stint averages across every class combined — for the
