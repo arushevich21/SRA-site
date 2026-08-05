@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import {
   msToLaptime,
   accCarClassName,
@@ -171,12 +172,16 @@ export type PaginatedLeaderboard<T> = {
 // only matters for a driver with both a wet and dry lap in the same car,
 // split across a page boundary — accepted for now; the fully correct fix is
 // a DB-side DISTINCT ON view that dedups before pagination.
-export async function getAccTrackLeaderboard(
+// Internal implementation, cached below — kept as a plain function (not
+// exported) so unstable_cache wraps a stable, pure-in-its-arguments target.
+// page/classFilter are pre-normalized by the exported wrapper so e.g.
+// `opts.page` omitted and `opts.page: 1` hash to the same cache entry.
+async function fetchAccTrackLeaderboard(
   trackKey: string,
-  board: AccBoard = PERSISTENT_DRY,
-  opts: { page?: number; classFilter?: string } = {},
+  board: AccBoard,
+  page: number,
+  classFilter: string | null,
 ): Promise<PaginatedLeaderboard<EnrichedAccHotLapEntry>> {
-  const page = Math.max(1, opts.page ?? 1);
   const from = (page - 1) * LEADERBOARD_PAGE_SIZE;
   const to = from + LEADERBOARD_PAGE_SIZE - 1;
 
@@ -190,9 +195,7 @@ export async function getAccTrackLeaderboard(
       .eq('board_scope', board.scope),
     board.season,
   );
-  const filtered = opts.classFilter
-    ? base.in('car_model_id', carModelIdsForClass(opts.classFilter))
-    : base;
+  const filtered = classFilter ? base.in('car_model_id', carModelIdsForClass(classFilter)) : base;
 
   const { data, error, count } = await filtered
     .order('best_lap_ms', { ascending: true })
@@ -241,6 +244,32 @@ export async function getAccTrackLeaderboard(
     });
   }
   return { entries, totalCount: count ?? 0, page, pageSize: LEADERBOARD_PAGE_SIZE };
+}
+
+// Cached entry point — one unstable_cache hit covers BOTH the page's initial
+// SSR render and every page/class switch from AccTrackLeaderboard's Server
+// Action (fetchAccLeaderboardPage in [sim]/leaderboards/actions.ts), since
+// both call this same function. Route-level ISR alone wouldn't cover the
+// Server Action path — Server Actions always execute live, so caching had to
+// move to the data-fetch level to actually cut Supabase calls on page/class
+// switches, not just on first paint.
+//
+// revalidate: 300s is a safety-net ceiling, not the expected staleness — the
+// ACC hotlap cron (refresh-acc-leaderboard) calls revalidateTag for exactly
+// the tracks it touched right after writing, so real staleness is bounded by
+// the cron's own cadence (~10min) rather than this window, except if a
+// revalidateTag call is ever missed.
+export function getAccTrackLeaderboard(
+  trackKey: string,
+  board: AccBoard = PERSISTENT_DRY,
+  opts: { page?: number; classFilter?: string } = {},
+): Promise<PaginatedLeaderboard<EnrichedAccHotLapEntry>> {
+  const page = Math.max(1, opts.page ?? 1);
+  const classFilter = opts.classFilter ?? null;
+  return unstable_cache(fetchAccTrackLeaderboard, ['acc-hotlap-leaderboard'], {
+    revalidate: 300,
+    tags: [`acc-hotlap:${trackKey}`],
+  })(trackKey, board, page, classFilter);
 }
 
 // Outright fastest N times at this track across every class combined — for

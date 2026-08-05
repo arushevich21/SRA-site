@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { refreshWithLock } from '@/lib/acc/hotlaps';
 
 // Called by an external scheduler (e.g. cron-job.org), same pattern as
@@ -46,10 +46,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // — bust exactly what changed rather than the whole site or waiting out the
   // window. This only touches acc_hotlap_leaderboard, not hot-stint (that's
   // written externally — see [sim]/leaderboards/hotstint/[track]/page.tsx).
+  //
+  // Two invalidations, not one: revalidatePath busts the route/RSC cache for
+  // the initial page-1 render; revalidateTag busts getAccTrackLeaderboard's
+  // unstable_cache (see tracks.ts), which is what actually serves page-2+ and
+  // class-filtered requests via the leaderboards Server Action — those never
+  // go through the route cache, so revalidatePath alone wouldn't reach them.
   if (result.tracks.length > 0) {
     revalidatePath('/acc/leaderboards');
     for (const track of result.tracks) {
       revalidatePath(`/acc/leaderboards/${track}`);
+      revalidateTag(`acc-hotlap:${track}`);
     }
   }
 

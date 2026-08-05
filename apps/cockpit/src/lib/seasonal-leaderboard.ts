@@ -1,4 +1,5 @@
 import 'server-only';
+import { unstable_cache } from 'next/cache';
 import type { AccHotLapEntry } from '@sra/shared-types';
 import type { ChampionshipContent } from '@/content/championships';
 import { getChampionships } from './championships-store';
@@ -140,7 +141,12 @@ export function compareSeasonsDesc(a: string, b: string): number {
 // Not filtered by is_wet — a season with only wet rows still counts (wet laps
 // show on the board too, just without a reference-time badge). Pages through
 // the column so a season is never missed to a single-request row cap.
-export async function getHotlapSeasons(): Promise<string[]> {
+//
+// This scans the `season` column across EVERY seasonal row in the table (not
+// scoped to one track) — genuinely expensive, and was the main reason a
+// seasonal track page loaded noticeably slower than the regular hot-lap page:
+// every seasonal track view re-ran this full scan from scratch. Cached below.
+async function fetchHotlapSeasons(): Promise<string[]> {
   const seasons = new Set<string>();
   const page = 1000;
   for (let from = 0; ; from += page) {
@@ -161,6 +167,18 @@ export async function getHotlapSeasons(): Promise<string[]> {
     if (data.length < page) break;
   }
   return [...seasons].sort(compareSeasonsDesc);
+}
+
+// Cached — the season list itself only changes when a season is added, so a
+// 1hr window is a safe ceiling; no write path in this repo triggers a new
+// season's first row, so there's no revalidateTag call site (unlike the
+// per-track hotlap/hotstint caches). The 'acc-hotlap-seasons' tag is kept so
+// it CAN be busted manually (e.g. from an admin action) if that ever changes.
+export function getHotlapSeasons(): Promise<string[]> {
+  return unstable_cache(fetchHotlapSeasons, ['acc-hotlap-seasons'], {
+    revalidate: 3600,
+    tags: ['acc-hotlap-seasons'],
+  })();
 }
 
 // Whether the Seasonal tab should be shown at all: either an admin has released
@@ -246,11 +264,11 @@ export async function seasonalTrackKeys(
 // comment in acc/tracks.ts for why is_wet isn't otherwise a board dimension —
 // wet and dry laps share the same board and this is purely a display label,
 // not a board split). Shared by the hot-lap and hot-stint seasonal views.
-export async function hasWetSessionRows(
+async function fetchWetSessionRows(
   table: 'acc_hotlap_leaderboard' | 'acc_hotstint_leaderboard',
   trackKey: string,
   season: string,
-  extraEq: Record<string, string | boolean> = {},
+  extraEq: Record<string, string | boolean>,
 ): Promise<boolean> {
   let query = supabase
     .from(table)
@@ -267,6 +285,23 @@ export async function hasWetSessionRows(
     return false;
   }
   return (count ?? 0) > 0;
+}
+
+// Cached, tagged the same as the matching leaderboard board (acc-hotlap:/
+// acc-hotstint:<trackKey> — see tracks.ts/hotstint.ts) so a new lap/stint
+// posted for this track busts this alongside the board itself, rather than
+// this staying stale for up to the 300s window on its own.
+export function hasWetSessionRows(
+  table: 'acc_hotlap_leaderboard' | 'acc_hotstint_leaderboard',
+  trackKey: string,
+  season: string,
+  extraEq: Record<string, string | boolean> = {},
+): Promise<boolean> {
+  const tag = table === 'acc_hotlap_leaderboard' ? `acc-hotlap:${trackKey}` : `acc-hotstint:${trackKey}`;
+  return unstable_cache(fetchWetSessionRows, ['acc-wet-session-rows'], {
+    revalidate: 300,
+    tags: [tag],
+  })(table, trackKey, season, extraEq);
 }
 
 // Hot-lap seasonal track list, shaped exactly like the Hot Lap index
