@@ -38,7 +38,19 @@ const BUCKET = 'manufacturer-logos';
 // apps/cockpit/src/lib/leaderboard-tracks.ts) — printed as a checklist so it's
 // obvious what's still missing after a run. Add to both places together when
 // AC Evo content adds a manufacturer @cardog-icons doesn't cover.
-const EXPECTED_SLUGS = ['ktm', 'alpine', 'ginetta'];
+const EXPECTED_SLUGS = [
+  'ktm',
+  'alpine',
+  'ginetta',
+  'abarth',
+  'caterham',
+  'dallara',
+  'lancia',
+  'mcmurtry',
+  'morgan',
+  'peugeot',
+  'renault',
+];
 
 const CONTENT_TYPES: Record<string, string> = {
   '.png': 'image/png',
