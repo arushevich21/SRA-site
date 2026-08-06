@@ -1,10 +1,6 @@
 import { unstable_cache } from 'next/cache';
-import {
-  msToLaptime,
-  accCarClassName,
-  accCarManufacturerIconName,
-  accCarManufacturerLogoUrl,
-} from '@sra/domain';
+import { msToLaptime, accCarClassName, accCarManufacturerIconName } from '@sra/domain';
+import { accCarManufacturerLogoUrl } from './manufacturer-logo';
 import type { AccHotLapEntry } from '@sra/shared-types';
 import type { TrackSummary, TrackTopEntry } from '../track-summary';
 import { supabase } from '../supabase';
