@@ -2,8 +2,11 @@
 --
 -- Fallback car-manufacturer logos for manufacturers @cardog-icons/react has no
 -- icon for (KTM, Alpine, Ginetta — see ACEVO_MANUFACTURERS in
--- apps/cockpit/src/lib/leaderboard-tracks.ts and
--- ACC_CAR_MANUFACTURER_CDN_SLUGS in packages/domain/src/acc/acc-constants.ts).
+-- apps/cockpit/src/lib/leaderboard-tracks.ts and ACC_CAR_MANUFACTURER_CDN_SLUGS
+-- in packages/domain/src/acc/acc-constants.ts, resolved to a public URL by
+-- acEvoManufacturerLogoUrl / accCarManufacturerLogoUrl respectively — both in
+-- apps/cockpit, since building the URL needs NEXT_PUBLIC_SUPABASE_URL and
+-- packages/domain stays env/network-free).
 -- The old site's CDN that used to host these died with the site itself, so
 -- this is our own replacement, uploaded via scripts/upload-manufacturer-logos.ts
 -- as .svg files sourced from each manufacturer's own brand-kit vector logo —
