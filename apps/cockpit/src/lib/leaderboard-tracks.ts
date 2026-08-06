@@ -63,6 +63,7 @@ const ACEVO_MANUFACTURERS: ReadonlyArray<
 > = [
   [/mercedes|amg/i, { icon: 'MBIconDark' }],
   [/aston\s*martin/i, { icon: 'AstonMartinIconDark' }],
+  [/alfa\s*romeo/i, { icon: 'AlfaRomeoIcon' }],
   [/mazda/i, { icon: 'MazdaIcon' }],
   [/ferrari/i, { icon: 'FerrariIconDark' }],
   [/porsche/i, { icon: 'PorscheIcon' }],
@@ -81,11 +82,23 @@ const ACEVO_MANUFACTURERS: ReadonlyArray<
   [/\bbmw\b/i, { icon: 'BMWIcon' }],
   [/\baudi\b/i, { icon: 'AudiIconDark' }],
   [/\bford\b/i, { icon: 'FordIcon' }],
+  [/lotus/i, { icon: 'LotusIcon' }],
+  [/\bmini\b/i, { icon: 'MiniIconDark' }],
+  [/volkswagen/i, { icon: 'VolkswagenIconDark' }],
+  [/datsun/i, { icon: 'NissanIconDark' }],
   // No @cardog-icons entry — fall back to our own uploaded logo, once one
   // exists at that slug in the manufacturer-logos bucket.
   [/ktm|x-?bow/i, { slug: 'ktm' }],
   [/alpine/i, { slug: 'alpine' }],
   [/ginetta/i, { slug: 'ginetta' }],
+  [/abarth/i, { slug: 'abarth' }],
+  [/caterham/i, { slug: 'caterham' }],
+  [/dallara/i, { slug: 'dallara' }],
+  [/lancia/i, { slug: 'lancia' }],
+  [/mcmurtry/i, { slug: 'mcmurtry' }],
+  [/morgan/i, { slug: 'morgan' }],
+  [/peugeot/i, { slug: 'peugeot' }],
+  [/renault/i, { slug: 'renault' }],
 ];
 
 function matchAcEvoManufacturer(carModel: string | null): { icon?: string; slug?: string } | null {
