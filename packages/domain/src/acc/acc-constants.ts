@@ -240,3 +240,8 @@ export const ACC_CAR_MANUFACTURER_CDN_SLUGS: Readonly<Record<number, string>> = 
   57: 'ktm', // KTM X-Bow GT4
   82: 'ktm', // KTM XBOW GT2
 };
+
+export function accCarManufacturerLogoUrl(carModel: number): string | null {
+  const slug = ACC_CAR_MANUFACTURER_CDN_SLUGS[carModel];
+  return slug ? `${MANUFACTURER_LOGO_BASE_URL}/${slug}.svg` : null;
+}
