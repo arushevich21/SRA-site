@@ -56,7 +56,6 @@ export {
   accCupCategoryName,
   accCarClassName,
   accCarManufacturerIconName,
-  accCarManufacturerLogoUrl,
 } from './acc/acc-constants.js';
 
 export {

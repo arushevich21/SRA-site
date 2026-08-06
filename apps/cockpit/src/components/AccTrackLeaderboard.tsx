@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import type { AccHotLapEntry } from '@sra/shared-types';
-import { accCarManufacturerIconName, accCarManufacturerLogoUrl } from '@sra/domain';
+import { accCarManufacturerIconName } from '@sra/domain';
+import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
 import type { DriverInfo } from '@/lib/driver-lookup';
 import { getReferenceLegend, type LapTier } from '@/lib/acc/reference-times';
 import { ACC_CLASSES, LEADERBOARD_PAGE_SIZE } from '@/lib/acc/leaderboard-constants';

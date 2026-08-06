@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Icon, type IconName } from '@cardog-icons/react';
-import { accCarManufacturerIconName, accCarManufacturerLogoUrl } from '@sra/domain';
+import { accCarManufacturerIconName } from '@sra/domain';
+import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
 import type { AccDriverResult, AccSessionResult, AccSessionType } from '@sra/shared-types';
 import { FallbackLogoImage } from './FallbackLogoImage';
 

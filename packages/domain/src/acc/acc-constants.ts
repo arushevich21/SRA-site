@@ -179,20 +179,20 @@ export const ACC_CAR_MANUFACTURER_ICON_NAMES: Readonly<Record<number, string>> =
   35: 'MclarenIconDark',
   36: 'FordIcon',
   // 50: Alpine — no icon available
-  51: 'AstonMartinIcon',
-  52: 'AudiIcon',
-  53: 'BMWIcon',
-  55: 'ChevroletIcon',
+  51: 'AstonMartinIconDark',
+  52: 'AudiIconDark',
+  53: 'BMWIconDark',
+  55: 'ChevroletIconDark',
   // 56: Ginetta — no icon available
   // 57: KTM — no icon available
   58: 'MaseratiIcon',
   59: 'MclarenIcon',
-  60: 'MBIcon',
+  60: 'MBIconDark',
   61: 'PorscheIcon',
-  80: 'AudiIcon',
+  80: 'AudiIconDark',
   // 82: KTM — no icon available
   83: 'MaseratiIcon',
-  84: 'MBIcon',
+  84: 'MBIconDark',
   85: 'PorscheIcon',
   86: 'PorscheIcon',
 };
@@ -225,22 +225,18 @@ export function accCarManufacturerIconName(carModel: number): string | null {
   return ACC_CAR_MANUFACTURER_ICON_NAMES[carModel] ?? null;
 }
 
-// CDN fallback for the manufacturers @cardog-icons/react has no icon for at
-// all (Alpine, Ginetta, KTM — all GT4-class). Unlike the confirmed asset
-// convention for splash art/track maps, these slugs are unconfirmed guesses
-// — callers should render defensively (hide on load failure) rather than
-// assume the URL resolves.
-const MANUFACTURER_LOGO_BASE_URL =
-  'https://static.simracingalliance.com/assets/images/logo/manufacturers/light';
-
+// Manufacturer-logos Supabase Storage bucket fallback for the manufacturers
+// @cardog-icons/react has no icon for at all (Alpine, Ginetta, KTM — all
+// GT4-class). Just the slug data lives here — packages/domain stays
+// pure (no env, no network; the Supabase project ID shouldn't be hardcoded
+// here either), so the actual URL-building function (accCarManufacturerLogoUrl)
+// lives in apps/cockpit/src/lib/acc/manufacturer-logo.ts instead, since it
+// needs NEXT_PUBLIC_SUPABASE_URL. Callers should render defensively (hide on
+// load failure) since a mapped slug doesn't guarantee the file has actually
+// been uploaded yet.
 export const ACC_CAR_MANUFACTURER_CDN_SLUGS: Readonly<Record<number, string>> = {
   50: 'alpine', // Alpine A110 GT4
   56: 'ginetta', // Ginetta G55 GT4
   57: 'ktm', // KTM X-Bow GT4
   82: 'ktm', // KTM XBOW GT2
 };
-
-export function accCarManufacturerLogoUrl(carModel: number): string | null {
-  const slug = ACC_CAR_MANUFACTURER_CDN_SLUGS[carModel];
-  return slug ? `${MANUFACTURER_LOGO_BASE_URL}/${slug}.svg` : null;
-}

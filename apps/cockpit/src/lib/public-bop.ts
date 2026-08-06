@@ -1,5 +1,6 @@
 import 'server-only';
-import { accCarModelName, accCarManufacturerLogoUrl } from '@sra/domain';
+import { accCarModelName } from '@sra/domain';
+import { accCarManufacturerLogoUrl } from './acc/manufacturer-logo';
 import { supabase } from './supabase';
 import { BOP_CAR_MODELS, BOP_TRACKS } from '@/content/bop';
 import { BOP_DATA, MANUFACTURER_LOGOS } from '@/content/custom-bop';
