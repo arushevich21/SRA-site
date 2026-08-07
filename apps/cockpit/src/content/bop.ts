@@ -15,10 +15,20 @@ export const BOP_CAR_MODELS: number[] = [
 ];
 
 // Rows: reuse the ACC catalog tracks (every one carries an accTrackKey).
+// Display names shorten to fit the BoP grid's column headers (e.g. COTA
+// instead of the full "Circuit of the Americas") without affecting the
+// full name shown elsewhere (leaderboards, standings, etc).
+const BOP_DISPLAY_NAME_OVERRIDES: Record<string, string> = {
+  cota: 'COTA',
+};
+
 export const BOP_TRACKS: { key: string; displayName: string }[] =
   SIM_CATALOG.ACC.tracks
     .filter((t) => t.accTrackKey)
-    .map((t) => ({ key: t.accTrackKey as string, displayName: t.displayName }));
+    .map((t) => ({
+      key: t.accTrackKey as string,
+      displayName: BOP_DISPLAY_NAME_OVERRIDES[t.accTrackKey as string] ?? t.displayName,
+    }));
 
 export function clampBallast(n: number): number {
   return Math.max(BOP_BALLAST_MIN, Math.min(BOP_BALLAST_MAX, Math.trunc(n)));

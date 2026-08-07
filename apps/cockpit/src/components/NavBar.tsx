@@ -31,7 +31,7 @@ const MAIN_NAV: NavItem[] = [
       { label: 'Rules & Regs', href: '/about/rules' },
       { label: 'Reference Lap Times', href: '/about/reference-lap-times' },
       { label: 'Custom BoP', href: '/about/custom-bop' },
-      { label: 'SRAting', href: '/about/srating' },
+      { label: 'SRAting', href: '/acc/srating' },
       { label: 'Drivers & Stats', href: '/about/drivers' },
       { label: 'Statistics', href: '/about/stats' },
       { label: 'Accolades', href: '/about/accolades' },
