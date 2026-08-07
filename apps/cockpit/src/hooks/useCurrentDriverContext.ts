@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 export type CurrentDriverContext = {
+  driverId: string | null; // drivers.id (uuid) — null if signed out
   steamId: string | null;
   division: number | null; // 1-4, from drivers.division_id — null if unassigned
 };
 
-const SIGNED_OUT: CurrentDriverContext = { steamId: null, division: null };
+const SIGNED_OUT: CurrentDriverContext = { driverId: null, steamId: null, division: null };
 
 // Client-side counterpart to lib/current-driver.ts's getCurrentDriverContext —
 // fetched in the browser (not via a server-side cookie read) so leaderboard
@@ -42,11 +43,12 @@ export function useCurrentDriverContext(): CurrentDriverContext {
       }
       const { data } = await supabase
         .from('drivers')
-        .select('steam_id, division_id')
+        .select('id, steam_id, division_id')
         .eq('user_id', user.id)
         .maybeSingle();
       if (active) {
         setContext({
+          driverId: data?.id ?? null,
           steamId: data?.steam_id ?? null,
           division: data?.division_id ?? null,
         });
