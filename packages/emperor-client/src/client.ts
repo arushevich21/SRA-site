@@ -55,14 +55,24 @@ export type EmperorClientOptions = {
   // Minimum gap between consecutive requests made by this client instance.
   // Emperor's documented limit is ~2 req/min; default stays safely under that.
   minRequestIntervalMs?: number;
-  // Hard ceiling on a single request. Emperor (ACCSM especially) sometimes
-  // accepts a connection then stalls without ever responding — a plain fetch()
-  // has no timeout, so that request hangs forever. In a serverless caller that
-  // means the whole function runs until the platform kills it, so any DB lock
-  // it holds (see the ACC hot-lap refresh lock) is stranded and no work gets
-  // done. Aborting after this many ms turns an indefinite hang into a normal
-  // per-request error the caller can log and move past. Default 15s.
+  // Hard ceiling on a single request for endpoints without a more specific
+  // timeout below (healthcheck, championship standings). Emperor (ACCSM
+  // especially) sometimes accepts a connection then stalls without ever
+  // responding — a plain fetch() has no timeout, so that request hangs
+  // forever. In a serverless caller that means the whole function runs until
+  // the platform kills it, so any DB lock it holds (see the ACC hot-lap
+  // refresh lock) is stranded and no work gets done. Aborting after this many
+  // ms turns an indefinite hang into a normal per-request error the caller
+  // can log and move past. Default 15s.
   requestTimeoutMs?: number;
+  // Results-list is the first call made against each server and, for a dead
+  // host, the one whose hang costs the most — a short ceiling lets the ACC
+  // hot-lap cron's per-server tasks fail fast instead of burning the full
+  // socket timeout sequentially. Default 5s.
+  resultsListTimeoutMs?: number;
+  // Result JSON can be large, so it gets more headroom than the list call.
+  // Default 15s.
+  downloadTimeoutMs?: number;
 };
 
 function sleep(ms: number): Promise<void> {
@@ -80,31 +90,29 @@ export class EmperorClient {
   // Every request the client makes goes through here, so consumers never need
   // to hand-roll their own spacing/sleeps — see scripts/validate-ac-evo-lap-flags.ts
   // for what that looked like before this existed.
-  private async throttledFetch(url: string): Promise<Response> {
+  private async throttledFetch(url: string, timeoutMs: number): Promise<Response> {
     const minInterval = this.opts.minRequestIntervalMs ?? 31_000;
     const wait = this.lastRequestAt + minInterval - Date.now();
     if (wait > 0) await sleep(wait);
     this.lastRequestAt = Date.now();
 
-    const timeoutMs = this.opts.requestTimeoutMs ?? 15_000;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await fetch(url, { signal: controller.signal });
+      return await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     } catch (err) {
-      // A timeout surfaces as an AbortError; rewrite it into something the
+      // A timeout surfaces as a TimeoutError; rewrite it into something the
       // caller's logs can act on, and leave every other network error as-is.
-      if (controller.signal.aborted) {
+      if (err instanceof Error && err.name === 'TimeoutError') {
         throw new Error(`Emperor request timed out after ${timeoutMs}ms: ${url}`);
       }
       throw err;
-    } finally {
-      clearTimeout(timer);
     }
   }
 
   async getHealthcheck(): Promise<EmperorHealthcheck> {
-    const res = await this.throttledFetch(`${this.baseUrl}/healthcheck.json`);
+    const res = await this.throttledFetch(
+      `${this.baseUrl}/healthcheck.json`,
+      this.opts.requestTimeoutMs ?? 15_000,
+    );
     if (!res.ok) throw new Error(`Emperor healthcheck failed: ${res.status}`);
     const raw = await res.json();
     return {
@@ -119,7 +127,7 @@ export class EmperorClient {
   // Emperor's results list API is 0-indexed (current_page: 0 for the first page).
   async getResultsList(page = 0): Promise<EmperorResultListPage> {
     const url = `${this.baseUrl}/api/results/list.json?page=${page}`;
-    const res = await this.throttledFetch(url);
+    const res = await this.throttledFetch(url, this.opts.resultsListTimeoutMs ?? 5_000);
     if (!res.ok) throw new Error(`Emperor results list failed: ${res.status}`);
     const raw: RawResultListResponse = await res.json();
     return {
@@ -143,14 +151,14 @@ export class EmperorClient {
     const url = resultsJsonUrl.startsWith('http')
       ? resultsJsonUrl
       : `${this.baseUrl}${resultsJsonUrl}`;
-    const res = await this.throttledFetch(url);
+    const res = await this.throttledFetch(url, this.opts.downloadTimeoutMs ?? 15_000);
     if (!res.ok) throw new Error(`Emperor result download failed: ${res.status} for ${url}`);
     return res.json();
   }
 
   async getChampionshipStandings(championshipId: string): Promise<EmperorChampionshipStandings> {
     const url = `${this.baseUrl}/api/championship/${championshipId}/standings.json`;
-    const res = await this.throttledFetch(url);
+    const res = await this.throttledFetch(url, this.opts.requestTimeoutMs ?? 15_000);
     if (!res.ok) throw new Error(`Emperor championship standings failed: ${res.status}`);
     const raw: RawChampionshipStandingsResponse = await res.json();
     return normalizeChampionshipStandings(raw);

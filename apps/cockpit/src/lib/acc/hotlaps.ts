@@ -72,13 +72,26 @@ export async function refreshWithLock(): Promise<AccIncrementalRefreshResult | n
     // below and strand the lock). The losing runIncrementalRefresh keeps going
     // on the background instance but is no longer awaited; its already-marked
     // sessions persist and releaseLock frees the row for the next tick.
+    //
+    // progress is shared with runIncrementalRefresh so the deadline path can
+    // report what was actually committed before it fired, rather than always
+    // claiming zero — the route only busts the leaderboard cache for tracks
+    // that come back in the result, so an accurate partial list here is what
+    // keeps a truncated run from leaving stale cached pages.
+    const progress: { tracks: Set<string>; count: number } = { tracks: new Set(), count: 0 };
     const deadline = new Promise<AccIncrementalRefreshResult>((resolve) =>
       setTimeout(
-        () => resolve({ processed: 0, tracks: [], durationMs: RUN_DEADLINE_MS, timedOut: true }),
+        () =>
+          resolve({
+            processed: progress.count,
+            tracks: [...progress.tracks],
+            durationMs: RUN_DEADLINE_MS,
+            timedOut: true,
+          }),
         RUN_DEADLINE_MS,
       ),
     );
-    const result = await Promise.race([runIncrementalRefresh(), deadline]);
+    const result = await Promise.race([runIncrementalRefresh(progress), deadline]);
     if (result.timedOut) {
       console.error(`ACC hot-lap refresh: hit ${RUN_DEADLINE_MS}ms deadline — a step stalled; releasing lock (see per-step timing logs above)`);
     }
@@ -97,126 +110,162 @@ export async function refreshWithLock(): Promise<AccIncrementalRefreshResult | n
 // scripts/check-emperor-page-order.ts) and processing sessions not yet in
 // acc_processed_sessions. New tracks (e.g. a quick-race venue) are
 // auto-created with a placeholder name by upsertTrackAndLeaderboard.
-async function runIncrementalRefresh(): Promise<AccIncrementalRefreshResult> {
+async function runIncrementalRefresh(
+  progress: { tracks: Set<string>; count: number } = { tracks: new Set(), count: 0 },
+): Promise<AccIncrementalRefreshResult> {
   const startedAt = Date.now();
+
+  // One task per server, run concurrently. Each server keeps its own
+  // EmperorClient (own minRequestIntervalMs pacing clock) and its own local
+  // {tracks, count} accumulator — results are merged below, after
+  // allSettled, rather than mutated from multiple tasks onto shared state.
+  // `progress` is the one exception: it's updated live, as each session
+  // completes, purely so the RUN_DEADLINE_MS race in refreshWithLock can
+  // report accurate partial counts if it fires mid-run — see its usage there.
+  const serverResults = await Promise.allSettled(
+    EMPEROR_ACC_BASE_URLS.map((baseUrl) => runServerRefresh(baseUrl, progress)),
+  );
+
   const processedTracks = new Set<string>();
   let processedCount = 0;
-
-  for (const baseUrl of EMPEROR_ACC_BASE_URLS) {
-    try {
-      const client = new EmperorClient(baseUrl, { minRequestIntervalMs: CRON_REQUEST_INTERVAL_MS });
-
-      console.log(`ACC refresh: [${baseUrl}] fetching results list…`);
-      const listStart = Date.now();
-      const { entries } = await client.getResultsList(0);
-      console.log(`ACC refresh: [${baseUrl}] results list returned ${entries.length} entries in ${Date.now() - listStart}ms`);
-      if (entries.length === 0) continue;
-
-      // Registry check is the sole source of truth for "already processed" —
-      // page 0 is capped at ~20 entries, so checking every one is cheap. An
-      // earlier version pre-filtered by wall-clock date (last run's
-      // completion time) before this check, as an optimization; that silently
-      // and permanently orphaned any entry whose results.json appeared later
-      // than its embedded session date, or that a prior run's cap/error left
-      // behind — once the cutoff advanced past it, it was never picked up
-      // again. Confirmed happening in practice (Nurburgring FP posted
-      // 2026-07-22T18:13:41Z, still unprocessed, excluded because a later run
-      // had already bumped the cutoff past it).
-      const allUrls = entries.map((e) => e.resultsJsonUrl);
-      const knownStart = Date.now();
-      const { data: knownRows, error: knownError } = await supabase
-        .from('acc_processed_sessions')
-        .select('session_url')
-        .in('session_url', allUrls);
-      console.log(`ACC refresh: [${baseUrl}] known-sessions lookup took ${Date.now() - knownStart}ms`);
-
-      if (knownError) {
-        console.error(`ACC hot-lap refresh: known-sessions lookup failed for ${baseUrl}:`, knownError);
-        continue;
-      }
-
-      const knownUrls = new Set((knownRows ?? []).map((r) => r.session_url as string));
-
-      // Can't assume a clean "unprocessed prefix, then already-processed
-      // rest" boundary — MAX_SESSIONS_PER_SERVER_PER_RUN means a run can leave
-      // older entries unprocessed while a newer one right before them (in
-      // this newest-first list) already got marked done. Check every entry
-      // rather than stopping at the first known one.
-      const newEntries = entries.filter((e) => !knownUrls.has(e.resultsJsonUrl));
-
-      if (newEntries.length === 0) continue;
-
-      // Unlike the AC Evo cron, there's no backfill script for ACC — this cron
-      // is the only ingestion path, and this never reaches further back than
-      // page 0 regardless. Cap what gets processed this run (see
-      // MAX_SESSIONS_PER_SERVER_PER_RUN) — a big first-run backlog drains over
-      // several runs rather than all at once or never.
-      const toProcess = newEntries.slice(0, MAX_SESSIONS_PER_SERVER_PER_RUN);
-      if (newEntries.length > toProcess.length) {
-        console.log(
-          `ACC hot-lap refresh: ${newEntries.length} new session(s) for ${baseUrl}, processing ${toProcess.length} this run — remainder picked up next run`,
-        );
-      }
-
-      for (const entry of toProcess) {
-        try {
-          // Per-step timing: the last line logged before the run goes silent
-          // (and hits RUN_DEADLINE_MS) pinpoints which await stalled — Emperor
-          // download, parse, hot-lap upsert, race ingest, or the mark insert.
-          console.log(`ACC refresh: → download ${entry.resultsJsonUrl} (${baseUrl})`);
-          const tStart = Date.now();
-          const raw = await client.downloadResult(entry.resultsJsonUrl);
-          const tDownload = Date.now();
-
-          const session = parseAccSession(raw);
-          const tParse = Date.now();
-
-          await upsertTrackAndLeaderboard(entry.track, session);
-          const tHotlap = Date.now();
-
-          // Full race-results storage — separate table/concern from the
-          // hot-lap leaderboard above. Its own try/catch so a failure here
-          // can't leave this session stuck unprocessed (it's still marked
-          // done below) or abort the rest of the run.
-          try {
-            await ingestAccRaceSession(session, entry.resultsJsonUrl);
-          } catch (raceResultsErr) {
-            console.error(`ACC race-results ingest failed for ${entry.resultsJsonUrl}:`, raceResultsErr);
-          }
-          const tRace = Date.now();
-
-          const { error: markErr } = await supabase.from('acc_processed_sessions').insert({
-            session_url: entry.resultsJsonUrl,
-            track: entry.track,
-            session_type: entry.sessionType,
-            session_date: entry.date,
-          });
-          if (markErr) throw markErr;
-          const tMark = Date.now();
-
-          processedTracks.add(entry.track);
-          processedCount++;
-          console.log(
-            `ACC hot-lap refresh: processed [${entry.sessionType}] ${entry.track} @ ${entry.date} (${baseUrl}) — ` +
-              `download=${tDownload - tStart}ms parse=${tParse - tDownload}ms hotlap=${tHotlap - tParse}ms ` +
-              `race=${tRace - tHotlap}ms mark=${tMark - tRace}ms`,
-          );
-        } catch (err) {
-          // Don't let one session abort the rest — its URL stays unmarked, so
-          // the next run retries it.
-          console.error(`ACC hot-lap refresh: failed to process ${entry.resultsJsonUrl}:`, err);
-        }
-      }
-    } catch (err) {
-      // Don't let one unreachable/not-yet-live server (e.g. accsm1-3/5-7
-      // before they're brought online) abort the rest of the server list.
-      console.error(`ACC hot-lap refresh: server ${baseUrl} failed:`, err);
-    }
+  for (const result of serverResults) {
+    // runServerRefresh has its own top-level try/catch, so a rejection here
+    // shouldn't happen — guard anyway rather than let one bad promise wipe
+    // out every other server's already-fulfilled contribution.
+    if (result.status !== 'fulfilled') continue;
+    for (const track of result.value.tracks) processedTracks.add(track);
+    processedCount += result.value.count;
   }
 
   const durationMs = Date.now() - startedAt;
   console.log(`ACC hot-lap refresh: done — ${processedCount} session(s) in ${Math.round(durationMs / 1000)}s`);
   return { processed: processedCount, tracks: [...processedTracks], durationMs };
+}
+
+async function runServerRefresh(
+  baseUrl: string,
+  progress: { tracks: Set<string>; count: number },
+): Promise<{ tracks: string[]; count: number }> {
+  const tracks = new Set<string>();
+  let count = 0;
+
+  try {
+    const client = new EmperorClient(baseUrl, { minRequestIntervalMs: CRON_REQUEST_INTERVAL_MS });
+
+    console.log(`ACC refresh: [${baseUrl}] fetching results list…`);
+    const listStart = Date.now();
+    const { entries } = await client.getResultsList(0);
+    console.log(`ACC refresh: [${baseUrl}] results list returned ${entries.length} entries in ${Date.now() - listStart}ms`);
+    if (entries.length === 0) return { tracks: [...tracks], count };
+
+    // Registry check is the sole source of truth for "already processed" —
+    // page 0 is capped at ~20 entries, so checking every one is cheap. An
+    // earlier version pre-filtered by wall-clock date (last run's
+    // completion time) before this check, as an optimization; that silently
+    // and permanently orphaned any entry whose results.json appeared later
+    // than its embedded session date, or that a prior run's cap/error left
+    // behind — once the cutoff advanced past it, it was never picked up
+    // again. Confirmed happening in practice (Nurburgring FP posted
+    // 2026-07-22T18:13:41Z, still unprocessed, excluded because a later run
+    // had already bumped the cutoff past it).
+    const allUrls = entries.map((e) => e.resultsJsonUrl);
+    const knownStart = Date.now();
+    const { data: knownRows, error: knownError } = await supabase
+      .from('acc_processed_sessions')
+      .select('session_url')
+      .in('session_url', allUrls);
+    console.log(`ACC refresh: [${baseUrl}] known-sessions lookup took ${Date.now() - knownStart}ms`);
+
+    if (knownError) {
+      console.error(`ACC hot-lap refresh: known-sessions lookup failed for ${baseUrl}:`, knownError);
+      return { tracks: [...tracks], count };
+    }
+
+    const knownUrls = new Set((knownRows ?? []).map((r) => r.session_url as string));
+
+    // Can't assume a clean "unprocessed prefix, then already-processed
+    // rest" boundary — MAX_SESSIONS_PER_SERVER_PER_RUN means a run can leave
+    // older entries unprocessed while a newer one right before them (in
+    // this newest-first list) already got marked done. Check every entry
+    // rather than stopping at the first known one.
+    const newEntries = entries.filter((e) => !knownUrls.has(e.resultsJsonUrl));
+
+    if (newEntries.length === 0) return { tracks: [...tracks], count };
+
+    // Unlike the AC Evo cron, there's no backfill script for ACC — this cron
+    // is the only ingestion path, and this never reaches further back than
+    // page 0 regardless. Cap what gets processed this run (see
+    // MAX_SESSIONS_PER_SERVER_PER_RUN) — a big first-run backlog drains over
+    // several runs rather than all at once or never.
+    const toProcess = newEntries.slice(0, MAX_SESSIONS_PER_SERVER_PER_RUN);
+    if (newEntries.length > toProcess.length) {
+      console.log(
+        `ACC hot-lap refresh: ${newEntries.length} new session(s) for ${baseUrl}, processing ${toProcess.length} this run — remainder picked up next run`,
+      );
+    }
+
+    for (const entry of toProcess) {
+      try {
+        // Per-step timing: the last line logged before the run goes silent
+        // (and hits RUN_DEADLINE_MS) pinpoints which await stalled — Emperor
+        // download, parse, hot-lap upsert, race ingest, or the mark insert.
+        console.log(`ACC refresh: → download ${entry.resultsJsonUrl} (${baseUrl})`);
+        const tStart = Date.now();
+        const raw = await client.downloadResult(entry.resultsJsonUrl);
+        const tDownload = Date.now();
+
+        const session = parseAccSession(raw);
+        const tParse = Date.now();
+
+        await upsertTrackAndLeaderboard(entry.track, session);
+        const tHotlap = Date.now();
+
+        // Full race-results storage — separate table/concern from the
+        // hot-lap leaderboard above. Its own try/catch so a failure here
+        // can't leave this session stuck unprocessed (it's still marked
+        // done below) or abort the rest of the run.
+        try {
+          await ingestAccRaceSession(session, entry.resultsJsonUrl);
+        } catch (raceResultsErr) {
+          console.error(`ACC race-results ingest failed for ${entry.resultsJsonUrl}:`, raceResultsErr);
+        }
+        const tRace = Date.now();
+
+        const { error: markErr } = await supabase.from('acc_processed_sessions').insert({
+          session_url: entry.resultsJsonUrl,
+          track: entry.track,
+          session_type: entry.sessionType,
+          session_date: entry.date,
+        });
+        if (markErr) throw markErr;
+        const tMark = Date.now();
+
+        tracks.add(entry.track);
+        count++;
+        // Live-updated for the RUN_DEADLINE_MS race in refreshWithLock — see
+        // the comment on `progress` there. Plain Set.add/increment is safe
+        // here even with multiple server tasks in flight concurrently: JS
+        // never interleaves mid-statement, so there's no lost update.
+        progress.tracks.add(entry.track);
+        progress.count++;
+        console.log(
+          `ACC hot-lap refresh: processed [${entry.sessionType}] ${entry.track} @ ${entry.date} (${baseUrl}) — ` +
+            `download=${tDownload - tStart}ms parse=${tParse - tDownload}ms hotlap=${tHotlap - tParse}ms ` +
+            `race=${tRace - tHotlap}ms mark=${tMark - tRace}ms`,
+        );
+      } catch (err) {
+        // Don't let one session abort the rest — its URL stays unmarked, so
+        // the next run retries it.
+        console.error(`ACC hot-lap refresh: failed to process ${entry.resultsJsonUrl}:`, err);
+      }
+    }
+  } catch (err) {
+    // Don't let one unreachable/not-yet-live server (e.g. accsm1-3/5-7
+    // before they're brought online) abort the rest of the server list.
+    console.error(`ACC hot-lap refresh: server ${baseUrl} failed:`, err);
+  }
+
+  return { tracks: [...tracks], count };
 }
 
 // Ensures the track exists in acc_tracks (placeholder display_name = the raw
