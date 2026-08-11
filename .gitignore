@@ -32,3 +32,8 @@ fixtures/gridos/
 .next/
 *Zone.Identifier
 scripts/drivers_seed.json
+
+# Supabase CLI's local link cache (project ref, pooler URL, version info) —
+# machine-local state from `supabase link`, not project source. schema.sql
+# (the actual schema snapshot dump-schema.ps1 produces) is committed.
+supabase/.temp/
