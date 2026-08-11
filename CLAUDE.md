@@ -30,6 +30,37 @@ We never write to SimGrid. Our durable truth (standings snapshots, driver
 identity, registrations, penalty/points state) lives in **our own store
 (Supabase + `packages/store`)**.
 
+## Database schema — always read this first
+
+**`supabase/schema.sql` is the authoritative schema reference.** It's a full
+`pg_dump --schema-only` of the `public` schema: every table, column, type,
+index, function, trigger, and RLS policy. Treat it as ground truth over any
+assumption about what a table contains.
+
+Regenerate after **every** migration — a stale snapshot is worse than none,
+because it produces confident reasoning against columns that no longer exist:
+
+```powershell
+.\scripts\dump-schema.ps1
+```
+
+Connection notes (these took a while to pin down, don't re-derive them):
+
+- Server is **PostgreSQL 17.6**. The local `pg_dump` client must be 17.x or
+  newer — an older client refuses to dump a newer server.
+- The **direct** host `db.<ref>.supabase.co` does not resolve from this
+  network. Use the **session pooler**:
+  `aws-1-us-west-2.pooler.supabase.com:5432`, user `postgres.<project-ref>`.
+- Session pooler (5432), **not** transaction pooler (6543) — `pg_dump` needs a
+  real session with prepared statements.
+- `supabase db dump` via the CLI requires Docker, which isn't installed. Use
+  `pg_dump` directly.
+- The DB password is a **separate credential** from the service-role key. It
+  lives as `SUPABASE_DB_PASSWORD` in `apps/cockpit/.env.local` (git-ignored).
+
+`supabase/schema.sql` contains no credentials and **is committed** — schema
+changes then show up as reviewable diffs in PRs, which catches drift.
+
 ## Architecture at a glance
 
 **Monorepo** (pnpm workspaces). Key packages/apps:
@@ -68,6 +99,32 @@ identity, registrations, penalty/points state) lives in **our own store
 - Legacy flat pages (`/championships`, `/calendar`, `/about/*`) still exist and
   coexist during transition. [VERIFY: reconciliation status.]
 
+## Driver identity — the join rule
+
+**SteamID is the stable identity anchor across every source.** But it is
+stored in two different formats, and getting this wrong silently produces zero
+matches:
+
+- `drivers.steam_id` — `text`, stored **bare**: `76561198129073265`
+- `player_id` on ratings/leaderboard tables — `text`, **`S`-prefixed**:
+  `S76561198129073265` (ACC's native format)
+
+So the join is:
+
+```sql
+join public.drivers d on d.steam_id = substring(r.player_id from 2)
+```
+
+Never assume the prefix convention — check both sides before writing a
+migration. Some tables may store it either way.
+
+Known identity gaps as of this writing:
+
+- 5 rows in `drivers` have a **NULL `steam_id`**. These can never match a
+  `player_id` join. They group together in a `count(*) > 1` duplicate check and
+  look like a duplicate — they aren't.
+- Orphans exist: `player_id` values with no corresponding `drivers` row at all.
+
 ## Data sources & key facts
 
 - **Emperor (AC Evo/ACC):** base e.g. `https://sram1acevo.emperorservers.com`.
@@ -86,8 +143,19 @@ identity, registrations, penalty/points state) lives in **our own store
 - **Standings storage:** Supabase (`standings` table, jsonb keyed by
   `standings_key`). Filesystem storage fails on Vercel (read-only runtime);
   pages reading live/uploaded standings use `export const dynamic = 'force-dynamic'`.
-- **Supabase tables:** `standings` (in use), `drivers` and `team_registrations`
-  (for the registration feature — [VERIFY current schema]).
+  [VERIFY: `force-dynamic` disables caching entirely — confirm it's still
+  needed on every standings route, or whether some can be cached.]
+
+### Supabase tables (partial inventory — `schema.sql` is authoritative)
+
+- `standings` — jsonb standings snapshots keyed by `standings_key`
+- `drivers` — driver identity; `steam_id text`, `steam_verified boolean`
+- `driver_ratings` — PK `player_id text`, FK `driver_id uuid`
+- `srating_history` — same `player_id` / `driver_id` column pair
+- `acc_hotlap_leaderboard`, `acc_hotstint_leaderboard` — `steam_id text`
+- `acevo_round_points_cache`, `acevo_round_points_cache_v2` —
+  `pole_steam_id`, `fastest_lap_steam_id`
+- `team_registrations` — registration feature [VERIFY current schema]
 
 ## In progress
 
@@ -99,6 +167,21 @@ identity, Supabase Auth Discord OAuth) + SteamID linked during registration
 first (team standings come later, since ACC results pipeline isn't built yet).
 A members JSON (Discord+SteamID) exists and can pre-seed the `drivers` table.
 Build order: (1) auth + identity, (2) division admin UI, (3) registration flow.
+
+**`driver_id` backfill.** `driver_ratings` is **done** — 714 of 750 null rows
+linked, 36 orphans remain unlinked. Still outstanding:
+
+1. `srating_history` — same backfill, not yet run. Dry-run the counts first;
+   don't assume the orphan population matches `driver_ratings` (history tables
+   reach further back and pick up drivers since removed).
+2. Resolve the 36 orphans — either create `drivers` rows or accept a permanent
+   null, and confirm site queries tolerate it.
+3. Investigate the 5 NULL-`steam_id` driver rows; some may *be* orphans whose
+   `steam_id` was simply never populated, fixable without new records.
+4. **Prevent recurrence.** Nothing currently stops a new `driver_ratings` row
+   from landing with a null `driver_id`. Once orphans are cleared, a `NOT NULL`
+   FK turns a silent data problem into a loud insert failure at the point it
+   happens. Decide whether resolution belongs in the ingest path or a trigger.
 
 ## Conventions
 
@@ -113,19 +196,29 @@ Build order: (1) auth + identity, (2) division admin UI, (3) registration flow.
 - **Test-first on `packages/domain`** — it's pure and its tests catch the bugs
   that matter most.
 - **Before committing:** `pnpm typecheck`, `pnpm lint`, `pnpm --filter cockpit build`.
-- **Secrets discipline:** API keys and the Supabase **service-role** key never
-  in the repo, never client-side, never in any `NEXT_PUBLIC_` var. `.env.local`
-  is git-ignored. **gitleaks** runs as a pre-commit hook and in CI.
-- **Env vars** (in `.env.local` + Vercel, both Production and Preview):
-  `GRIDOS_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`,
-  `SUPABASE_SERVICE_ROLE_KEY`, `DISCORD_INTEGRATION_WEBHOOK_URL` (optional —
-  unset disables the SRA-Bot nick/role resync nudge). [VERIFY full current list.]
+- **Wrap destructive SQL in a transaction.** `begin;` → run → check the affected
+  row count against the dry-run estimate → `commit;` or `rollback;`. A mismatch
+  usually means a duplicate join key silently picked an arbitrary row.
+- **Dry-run before any backfill.** Count `matchable` vs `orphans` with a `LEFT
+  JOIN` before writing the `UPDATE`. Diagnose in SQL before changing schema —
+  more than one issue here has been misdiagnosed before the data was checked.
+- **Secrets discipline:** API keys, the Supabase **service-role** key, and the
+  **database password** never in the repo, never client-side, never in any
+  `NEXT_PUBLIC_` var. `.env.local` is git-ignored. **gitleaks** runs as a
+  pre-commit hook and in CI. Never paste a full connection string into a
+  terminal you might screenshot — the password is embedded in it.
+- **Env vars** (in `apps/cockpit/.env.local` + Vercel, both Production and
+  Preview): `GRIDOS_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_PASSWORD` (local schema dumps only),
+  `DISCORD_INTEGRATION_WEBHOOK_URL` (optional — unset disables the SRA-Bot
+  nick/role resync nudge). [VERIFY full current list.]
 - **Windows/WSL:** avoid committing `*Zone.Identifier` NTFS metadata files
   (they break Windows checkouts — gitignored). Some pnpm/dev commands must run
-  with `--filter cockpit` rather than from root.
+  with `--filter cockpit` rather than from root. In PowerShell, backtick line
+  continuations break easily on paste — keep long commands on one line.
 
 ## Working style
 
 Prefer complete file replacements over partial patches when asked. For any
 multi-part or security-sensitive build (auth, RLS, ingestion), present the plan
-and proposed types/schema for review BEFORE implementing.
+and proposed types/schema for review BEFORE implementing.s
