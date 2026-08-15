@@ -19,6 +19,8 @@ type Props = {
   currentDriverId: string;
   simSlug: string;
   maxTeamSize: number;
+  championshipKey: string;
+  season: string;
 };
 
 export default function CurrentTeam({
@@ -30,6 +32,8 @@ export default function CurrentTeam({
   currentDriverId,
   simSlug,
   maxTeamSize,
+  championshipKey,
+  season,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -37,7 +41,7 @@ export default function CurrentTeam({
 
   function handleLeave() {
     startTransition(async () => {
-      await leaveTeam(teamId, simSlug);
+      await leaveTeam(teamId, championshipKey, season, simSlug);
       router.refresh();
     });
   }

@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import Link from 'next/link';
+import { accCarModelName } from '@sra/domain';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabase as adminClient } from '@/lib/supabase';
 import type { ChampionshipContent } from '@/content/championships';
@@ -13,14 +14,19 @@ type RawMemberJoin = {
   driver_id: string;
   drivers: { display_name: string | null; tier: string | null } | null;
 };
-type RawTeamJoin = {
+type RawRegistrationJoin = {
   id: string;
-  team_name: string;
-  car: string;
+  team_id: string;
+  car_model_id: number | null;
   division_id: number;
-  divisions: { name: string } | null;
-  team_members: RawMemberJoin[] | null;
+  teams: { name: string } | { name: string }[] | null;
+  divisions: { name: string } | { name: string }[] | null;
+  registration_drivers: RawMemberJoin[] | null;
 };
+
+function one<T>(rel: T | T[] | null): T | null {
+  return Array.isArray(rel) ? (rel[0] ?? null) : rel;
+}
 
 export async function RegisterBody({
   champ,
@@ -60,47 +66,50 @@ export async function RegisterBody({
     );
   }
 
-  // ── Public: fetch all registered teams (no auth needed) ───────────────────
-  const { data: rawTeams } = await adminClient
-    .from('team_registrations')
+  // ── Public: fetch the confirmed entry list (no auth needed) ────────────────
+  // registrations/registration_drivers, not team_registrations/team_members —
+  // registration_drivers is authoritative for "who is in this car for this
+  // event" (see supabase/migrations/20260814d-f). Waitlisted entries are
+  // excluded from the public entry list (they aren't "in" the event yet),
+  // but see takenSet below — a waitlisted claim still counts as taken.
+  const { data: rawRegistrations } = await adminClient
+    .from('registrations')
     .select(
-      'id, team_name, car, division_id, divisions(name), team_members(driver_id, drivers(display_name, tier))',
+      'id, team_id, car_model_id, division_id, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, tier))',
     )
     .eq('championship_key', champ.registrationKey)
     .eq('season', champ.registrationSeason)
-    .order('team_name');
+    .eq('status', 'confirmed')
+    .order('id');
 
-  const teams: Team[] = ((rawTeams ?? []) as unknown as RawTeamJoin[]).map(
+  const teams: Team[] = ((rawRegistrations ?? []) as unknown as RawRegistrationJoin[]).map(
     (r) => ({
-      id: r.id,
-      team_name: r.team_name,
-      car: r.car,
+      id: r.team_id,
+      team_name: one(r.teams)?.name ?? 'Unnamed Team',
+      car: (r.car_model_id != null ? accCarModelName(r.car_model_id) : null) ?? 'Unknown Car',
       division_id: r.division_id,
-      division_name:
-        (r.divisions as unknown as { name: string } | null)?.name ??
-        `Division ${r.division_id}`,
-      members: ((r.team_members ?? []) as unknown as RawMemberJoin[]).map(
-        (m) => ({
-          driver_id: m.driver_id,
-          display_name:
-            (
-              m.drivers as unknown as {
-                display_name: string | null;
-              } | null
-            )?.display_name ?? null,
-          tier: (
-            (m.drivers as unknown as { tier: string | null } | null)?.tier ??
-            null
-          ) as 'gold' | 'silver' | null,
-        }),
-      ),
+      division_name: one(r.divisions)?.name ?? `Division ${r.division_id}`,
+      members: (r.registration_drivers ?? []).map((m) => ({
+        driver_id: m.driver_id,
+        display_name: m.drivers?.display_name ?? null,
+        tier: (m.drivers?.tier ?? null) as 'gold' | 'silver' | null,
+      })),
     }),
   );
 
-  // Derive taken set from fetched teams — avoids a separate team_members query
-  const takenSet = new Set(
-    teams.flatMap((t) => t.members.map((m) => m.driver_id)),
-  );
+  // Every driver already CLAIMED for this event, confirmed or waitlisted —
+  // register_entry()'s unique constraint blocks a second claim regardless of
+  // status, so a waitlisted driver must not appear as "available" here
+  // either. Queried directly against registration_drivers (denormalized
+  // championship_key/season, see 20260814d), not derived from the
+  // confirmed-only `teams` list above, specifically to include waitlisted
+  // claims the public entry list itself doesn't show.
+  const { data: claimedRows } = await adminClient
+    .from('registration_drivers')
+    .select('driver_id')
+    .eq('championship_key', champ.registrationKey)
+    .eq('season', champ.registrationSeason);
+  const takenSet = new Set((claimedRows ?? []).map((r) => r.driver_id as string));
 
   // ── Auth ───────────────────────────────────────────────────────────────────
   const supabase = await createSupabaseServerClient();
@@ -157,7 +166,14 @@ export async function RegisterBody({
         </div>
       );
     } else {
-      // Derive team membership from the already-fetched teams list
+      // Derive team membership from the already-fetched (confirmed-only)
+      // teams list. NOTE: a WAITLISTED registrant (claimed via takenSet
+      // above, but not in `teams` since that's confirmed-only) falls
+      // through to the registration form below rather than a "you're
+      // waitlisted" state — CurrentTeam/TeamList have no such state today.
+      // They'd hit DRIVER_ALREADY_CLAIMED if they tried to submit again,
+      // which is correct but not a good message for someone legitimately
+      // waitlisted. Flagged, not built — out of scope for this pass.
       const myTeam = teams.find((t) =>
         t.members.some((m) => m.driver_id === driver.id),
       );
@@ -173,6 +189,8 @@ export async function RegisterBody({
             currentDriverId={driver.id}
             simSlug={simSlug}
             maxTeamSize={champ.maxTeamSize}
+            championshipKey={champ.registrationKey}
+            season={champ.registrationSeason}
           />
         );
       } else {

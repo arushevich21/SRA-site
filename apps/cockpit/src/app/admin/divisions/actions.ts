@@ -1,7 +1,41 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/require-admin';
 import { supabase } from '@/lib/supabase';
+
+// drivers.division_id/drivers.tier feed the tier badge (getDriverTierBadge,
+// lib/driver-tier-badge.ts) wherever a driver's registered classification is
+// shown. Exactly two page-level caches actually read that data and need
+// busting after a write here — enumerated explicitly rather than blowing the
+// whole site cache, since this runs repeatedly during classification:
+//   - /acc/srating — no `revalidate`/`dynamic` export, so it's cached
+//     indefinitely between explicit busts (same as /api/cron/refresh-srating
+//     already does for its own reason). SRAting is GT3-only, hence the
+//     hardcoded /acc/ prefix rather than a dynamic [sim] path.
+//   - /[sim]/championships/[slug]/leaderboards — `revalidate = 3600` ISR.
+//     sim/slug aren't derivable from a driver id here, so this uses Next's
+//     dynamic-route revalidation form (path template + 'page' type) to bust
+//     every sim/slug combination in one call instead of enumerating them.
+//
+// Deliberately does NOT reach the ACC hot-lap/hot-stint leaderboard pages
+// ([sim]/leaderboards/[track] and friends). Those routes are all
+// `force-dynamic`, so revalidatePath is a no-op for them — but the driver
+// info baked into their rows comes from getAccTrackLeaderboard/
+// getAccTrackHotStint (lib/acc/tracks.ts, lib/acc/hotstint.ts), each wrapped
+// in unstable_cache with `revalidate: 300` and a *per-track* tag
+// (`acc-hotlap:<track>` / `acc-hotstint:<track>`). unstable_cache's
+// `revalidate` is time-based and self-correcting — once 300s elapses, the
+// next request to that track's board simply refetches, no revalidateTag
+// required. So a badge changed here is wrong for at most 5 minutes on those
+// two pages and then fixes itself; deliberately not building per-driver
+// track lookups + per-track revalidateTag calls to shrink a five-minute
+// window that already self-heals (hotstint.ts ships with zero busting at all
+// today for the same reason).
+function revalidateDriverTierBadgePages(): void {
+  revalidatePath('/acc/srating');
+  revalidatePath('/[sim]/championships/[slug]/leaderboards', 'page');
+}
 
 export async function assignDivision(
   driverIds: string[],
@@ -16,6 +50,7 @@ export async function assignDivision(
     .in('id', driverIds);
 
   if (error) throw new Error(error.message);
+  revalidateDriverTierBadgePages();
 }
 
 export async function assignTier(
@@ -31,6 +66,7 @@ export async function assignTier(
     .in('id', driverIds);
 
   if (error) throw new Error(error.message);
+  revalidateDriverTierBadgePages();
 }
 
 /**
@@ -56,6 +92,7 @@ export async function assignBulk(
     .in('id', driverIds);
 
   if (error) throw new Error(error.message);
+  revalidateDriverTierBadgePages();
 }
 
 export type ResolveDiscordIdsResult = {

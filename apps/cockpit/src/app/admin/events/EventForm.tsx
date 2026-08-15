@@ -301,6 +301,18 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
           <div className="flex items-end"><Check label="Registration open" value={f.registrationOpen}
             onChange={(v) => set('registrationOpen', v)} /></div>
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <label className={labelCls}>
+            Max registrations
+            <input type="number" min={1} step={1} className={inputCls} value={f.maxRegistrations}
+              placeholder="Unlimited" onChange={(e) => set('maxRegistrations', e.target.value)} />
+          </label>
+        </div>
+        <p className="font-sans text-[12px] text-txt-3 -mt-3">
+          Caps CONFIRMED entries (cars/teams, not drivers). Leave empty for unlimited. Once
+          confirmed entries reach this number, new registrations are waitlisted instead of
+          rejected — see the Registrations section below once this event exists.
+        </p>
         <MultiSelectField label="Allowed cars" value={f.allowedCars} onChange={(v) => set('allowedCars', v)}
           options={catalog.cars} />
       </Section>

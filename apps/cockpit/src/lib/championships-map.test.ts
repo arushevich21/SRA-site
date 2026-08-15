@@ -24,6 +24,7 @@ function row(overrides: Partial<ChampionshipRow> = {}): ChampionshipRow {
     registration_season: null,
     registration_open: false,
     max_team_size: null,
+    max_registrations: null,
     allowed_cars: null,
     teaser_only: false,
     concluded: false,
