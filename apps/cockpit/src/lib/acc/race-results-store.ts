@@ -1,60 +1,19 @@
-import { computeAccEventKey, msToLaptime } from '@sra/domain';
+import { msToLaptime } from '@sra/domain';
 import type { AccSessionResult, AccSessionType } from '@sra/shared-types';
 import { supabase } from '../supabase';
+import { ingestAccRaceSessionInto } from './ingest-session';
 
 const SESSION_ORDER: Record<AccSessionType, number> = { Practice: 0, Qualify: 1, Race: 2 };
 
-// Upserts one parsed session into acc_race_sessions. sessionKey must be
-// stable and unique per session: the cron passes Emperor's resultsJsonUrl;
-// the admin upload page (no Emperor URL to key on) passes
-// 'manual:'+track+':'+sessionFile. Also ensures the track exists in both the
-// legacy acc_tracks table and the shared tracks/track_layouts v2 schema —
-// same idempotent upserts as hotlaps.ts's upsertTrackAndLeaderboard — so
-// this is self-sufficient regardless of caller, including the admin upload
-// action which (unlike the cron) never otherwise touches those tables, and
-// getAccTrack()/getAccTracks() (which read track_layouts) resolve a display
-// name for every event, not just cron-ingested ones.
+// Upserts one parsed session into acc_race_sessions, using the production
+// singleton client. Thin wrapper over ingestAccRaceSessionInto (see
+// ingest-session.ts for the actual upsert logic and why it's factored out
+// this way) — kept so existing callers (the cron's hotlaps.ts, the admin
+// upload action) don't need to change; scripts/backfill-acc-sessions.ts
+// calls ingestAccRaceSessionInto directly with its own client and
+// 'acc_race_sessions_staging' as the target instead.
 export async function ingestAccRaceSession(session: AccSessionResult, sessionKey: string): Promise<void> {
-  const { error: trackErr } = await supabase
-    .from('acc_tracks')
-    .upsert({ track_key: session.track, display_name: session.track }, { onConflict: 'track_key', ignoreDuplicates: true });
-  if (trackErr) throw trackErr;
-
-  try {
-    await supabase
-      .from('tracks')
-      .upsert({ base_track_key: session.track, display_name: session.track }, { onConflict: 'base_track_key', ignoreDuplicates: true })
-      .throwOnError();
-    await supabase
-      .from('track_layouts')
-      .upsert(
-        { layout_key: session.track, base_track_key: session.track, game: 'ACC', layout_name: null, display_name: session.track },
-        { onConflict: 'layout_key', ignoreDuplicates: true },
-      )
-      .throwOnError();
-  } catch (v2Err) {
-    console.error(`ACC tracks/track_layouts dual-write failed for "${session.track}":`, v2Err);
-  }
-
-  const { error } = await supabase.from('acc_race_sessions').upsert(
-    {
-      session_key: sessionKey,
-      event_key: computeAccEventKey(session),
-      session_type: session.sessionType,
-      track_key: session.track,
-      server_name: session.serverName,
-      session_date: session.date ?? new Date().toISOString(),
-      session_file: session.sessionFile,
-      meta_data: session.metaDataRaw,
-      championship_id: session.championshipId,
-      season_id: session.seasonId,
-      is_wet_session: session.isWetSession,
-      best_lap_ms: session.bestLapMs,
-      results: session.results,
-    },
-    { onConflict: 'session_key' },
-  );
-  if (error) throw error;
+  await ingestAccRaceSessionInto(supabase, 'acc_race_sessions', session, sessionKey);
 }
 
 export type AccRaceEventSummary = {
