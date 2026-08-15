@@ -4,6 +4,7 @@ import { TrackList, type TrackWithTopTimes } from '@/components/TrackList';
 import { LeaderboardTabs } from '@/components/LeaderboardTabs';
 import { GameLabel } from '@/components/GameLabel';
 import { hasSeasonalContent, hasEnduranceReleased } from '@/lib/seasonal-leaderboard';
+import { hasHotStintQualifyingContent } from '@/lib/acc/hot-stint-store';
 import { getAccTracks, getAccTrackTopTimes, getAccTrackStats, toTrackSummary, toTrackTopEntry } from '@/lib/acc/tracks';
 import { getLeaderboardTracksWithTopTimes } from '@/lib/leaderboard-tracks';
 
@@ -64,6 +65,7 @@ export default async function SimLeaderboardsPage({
           simSlug={sim.slug}
           showSeasonal={await hasSeasonalContent()}
           showEndurance={await hasEnduranceReleased()}
+          showHotStintQualifying={await hasHotStintQualifyingContent()}
         />
       )}
 

@@ -72,3 +72,18 @@ export {
   type StandingsEntrant,
   type StandingsRoundResult,
 } from './standings-order.js';
+
+// UNUSED as of 2026-08-14: built for a Hot Stint Qualifying ingest pipeline
+// that turned out to be unnecessary (that data already exists, correct,
+// written by an external bot into acc_hotstint_leaderboard/
+// classification_status — see supabase/migrations/
+// 20260814_drop_hot_stint_ingest.sql). Kept, not deleted: it's a verified,
+// tested implementation of gaps-and-islands rolling-average qualifying, on
+// the same day this codebase started relying on someone else's version of
+// the same computation — deleting it costs nothing to redo badly later.
+// Left exported so it stays reachable without re-wiring if it's ever needed.
+export {
+  computeHotStintResults,
+  type HotStintLapInput,
+  type HotStintDriverResult,
+} from './acc/hot-stint.js';
