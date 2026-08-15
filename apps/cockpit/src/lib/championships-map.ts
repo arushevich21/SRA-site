@@ -35,6 +35,7 @@ export type ChampionshipRow = {
   registration_season: string | null;
   registration_open: boolean;
   max_team_size: number | null;
+  max_registrations: number | null;
   allowed_cars: string[] | null;
   teaser_only: boolean;
   concluded: boolean;

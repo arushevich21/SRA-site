@@ -27,6 +27,9 @@ Thumbs.db
 # Spike / investigation scripts — never production code
 scratch/
 
+# Output of one-off diagnostic scripts (e.g. survey-accsm-history.ts)
+apps/cockpit/scripts/out/
+
 # Raw API fixtures — may contain sensitive league data; regenerate from the spike
 fixtures/gridos/
 .next/

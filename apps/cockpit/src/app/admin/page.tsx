@@ -24,6 +24,12 @@ const ADMIN_SECTIONS = [
         description:
           'Assign divisions and tiers to drivers, including bulk assignment by pasted Discord ID.',
       },
+      {
+        label: 'Hot Stint Qualifying',
+        href: '/admin/hot-stint-qualifying',
+        description:
+          'Full pre-season classification run — lap counts, eligibility, and rating internals. Data is written by an external bot; this is read-only.',
+      },
     ],
   },
   {

@@ -9,6 +9,7 @@ import {
   getSeasonHotlapTrackList,
   hasEnduranceReleased,
 } from '@/lib/seasonal-leaderboard';
+import { hasHotStintQualifyingContent } from '@/lib/acc/hot-stint-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,7 @@ export default async function SeasonalLeaderboardsPage({
         simSlug={sim.slug}
         showSeasonal={seasons.length > 0}
         showEndurance={await hasEnduranceReleased()}
+        showHotStintQualifying={await hasHotStintQualifyingContent()}
       />
 
       {seasons.length === 0 || !selectedSeason ? (
