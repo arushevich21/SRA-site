@@ -1,0 +1,97 @@
+.overlay-root { min-height: 100vh; background: #07090e; color: #f5f5f5; overflow: hidden; }
+.overlay-canvas { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 100vh; max-height: 100vh; overflow: hidden; padding: 1.6% 1.2%; background: radial-gradient(circle at 50% 45%, #172035 0, #080a10 62%); font-family: var(--font-sans, var(--font-hanken)), system-ui, sans-serif; }
+.stream-sponsor-ticker { position: absolute; inset: 0 0 auto; height: 4.2%; display: flex; align-items: center; padding: .5% 1.2%; background: #050507; color: #f2f2f2; font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace; font-size: clamp(12px, 1.15vw, 30px); letter-spacing: .04em; white-space: nowrap; overflow: hidden; }
+.stream-sponsor-ticker-label { flex: 0 0 auto; margin-right: .8em; color: #e4b83f; }
+.stream-sponsor-ticker-window { min-width: 0; overflow: hidden; }
+.stream-sponsor-ticker-track { display: inline-flex; width: max-content; animation: stream-sponsor-scroll 48s linear infinite; }
+.stream-sponsor-ticker-track > span { display: inline-block; padding-right: 4em; }
+@keyframes stream-sponsor-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.stream-sponsor-ticker strong, .stream-header h1, .stream-panel h2, .stream-round-heading strong, .stream-track-facts b { color: #e4b83f; }
+.stream-sponsor-ticker span { color: #8995ad; padding: 0 .5em; }
+.stream-header { display: flex; align-items: flex-start; gap: 1.5%; margin-bottom: 2%; }
+.stream-logo { display: grid; place-items: center; width: 7%; aspect-ratio: 2.4; border: 2px solid #e4b83f; color: #e4b83f; font-weight: 900; font-size: clamp(18px, 2vw, 52px); }
+.stream-header h1 { margin: 0; font-family: var(--font-display, 'Saira Condensed'), sans-serif; font-weight: 800; letter-spacing: -.025em; text-transform: uppercase; font-size: clamp(22px, 2.5vw, 64px); line-height: .9; }
+.stream-header p { margin: .45em 0 0; color: #fff; font-size: clamp(16px, 1.6vw, 40px); }
+.stream-standings-heading { position: relative; display: grid; grid-template-columns: 7% 7% minmax(0, 1fr) minmax(0, .75fr); align-items: center; height: 8%; margin-bottom: 1%; gap: 1%; }.stream-standings-heading h1,.stream-standings-heading h2 { min-width: 0; margin: 0; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.stream-standings-heading h1 { color: #e4b83f; font-size: clamp(22px, 2.4vw, 62px); }.stream-standings-heading h2 { color: #fff; text-align: right; font-size: clamp(18px, 1.35vw, 34px); }
+.stream-panel { border: 2px solid #44516e; border-radius: 8px; background: rgba(0, 0, 0, .78); box-shadow: inset 0 0 0 1px rgba(228,184,63,.2); padding: 1%; }
+.stream-standings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .7%; height: 86%; }
+.stream-standings-column { display: grid; grid-template-rows: repeat(13, 1fr); gap: .45%; }
+.stream-standing-row { min-width: 0; display: grid; grid-template-columns: 13% 1fr 25% 14%; align-items: center; gap: 1%; border: 1px solid #44516e; border-radius: 5px; background: #020204; padding: .15% 1%; }
+.stream-position { color: #e4b83f; font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace; font-size: clamp(18px, 1.65vw, 42px); text-align: center; }
+.stream-driver { min-width: 0; display: flex; flex-direction: column; overflow: hidden; }.stream-driver b { font-size: clamp(14px, 1.2vw, 30px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.stream-driver span, .stream-car { color: #c5cad4; font-size: clamp(10px, .75vw, 19px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.stream-car { text-align: right; }.stream-points { text-align: right; font-size: clamp(18px, 1.65vw, 42px); }.stream-points small { color: #9aa5b9; font-size: .45em; }
+.stream-calendar-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: .8%; height: 79%; }.stream-round-card { min-height: 0; display: flex; flex-direction: column; gap: 3%; }.stream-round-heading { display: flex; justify-content: space-between; gap: 2%; font-size: clamp(15px, 1.25vw, 32px); }.stream-round-map { flex: 1; display: grid; place-items: center; min-height: 0; background: #111727; color: #77849b; font-size: clamp(14px, 1vw, 26px); }.stream-round-card > span { color: #c7ccd5; font-size: clamp(12px, .9vw, 23px); }
+.stream-calendar-series-logo { position: absolute; top: 7.5%; right: 5.5%; width: 12%; height: 9%; object-fit: contain; }
+.stream-track-layout { display: grid; grid-template-columns: 60% 38%; gap: 2%; height: 82%; }.stream-track-map { display: grid; place-items: center; }.stream-map-placeholder { color: #e4b83f; text-align: center; font-size: clamp(30px, 4vw, 100px); font-weight: 900; }.stream-map-placeholder small { color: #fff; font-size: .4em; }.stream-track-facts { display: flex; flex-direction: column; justify-content: center; gap: 7%; }.stream-track-facts div { display: flex; flex-direction: column; gap: .3em; font-size: clamp(20px, 1.8vw, 46px); }.stream-track-facts strong { font-size: 1.2em; }.stream-race-layout h2, .stream-intermission h2, .stream-sponsor-columns h2 { margin-top: 0; color: #e4b83f; font-size: clamp(20px, 1.8vw, 46px); }
+.stream-race-top { height: 8%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3%; }.stream-race-top div { display: flex; gap: 1.2em; align-items: center; font-size: clamp(16px, 1.4vw, 36px); }.stream-race-top div span { border-left: 5px solid #21b957; border-right: 5px solid #21b957; padding: 0 .6em; }.stream-race-top > strong { font-size: clamp(18px, 1.35vw, 34px); }.stream-race-body { display: grid; grid-template-columns: 22% 1fr 17%; gap: .8%; height: 84%; }.stream-race-order { padding: .4%; }.stream-race-order h2 { margin: .2em .5em; color: #e4b83f; font-size: clamp(13px, 1vw, 25px); }.stream-order-row { display: grid; grid-template-columns: 13% 1fr 22%; align-items: center; height: 7.6%; padding: 0 3%; border-bottom: 1px solid #242d42; font-size: clamp(11px, .78vw, 20px); }.stream-order-row b { color: #fff; }.stream-order-row strong { text-align: right; }.stream-race-viewport { position: relative; display: grid; place-items: center; background: linear-gradient(135deg, #101925, #26334a); border: 1px solid #44516e; }.stream-race-viewport .stream-map-placeholder { opacity: .6; }.stream-driver-banner { position: absolute; left: 4%; right: 4%; bottom: 4%; display: grid; grid-template-columns: 9% 1fr 14%; align-items: center; padding: 1% 2%; background: linear-gradient(90deg, #d41b1b, #243d67 14%, #243d67 86%, #eee); font-size: clamp(16px, 1.3vw, 34px); }.stream-driver-banner small { color: #d3d8e2; font-size: .65em; }.stream-driver-banner strong { text-align: right; }.stream-race-info { align-self: start; padding: 8%; }.stream-race-info h2 { margin-top: 0; color: #e4b83f; font-size: clamp(16px, 1.2vw, 30px); }.stream-race-info p { font-size: clamp(11px, .8vw, 20px); }
+.stream-intermission, .stream-sponsor-columns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3%; height: 70%; }.stream-intermission .stream-panel { text-align: center; }.stream-photo-placeholder { height: 75%; display: grid; place-items: center; background: #111727; color: #7f8ba1; font-size: clamp(24px, 3vw, 76px); }.stream-intermission strong { font-size: clamp(20px, 1.8vw, 46px); }.stream-sponsor-columns { grid-template-columns: repeat(3, 1fr); height: 58%; }.stream-sponsor-columns .stream-panel { display: flex; min-height: 0; flex-direction: column; text-align: center; }.stream-sponsor-columns h2 { flex: 0 0 auto; margin-bottom: 3%; }.stream-sponsor-logo-list { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); flex: 1; min-height: 0; height: auto; gap: 2%; align-content: stretch; padding: 1% 5% 5%; }.stream-sponsor-logo { display: block; width: 100%; height: 100%; max-height: none; object-fit: contain; }.stream-sponsor-columns p { font-size: clamp(14px, 1.1vw, 28px); }.stream-footer-note { position: absolute; inset: auto 3% 2%; margin: 0; text-align: center; color: #fff; font-size: clamp(14px, 1.1vw, 28px); }.stream-commentator-placeholder { margin-top: 8%; text-align: center; font-size: clamp(18px, 2vw, 50px); }
+
+/* Overlay routes inherit the normal root layout. Chromium/OBS supports :has,
+   so the overlay marker suppresses the website chrome without a second app. */
+body:has(.overlay-root) > header, body:has(.overlay-root) > footer, body:has(.overlay-root) > div.border-t { display: none !important; }
+body:has(.overlay-root) > main { padding-top: 0 !important; }
+
+/* Broadcast-safe geometry overrides. */
+.overlay-canvas:has(.stream-sponsor-ticker) { padding-top: 5.5%; }
+.overlay-canvas.stream-marquee-content-canvas { padding-top: 5.5%; }
+.overlay-canvas.stream-ticker-canvas { background: transparent; }
+.overlay-canvas.stream-transparent-content-canvas { background: transparent; }
+.overlay-root:has(.stream-ticker-canvas) { background: transparent; }
+.overlay-root:has(.stream-transparent-content-canvas) { background: transparent; }
+body:has(.stream-ticker-canvas) { background: transparent !important; }
+body:has(.stream-transparent-content-canvas) { background: transparent !important; }
+body:has(.stream-ticker-canvas)::before,
+body:has(.stream-ticker-canvas)::after,
+body:has(.stream-transparent-content-canvas)::before,
+body:has(.stream-transparent-content-canvas)::after { display: none; }
+.stream-race-order, .stream-race-viewport, .stream-race-info { min-width: 0; }
+.stream-order-row { grid-template-columns: 13% minmax(0, 1fr) 22%; }
+.stream-order-row b, .stream-order-row strong, .stream-driver-banner strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stream-driver-banner { grid-template-columns: 9% minmax(0, 1fr) 14%; }
+.stream-race-info p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stream-driver-banner { display: none; }
+
+/* Race scene follows the ACC capture: the game image is the full canvas and
+   our data sits on top of it at the edges. */
+.overlay-canvas:has(.stream-race-top) { padding: 0; background: transparent; }
+.overlay-canvas.stream-marquee-content-canvas:has(.stream-race-top) { padding: 5.5% 1.2% 1.6%; }
+.overlay-canvas.stream-marquee-content-canvas .stream-race-top { inset: 5.5% 20% auto; }
+.stream-race-top { position: absolute; z-index: 4; inset: 4% 20% auto; height: auto; }
+.stream-race-top > div { font-size: clamp(16px, 1.35vw, 34px); }
+.stream-race-top > strong { display: inline-block; padding: .28em .9em .42em; background: #000; border-radius: 0 0 .55em .55em; box-shadow: 0 2px 0 rgba(0,0,0,.45); font-size: clamp(16px, 1.2vw, 30px); }
+.stream-partners-slideshow { position: absolute; z-index: 4; top: 6%; right: 1.2%; width: 16%; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; }
+.stream-partners-slideshow img { grid-area: 1 / 1; display: block; width: 72%; height: 72%; object-fit: contain; opacity: 0; animation: stream-partner-fade 110s infinite both; }
+.stream-partners-slideshow img:nth-child(1) { animation-delay: 0s; }
+.stream-partners-slideshow img:nth-child(2) { animation-delay: 8s; }
+.stream-partners-slideshow img:nth-child(3) { animation-delay: 18s; }
+.stream-partners-slideshow img:nth-child(4) { animation-delay: 28s; }
+.stream-partners-slideshow img:nth-child(5) { animation-delay: 38s; }
+.stream-partners-slideshow img:nth-child(6) { animation-delay: 48s; }
+.stream-partners-slideshow img:nth-child(7) { animation-delay: 58s; }
+.stream-partners-slideshow img:nth-child(8) { animation-delay: 68s; }
+.stream-partners-slideshow img:nth-child(9) { animation-delay: 78s; }
+.stream-partners-slideshow img:nth-child(10) { animation-delay: 88s; }
+.stream-partners-slideshow img:nth-child(11) { animation-delay: 98s; }
+@keyframes stream-partner-fade { 0% { opacity: 0; } .9% { opacity: 1; } 7.27% { opacity: 1; } 9.09%, 100% { opacity: 0; } }
+.stream-race-body { position: absolute; z-index: 1; inset: 0; display: block; height: auto; }
+.stream-race-viewport { position: absolute; z-index: 0; inset: 0; border: 0; background: transparent; }
+.stream-race-viewport .stream-map-placeholder { opacity: .35; }
+.stream-race-order { position: absolute; z-index: 3; left: 1%; top: 5%; bottom: 9%; width: 21%; padding: .2%; border: 0; border-radius: 0; background: linear-gradient(90deg, rgba(0,0,0,.72), rgba(0,0,0,.18)); box-shadow: none; }
+.stream-race-order h2 { margin: .2em 4%; font-size: clamp(13px, .85vw, 22px); }
+.stream-order-row { height: 4.15%; padding: 0 4%; border-bottom: 1px solid rgba(255,255,255,.08); font-size: clamp(11px, .85vw, 22px); }
+.stream-race-info { position: absolute; z-index: 3; top: 2.3%; right: 1.8%; width: 24%; padding: .35% .5%; border: 0; border-radius: 0; background: rgba(0,0,0,.55); box-shadow: none; }
+.stream-race-info h2 { display: none; }
+.stream-race-info p { display: inline-block; margin: 0 .65em 0 0; font-size: clamp(10px, .7vw, 18px); }
+.overlay-canvas:has(.stream-race-body) .stream-sponsor-ticker { right: auto; width: 45%; }
+.overlay-canvas:has(.stream-race-top) .stream-sponsor-ticker { right: auto; width: 45%; }
+.stream-logo-image { display: block; width: 7%; height: auto; max-height: 7%; object-fit: contain; }
+.stream-standings-heading { grid-template-columns: 7% 7% minmax(0, 1fr) minmax(0, .75fr); }
+.stream-series-logo { width: 100%; max-height: 100%; object-fit: contain; }
+.stream-sponsor-logo-list { display: grid; gap: 8%; align-content: center; height: 80%; }
+.stream-sponsor-logo { display: block; width: 100%; max-height: 18%; object-fit: contain; }
+.stream-points { display: grid; grid-template-columns: 4ch 4.5ch; justify-content: start; align-items: baseline; gap: .2em; text-align: right; }
+.stream-points-value { text-align: right; }
+.stream-points small { text-align: left; white-space: nowrap; }
+.stream-header h1, .stream-standings-heading h1 { font-family: var(--font-display, 'Saira Condensed'), sans-serif; font-weight: 800; letter-spacing: -.025em; text-transform: uppercase; }
+.stream-standings-heading h2, .stream-sponsor-ticker, .stream-round-heading strong { font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace; letter-spacing: .04em; }
+.stream-supporter-list { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); flex: 1; min-height: 0; gap: 2%; align-content: stretch; padding: 1% 5% 5%; }
+.stream-supporter-list strong { display: grid; place-items: center; min-width: 0; color: #f5f5f5; font-family: var(--font-mono, ui-monospace, monospace); font-size: clamp(18px, 1.35vw, 34px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

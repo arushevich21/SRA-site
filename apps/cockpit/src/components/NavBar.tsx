@@ -443,7 +443,6 @@ export default function NavBar({
                 </form>
               </div>
             ) : (
-              // eslint-disable-next-line @next/next/no-html-link-for-pages
               <a href="/auth/login" className="nav-signin">
                 <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
                   Sign In
@@ -643,7 +642,6 @@ export default function NavBar({
               </form>
             </div>
           ) : (
-            // eslint-disable-next-line @next/next/no-html-link-for-pages
             <a href="/auth/login" className="nav-signin self-start" onClick={close}>
               <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
                 Sign In
