@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SRA Stream Overlay Draft Preview</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;background:#20242b;color:#f5f5f5;font-family:Arial,sans-serif}.preview-nav{position:fixed;z-index:5;top:0;left:0;right:0;height:48px;background:#11151c;display:flex;align-items:center;gap:8px;padding:6px 12px}.preview-nav button{background:#252e3e;color:#fff;border:1px solid #52627f;padding:7px 12px;cursor:pointer}.preview-nav button.active{background:#c99c2d;color:#08090c}.preview-stage{padding-top:48px}.scene{display:none;position:relative;width:100vw;aspect-ratio:16/9;max-height:calc(100vh - 48px);overflow:hidden;padding:3.5% 3%;background:radial-gradient(circle at 50% 45%,#172035 0,#080a10 62%)}.scene.active{display:block}.ticker{position:absolute;inset:0 0 auto;height:4.2%;padding:.5% 1.2%;background:#050507;font-size:1.15vw;white-space:nowrap;overflow:hidden}.gold{color:#e4b83f}.header{display:flex;align-items:flex-start;gap:1.5%;margin-bottom:2%}.logo{display:grid;place-items:center;width:7%;aspect-ratio:2.4;border:2px solid #e4b83f;color:#e4b83f;font-weight:900;font-size:2vw}.header h1{margin:0;color:#e4b83f;font-size:2.5vw;line-height:.95}.header p{margin:.45em 0 0;font-size:1.6vw}.panel{border:2px solid #44516e;border-radius:8px;background:rgba(0,0,0,.78);box-shadow:inset 0 0 0 1px rgba(228,184,63,.2);padding:1%}.standings{display:grid;grid-template-columns:1fr 1fr;gap:1%;height:84%}.standing-col{display:grid;grid-template-rows:repeat(13,1fr);gap:.45%}.row{min-width:0;display:grid;grid-template-columns:13% 1fr 25% 14%;align-items:center;gap:1%;border:1px solid #44516e;border-radius:5px;background:#020204;padding:.5% 1%}.pos{color:#e4b83f;font-size:1.65vw;text-align:center}.driver{min-width:0;display:flex;flex-direction:column;overflow:hidden}.driver b{font-size:1.2vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.driver span,.car{color:#c5cad4;font-size:.75vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.car{text-align:right}.points{text-align:right;font-size:1.65vw}.points small{color:#9aa5b9;font-size:.45em}.calendar{display:grid;grid-template-columns:repeat(4,1fr);gap:1%}.round{min-height:34%;display:flex;flex-direction:column;gap:3%}.round-head{display:flex;justify-content:space-between;font-size:1.25vw}.round strong{color:#e4b83f}.map{flex:1;display:grid;place-items:center;min-height:125px;background:#111727;color:#77849b;font-size:1vw}.foot{position:absolute;inset:auto 3% 2%;margin:0;text-align:center;font-size:1.1vw}.track-layout,.race-layout{display:grid;grid-template-columns:58% 40%;gap:2%;height:76%}.track-map{display:grid;place-items:center}.track-word{color:#e4b83f;text-align:center;font-size:4vw;font-weight:900}.track-word small{color:#fff;font-size:.4em}.facts{display:flex;flex-direction:column;justify-content:center;gap:8%}.facts div{display:flex;flex-direction:column;gap:.3em;font-size:1.8vw}.facts b,.panel h2{color:#e4b83f}.facts strong{font-size:1.2em}.race-layout{height:auto}.race-layout .panel{min-height:300px}.panel h2{margin-top:0;font-size:1.8vw}.intermission,.sponsors{display:grid;grid-template-columns:repeat(2,1fr);gap:3%;height:70%}.intermission .panel{text-align:center}.photo{height:75%;display:grid;place-items:center;background:#111727;color:#7f8ba1;font-size:3vw}.sponsors{grid-template-columns:repeat(3,1fr);height:65%}.sponsors .panel{text-align:center}.sponsors p{font-size:1.1vw}
+    .scene{padding:1.6% 1.2%}.race-layout{display:grid;grid-template-columns:22% 1fr 17%;gap:.8%;height:84%}.race-layout .panel:first-child{padding:.4%}.race-layout .panel:first-child h2{font-size:1vw;margin:.2em .5em}.race-layout .panel:first-child p{display:none}.race-layout .panel:first-child:after{content:'1  T. Zamora       919\A 2  M. Higgs        882\A 3  S. Cerino       845\A 4  T. Johnston     808\A 5  W. Vargas       771\A 6  A. Movo         734\A 7  M. Artim        697\A 8  S. Boonstra     660\A 9  K. Barbour      623\A10  N. Suave        586\A11  S. Williams     549\A12  P. Müller       512';white-space:pre;display:block;line-height:1.9;padding:1em;color:#fff;font-size:1vw}.race-layout .panel:nth-child(2){grid-column:2;position:relative;display:grid;place-items:center;background:linear-gradient(135deg,#101925,#26334a)}.race-layout .panel:nth-child(2):after{content:'4    Taylor Johnston                                      452';position:absolute;left:4%;right:4%;bottom:4%;padding:1%;background:linear-gradient(90deg,#d41b1b,#243d67 14%,#243d67 86%,#eee);font-size:1.2vw}.race-layout:after{content:'SESSION\A\ATrack: Brands Hatch\AWeather: Pending\ATemperature: Pending\AWind: Pending';white-space:pre;grid-column:3;align-self:start;border:2px solid #44516e;border-radius:8px;background:rgba(0,0,0,.78);padding:8%;font-size:.85vw;line-height:1.7}.header{margin-bottom:1%}.standings{height:86%;gap:.7%}.standing-col{gap:.45%}.row{padding:.15% 1%}.calendar{height:79%;grid-template-rows:repeat(2,1fr);gap:.8%}.round{min-height:0}.foot{bottom:1.5%}
+    /* Keep the preview's persistent ticker out of the scene content. */
+    .scene:has(.ticker){padding-top:5.5%}
+    .race-layout{grid-template-columns:22% minmax(0,1fr) 17%}
+    .race-layout .panel{min-width:0}
+    .race-layout .panel:first-child{overflow:hidden}
+    .race-layout .panel:nth-child(2){overflow:hidden}
+  </style>
+  <style>
+    .scene:has(.ticker){padding-top:5.5% !important}
+    .race-layout{grid-template-columns:22% minmax(0,1fr) 17%}
+    .race-layout .panel{min-width:0}
+    .race-layout .panel:first-child,.race-layout .panel:nth-child(2){overflow:hidden}
+    .race-layout .panel:nth-child(2):after{display:none}
+    #race .header{display:none}
+    #race .race-layout{position:absolute;inset:0;display:block;height:auto}
+    #race .race-layout .panel:first-child{position:absolute;z-index:2;left:1%;top:5%;bottom:9%;width:21%;padding:.2%;border:0;border-radius:0;background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(0,0,0,.18));box-shadow:none}
+    #race .race-layout .panel:first-child h2{margin:.2em 4%;font-size:.85vw}
+    #race .race-layout .panel:first-child:after{line-height:1.9;font-size:.85vw;padding:0 4%;}
+    #race .race-layout .panel:nth-child(2){position:absolute;inset:0;z-index:0;border:0;border-radius:0;background:transparent}
+    #race .race-layout:after{position:absolute;z-index:2;top:2.3%;right:1.8%;width:24%;padding:.35% .5%;border:0;border-radius:0;background:rgba(0,0,0,.55);font-size:.7vw;line-height:1.7}
+    #race .race-layout .panel:first-child h2{font-size:0}
+    #race .race-layout .panel:first-child h2:after{content:'OVERALL';font-size:.85vw}
+    #race .ticker{z-index:4;right:auto;width:45%}
+    #race .race-layout{display:none}
+    #race:after{display:none}
+    .preview-race-label{position:absolute;z-index:5;top:4%;left:50%;width:max-content;max-width:50%;transform:translateX(-50%);padding:.28em .9em .42em;background:#000;border-radius:0 0 .55em .55em;box-shadow:0 2px 0 rgba(0,0,0,.45);text-align:center;font-size:1.2vw;font-weight:700}
+    .week-picker{margin-left:auto;display:flex;align-items:center;gap:6px;color:#fff;font-size:12px}.week-picker select{background:#252e3e;color:#fff;border:1px solid #52627f;padding:6px 8px}
+    #race:before{content:'';position:absolute;z-index:4;top:6%;right:1.2%;width:16%;aspect-ratio:16/9;background:url('apps/cockpit/public/sponsors/sliders/go-setups.png') center/contain no-repeat}
+    #race:before{display:none}
+    #calendar:after{content:'';position:absolute;top:7.5%;right:5.5%;width:12%;height:9%;background:url('apps/cockpit/public/badges/GT3TS_Logo.png') center/contain no-repeat}
+    .round.current{border-color:#e4b83f;box-shadow:inset 0 0 0 1px rgba(228,184,63,.65),0 0 1.2vw rgba(228,184,63,.18)}.round.current .round-head:after{content:'CURRENT';color:#e4b83f;font-size:.7em;align-self:center}
+    .partner-preview{position:absolute;z-index:4;top:6%;right:1.2%;width:16%;aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden}
+    .partner-preview img{grid-area:1/1;display:block;width:72%;height:72%;object-fit:contain;opacity:0;animation:preview-partner-fade 110s infinite both}
+    .partner-preview img:nth-child(1){animation-delay:0s}.partner-preview img:nth-child(2){animation-delay:8s}.partner-preview img:nth-child(3){animation-delay:18s}.partner-preview img:nth-child(4){animation-delay:28s}.partner-preview img:nth-child(5){animation-delay:38s}.partner-preview img:nth-child(6){animation-delay:48s}.partner-preview img:nth-child(7){animation-delay:58s}.partner-preview img:nth-child(8){animation-delay:68s}.partner-preview img:nth-child(9){animation-delay:78s}.partner-preview img:nth-child(10){animation-delay:88s}.partner-preview img:nth-child(11){animation-delay:98s}
+    @keyframes preview-partner-fade{0%{opacity:0}.9%{opacity:1}7.27%{opacity:1}9.09%,100%{opacity:0}}
+    .ticker-track{display:inline-flex;width:max-content;animation:preview-sponsor-scroll 48s linear infinite}.ticker-track>span{display:inline-block;padding-right:4em}@keyframes preview-sponsor-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    .ticker{display:flex;align-items:center}.ticker-fixed-label{position:relative;z-index:2;flex:0 0 auto;margin-right:.8em;color:#e4b83f;background:#050507}.ticker-window{min-width:0;overflow:hidden}.ticker-track{min-width:0;overflow:visible}
+    .logo{font-size:0;border:0;background:url('apps/cockpit/public/badges/GT3TSAsset_white.png') center/contain no-repeat}
+    #race .ticker + .header + .race-layout{top:0}
+    .race-layout .panel:first-child:after{content:'1  T. Zamora     919\A 2  M. Higgs      882\A 3  S. Cerino     845\A 4  T. Johnston   808\A 5  W. Vargas     771\A 6  A. Movo       734\A 7  M. Artim      697\A 8  S. Boonstra   660\A 9  K. Barbour    623\A 10 N. Suave      586\A 11 S. Williams   549\A 12 P. MÃ¼ller     512';}
+  </style>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Saira+Condensed:wght@500;600;700;800;900&display=swap');
+    html,body{font-family:'Hanken Grotesk',system-ui,sans-serif}
+    .header h1,.panel h2{font-family:'Saira Condensed',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:-.025em}
+    .ticker,.round-head strong{font-family:'JetBrains Mono',ui-monospace,monospace;letter-spacing:.04em}
+  </style>
+  <style>
+    .points{display:grid;grid-template-columns:4ch 4.5ch;justify-content:start;align-items:baseline;gap:.2em;text-align:right}.points-value{text-align:right}.points small{text-align:left;white-space:nowrap}
+    .sponsors{height:58%}.sponsors .panel{display:flex;flex-direction:column;min-height:0}.sponsors .panel h2{flex:0 0 auto;margin-bottom:3%}
+  </style>
+</head>
+<body>
+  <nav class="preview-nav"><strong>SRA 1440p overlay draft</strong><button data-scene="race">Race</button><button data-scene="track">Track</button><button data-scene="driver">Drivers standings</button><button data-scene="team">Team standings</button><button data-scene="calendar">Calendar</button><button data-scene="sponsors">Sponsors</button><button data-scene="intermission">Intermission</button></nav>
+  <main class="preview-stage">
+    <section id="race" class="scene active"><div class="ticker"><b class="gold">SPONSORS:</b> Community supporters <span class="gold">•</span> League partners <span class="gold">•</span> Thank you for supporting SRA</div><div class="header"><span class="logo">SRA</span><div><h1>GT3 · Division 2 · Round 7</h1><p>Brands Hatch</p></div></div><div class="race-layout"><div class="panel"><h2>RACE INFORMATION</h2><p>Session: Free Practice</p><p>Race length: 60 min</p><p>Qualifying: 10 minutes</p><p>Required pit stop: Yes</p></div><div class="panel"><h2>LIVE SESSION</h2><p>Track: Brands Hatch</p><p>Weather: Pending live session data</p><p>Temperature: Pending</p><p>Wind: Pending</p></div></div></section>
+    <section id="track" class="scene"><div class="header"><span class="logo">SRA</span><div><h1>TRACK MAP</h1><p>Sim Racing Alliance</p></div></div><div class="track-layout"><div class="panel track-map"><span class="track-word">BRANDS HATCH<br><small>TRACK MAP</small></span></div><div class="panel facts"><div><b>Track:</b><strong>Brands Hatch</strong></div><div><b>Location:</b><strong>Kent, Great Britain</strong></div><div><b>Length:</b><strong>3.916 km</strong></div><div><b>Turns:</b><strong>9</strong></div></div></div></section>
+    <section id="driver" class="scene"><div class="ticker"><b class="gold">SPONSORS:</b> Community supporters <span class="gold">•</span> League partners</div><div class="header"><span class="logo">SRA</span><div><h1>GT3 Team Series — Season 19 Division 2</h1><p>Drivers Standings — After 6 of 8 rounds</p></div></div><div class="standings" id="driverRows"></div></section>
+    <section id="team" class="scene"><div class="ticker"><b class="gold">SPONSORS:</b> Community supporters <span class="gold">•</span> League partners</div><div class="header"><span class="logo">SRA</span><div><h1>GT3 Team Series — Season 19 Division 2</h1><p>Team Standings — After 6 of 8 rounds</p></div></div><div class="standings" id="teamRows"></div></section>
+    <section id="calendar" class="scene"><div class="ticker"><b class="gold">SPONSORS:</b> Community supporters <span class="gold">•</span> League partners</div><div class="header"><span class="logo">SRA</span><div><h1>GT3 Team Series — Season 19 Calendar</h1><p>Division 2 · 8-week season</p></div></div><div class="calendar" id="calendarCards"></div><p class="foot">All events begin at 9:00 PM Eastern · Visit simracingalliance.com/calendar</p></section>
+    <section id="sponsors" class="scene"><div class="header"><span class="logo">SRA</span><div><h1>Thank you to our community supporters!</h1><p>Monthly supporters on Discord and Patreon</p></div></div><div class="sponsors" id="sponsorCards"></div><p class="foot">Thanks for watching · Join us at sra.gg/start · Chat with us at discord.gg/SimRacingAlliance</p></section>
+    <section id="intermission" class="scene"><div class="ticker"><b class="gold">SPONSORS:</b> Community supporters <span class="gold">•</span> League partners</div><div class="header"><span class="logo">SRA</span><div><h1>GT3 Team Series — Season 19 Division 2</h1><p>Round 7 · Brands Hatch</p></div></div><div class="intermission"><div class="panel"><div class="photo">DRIVER A</div><h2>Driver feature</h2><strong>Driver name pending</strong></div><div class="panel"><div class="photo">DRIVER B</div><h2>Driver feature</h2><strong>Driver name pending</strong></div></div></section>
+  </main>
+  <script>
+    const names=['Bryan Anderson','Pauleh Hartman','Amos Movo','Thomas Olhausen','Selena Boonstra','Jason Allen','Mike Geno','Kyle Barbour','Matthew Higgs','Jack Krouse','Mason Moffett','Matt Artim','Juan Caro','Dyck Zipperburn Jr.','Ethan Marvin','Jess Osborn','Harold MacDonald','Sam Cerino','Kevin Nichols','Taylor Johnston','Max Diggs','Curtis Lee','Pat Cockcroft','Justin MacKechnie','Tristan Zamora','Gordon Beverly III'];
+    const cars=['Lamborghini Huracán GT3 EVO2','Ferrari 296 GT3','Nissan GT-R Nismo GT3','Porsche 992 GT3 R'];
+    function rowList(team){return Array.from({length:26},(_,i)=>`<article class="row"><strong class="pos">#${i+1}</strong><div class="driver"><b>${team?'Team '+(i+1):names[i]}</b><span>${team?'Driver A · Driver B': 'Team name pending'}</span></div><span class="car">${cars[i%4]}</span><strong class="points">${410-i*9}<small>${i?' -'+i*5:''}</small></strong></article>`)}
+    function standingsMarkup(team){const list=rowList(team);return '<div class="standing-col">'+list.slice(0,13).join('')+'</div><div class="standing-col">'+list.slice(13).join('')+'</div>'}
+    document.querySelector('#driverRows').innerHTML=standingsMarkup(false);
+    document.querySelector('#teamRows').innerHTML=standingsMarkup(true);
+    document.querySelectorAll('.points').forEach(points=>{const value=document.createElement('span');value.className='points-value';value.textContent=points.firstChild.textContent;points.replaceChild(value,points.firstChild);});
+    const tracks=['Silverstone','COTA','Valencia','Zandvoort','Mount Panorama','Suzuka','Brands Hatch','Misano'];
+    document.querySelector('#calendarCards').innerHTML=tracks.map((track,i)=>`<div class="panel round"><div class="round-head"><b>R${i+1}: ${track}</b><strong>0${i+1}/15</strong></div><div class="map">TRACK MAP</div><span>60 min · Race night</span></div>`).join('');
+    document.querySelector('#sponsorCards').innerHTML=[['Title Supporters','Bryan Anderson','Pauleh Hartman','Amos Movo'],['Sponsors','Thomas Olhausen','Selena Boonstra','Jason Allen'],['Supporters','Mike Geno','Kyle Barbour','Matthew Higgs']].map(([label,...names])=>`<div class="panel"><h2>${label}</h2>${names.map(name=>`<strong>${name}</strong>`).join('')}</div>`).join('');
+    const previewTracks=['Silverstone','COTA','Valencia','Zandvoort','Mount Panorama','Suzuka','Brands Hatch','Misano'];
+    const weekPicker=document.createElement('label'); weekPicker.className='week-picker'; weekPicker.innerHTML='<span>Current week</span><select>'+previewTracks.map((track,i)=>`<option value="${i}">R${i+1} · ${track}</option>`).join('')+'</select>'; document.querySelector('.preview-nav').append(weekPicker);
+    const raceLabel=document.createElement('div'); raceLabel.className='preview-race-label'; document.querySelector('#race').append(raceLabel);
+    const updatePreviewWeek=()=>{const index=Number(weekPicker.querySelector('select').value); raceLabel.textContent=`Season 19 | D2 | R${index+1} - ${previewTracks[index].toUpperCase()}`;}; weekPicker.querySelector('select').addEventListener('change',updatePreviewWeek); updatePreviewWeek();
+    const previewTrackFacts=[
+      ['Northamptonshire, Great Britain','5.891 km','18'],['Austin, Texas','5.513 km','20'],['Valencia, Spain','4.005 km','14'],['Zandvoort, Netherlands','4.259 km','14'],
+      ['Bathurst, Australia','6.213 km','23'],['Suzuka, Japan','5.807 km','18'],['Kent, Great Britain','3.916 km','9'],['Misano Adriatico, Italy','4.226 km','16']
+    ];
+    const syncPreviewWeekAcrossScenes=()=>{const index=Number(weekPicker.querySelector('select').value); const track=previewTracks[index]; const facts=previewTrackFacts[index];
+      document.querySelector('#race h1').textContent=`GT3 · Division 2 · Round ${index+1}`;
+      document.querySelector('#race .header p').textContent=track;
+      document.querySelector('#race .race-layout .panel:nth-child(2) p').textContent=`Track: ${track}`;
+      document.querySelector('#track .track-word').innerHTML=`${track.toUpperCase()}<br><small>TRACK MAP</small>`;
+      const trackFactValues=document.querySelectorAll('#track .facts strong'); trackFactValues[0].textContent=track; trackFactValues[1].textContent=facts[0]; trackFactValues[2].textContent=facts[1]; trackFactValues[3].textContent=facts[2];
+      document.querySelector('#intermission .header p').textContent=`Round ${index+1} · ${track}`;
+      document.querySelector('#driver .header p').textContent=`Drivers Standings — After ${index+1} of 8 rounds`;
+      document.querySelector('#team .header p').textContent=`Team Standings — After ${index+1} of 8 rounds`;
+      document.querySelectorAll('#calendarCards .round').forEach((card,cardIndex)=>card.classList.toggle('current',cardIndex===index));
+    };
+    weekPicker.querySelector('select').addEventListener('change',syncPreviewWeekAcrossScenes); syncPreviewWeekAcrossScenes();
+    document.querySelectorAll('.ticker').forEach(ticker=>{const message='<b class="gold">SPONSORS:</b> Trackside VIP <span class="gold">•</span> Documize <span class="gold">•</span> Trak Racer <span class="gold">•</span> Triple Stint <span class="gold">•</span> GO Setups <span class="gold">•</span> Armamentario <span class="gold">•</span> AT3D Sim Shop <span class="gold">•</span> Castle Cauldron <span class="gold">•</span> Echoes of Nox <span class="gold">•</span> KP Concepts <span class="gold">•</span> Retro Saga <span class="gold">•</span> Thank you to all of our league partners and community supporters'; ticker.innerHTML=`<div class="ticker-track"><span>${message}</span><span aria-hidden="true">${message}</span></div>`;});
+    document.querySelectorAll('.ticker').forEach(ticker=>{const label=document.createElement('b');label.className='ticker-fixed-label gold';label.textContent='SPONSORS:';ticker.prepend(label);ticker.querySelectorAll('.ticker-track b.gold').forEach(x=>x.remove());const track=ticker.querySelector('.ticker-track');const windowEl=document.createElement('div');windowEl.className='ticker-window';track.replaceWith(windowEl);windowEl.append(track);});
+    const partnerAssets=['apps/cockpit/public/sponsors/partners/armamentario/ARMA-white.png','apps/cockpit/public/sponsors/sliders/at3d-sim-shop.png','apps/cockpit/public/sponsors/sliders/castlecauldron.png','apps/cockpit/public/sponsors/sliders/documize-com.png','apps/cockpit/public/sponsors/sliders/echoes_of_nox.png','apps/cockpit/public/sponsors/sliders/go-setups.png','apps/cockpit/public/sponsors/sliders/kp_concepts.png','apps/cockpit/public/sponsors/sliders/retro-saga-ca.png','apps/cockpit/public/sponsors/sliders/TS_Logo_White_SVG.png','apps/cockpit/public/sponsors/partners/trak-racer/logo-new.png','apps/cockpit/public/sponsors/partners/triple-stint/White%20Text/Logo.png'];
+    const partnerPreview=document.createElement('div'); partnerPreview.className='partner-preview'; partnerPreview.innerHTML=partnerAssets.map(src=>`<img src="${src}" alt="">`).join(''); document.querySelector('#race').append(partnerPreview);
+    document.querySelectorAll('[data-scene]').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.scene').forEach(s=>s.classList.toggle('active',s.id===btn.dataset.scene));document.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===btn));});
+    document.querySelector('[data-scene="race"]').classList.add('active');
+  </script>
+</body>
+</html>
