@@ -10,9 +10,10 @@ import {
 import { getAccTrackHotStint } from '@/lib/acc/hotstint';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
 
-// See [sim]/leaderboards/[track]/page.tsx — reverted to force-dynamic for the
-// same reason (ISR page-size limit); board is query-level paginated now.
-export const dynamic = 'force-dynamic';
+// See [sim]/leaderboards/[track]/page.tsx — same history (was force-dynamic
+// for the ISR page-size limit, board is query-level paginated now). Restored
+// to ISR (2026-08-25) to cut Vercel usage.
+export const revalidate = 300;
 
 // Per-track Hot Stint board (best 5-lap average, class-grouped). Mirrors the
 // Hot Lap track detail page but sources acc_hotstint_leaderboard and labels the
@@ -27,12 +28,15 @@ export default async function TrackHotStintPage({
   if (!sim) notFound();
   if (sim.game !== 'ACC') notFound();
 
-  const track = await getAccTrack(trackSlugParam);
+  // Independent queries (both keyed only on trackSlugParam) — parallelized
+  // rather than run one after the other.
+  const [track, board] = await Promise.all([
+    getAccTrack(trackSlugParam),
+    // Page 1, all classes — already sorted best_stint_ms ascending, so
+    // entries[0] is the outright fastest across every class.
+    getAccTrackHotStint(trackSlugParam),
+  ]);
   if (!track) notFound();
-
-  // Page 1, all classes — already sorted best_stint_ms ascending, so
-  // entries[0] is the outright fastest across every class.
-  const board = await getAccTrackHotStint(trackSlugParam);
   const fastest = board.entries[0];
 
   return (

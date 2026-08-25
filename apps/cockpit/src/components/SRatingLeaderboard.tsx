@@ -161,7 +161,14 @@ export function SRatingLeaderboard({ rows }: { rows: SRatingRow[] }) {
                       if (tierBadge) {
                         return (
                           <span className="relative w-7 h-7 shrink-0" title={tierBadge.label}>
-                            <Image src={tierBadge.src} alt={tierBadge.label} fill className="object-contain" />
+                            <Image
+                              src={tierBadge.src}
+                              alt={tierBadge.label}
+                              fill
+                              sizes="28px"
+                              unoptimized
+                              className="object-contain"
+                            />
                           </span>
                         );
                       }

@@ -83,25 +83,31 @@ export default async function JagoffPage({ params }: { params: Promise<{ sim: st
   if (!sim) notFound();
   if (sim.game !== 'ACC') notFound();
 
-  const scope = await getCurrentClassificationScope();
-  const jagoffRows = scope ? await getJagoffBoard(scope) : [];
-
-  const [showSeasonal, showEndurance, showHotStintQualifying, driverInfoMap, sraqStatus] =
+  // showSeasonal/showEndurance/showHotStintQualifying/sraqStatus don't depend
+  // on the classification scope or its rows — fire them alongside scope
+  // instead of waiting until after jagoffRows resolves.
+  const [scope, showSeasonal, showEndurance, showHotStintQualifying, sraqStatus] =
     await Promise.all([
+      getCurrentClassificationScope(),
       hasSeasonalContent(),
       hasEnduranceReleased(),
       hasHotStintQualifyingContent(),
-      getDriverInfoBySteamIds(jagoffRows.map((r) => stripSteamIdPrefix(r.steamId))),
       getSraqServerStatus(),
     ]);
+  const jagoffRows = scope ? await getJagoffBoard(scope) : [];
+  const trackKey = jagoffRows[0]?.trackKey ?? null;
+
+  // driverInfoMap and accTrack both depend only on jagoffRows/trackKey, not
+  // on each other — run them together rather than one after the other.
+  const [driverInfoMap, accTrack] = await Promise.all([
+    getDriverInfoBySteamIds(jagoffRows.map((r) => stripSteamIdPrefix(r.steamId))),
+    trackKey ? getAccTrack(trackKey) : Promise.resolve(null),
+  ]);
 
   const entries = jagoffRows.map((r) =>
     toJagoffEntry(r, driverInfoFor(driverInfoMap, stripSteamIdPrefix(r.steamId))),
   );
-  const trackKey = jagoffRows[0]?.trackKey ?? null;
   const referenceLegend = trackKey ? getReferenceLegend(trackKey, 'stint') : null;
-
-  const accTrack = trackKey ? await getAccTrack(trackKey) : null;
   const trackSummary: TrackSummary | null = accTrack ? toTrackSummary(accTrack) : null;
   const fastestStint =
     jagoffRows.length > 0

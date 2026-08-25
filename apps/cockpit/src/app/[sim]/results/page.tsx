@@ -5,7 +5,10 @@ import { getAccRaceEvents } from '@/lib/acc/race-results-store';
 import { getAccTracks } from '@/lib/acc/tracks';
 import { GameLabel } from '@/components/GameLabel';
 
-export const dynamic = 'force-dynamic';
+// Event list, not results content — small and bounded (no per-lap data).
+// No documented reason for force-dynamic and no dynamic API dependency;
+// switched to ISR (2026-08-25) to cut Vercel usage.
+export const revalidate = 300;
 
 export default async function SimResultsPage({
   params,

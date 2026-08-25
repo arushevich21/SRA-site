@@ -5,7 +5,10 @@ import { getAccRaceEventSessions } from '@/lib/acc/race-results-store';
 import { getAccTrack } from '@/lib/acc/tracks';
 import { ResultsTabs } from '@/components/ResultsTabs';
 
-export const dynamic = 'force-dynamic';
+// Single event's sessions — bounded (one race's worth of results, not
+// unbounded per-track history). No documented reason for force-dynamic and
+// no dynamic API dependency; switched to ISR (2026-08-25) to cut Vercel usage.
+export const revalidate = 300;
 
 // ACCSM server names are "|"-delimited and mix boilerplate (server-manager
 // tag, the league's own site URL, hosting/room tags) in with the one or two

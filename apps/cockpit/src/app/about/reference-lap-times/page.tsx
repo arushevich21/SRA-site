@@ -36,6 +36,7 @@ function LapTimeTable({ data }: { data: LapTimeEntry[] }) {
                   alt="Reference"
                   width={40}
                   height={40}
+                  unoptimized
                   className="w-[32px] h-[32px] object-contain mx-auto"
                 />
               </th>
@@ -46,6 +47,7 @@ function LapTimeTable({ data }: { data: LapTimeEntry[] }) {
                   alt={div.alt}
                   width={40}
                   height={40}
+                  unoptimized
                   className="w-[32px] h-[32px] object-contain mx-auto"
                 />
               </th>
