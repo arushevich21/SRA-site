@@ -101,11 +101,19 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
     (c) => c.registrationKey && c.registrationOpen,
   );
 
-  // ACC leaderboards split into four boards: Hot Lap, Hot Lap (Seasonal),
-  // Hot Stint, Hot Stint (Seasonal). The "Leaderboards" word opens the
-  // always-on Hot Lap board. The two Seasonal entries are always present for
-  // ACC (there's a deep history of seasonal boards, S7–S18); Endurance appears
-  // only once an endurance championship (formatTag "Endurance") releases a
+  // ACC leaderboards split into six boards: Hot Lap, Hot Lap (Seasonal),
+  // Hot Stint, Hot Stint (Seasonal), Hot Stint Qualifying, #Jagoff. The
+  // "Leaderboards" word opens the always-on Hot Lap board. The Seasonal/
+  // Qualifying/Jagoff entries are always present for ACC (there's a deep
+  // history of seasonal boards, S7–S18; each of those pages shows a
+  // graceful empty state when there's nothing to show yet — Hot Stint
+  // Qualifying "not currently running", Jagoff "no Jaguar times yet this
+  // season" — same pattern as the other always-on entries here; the
+  // sub-tab strip on each page (LeaderboardTabs) additionally hides
+  // Jagoff's own tab there until someone's actually set a time, but this
+  // top-level dropdown doesn't have per-request data to gate on, so it
+  // stays unconditional like Hot Stint Qualifying); Endurance appears only
+  // once an endurance championship (formatTag "Endurance") releases a
   // round. Other sims keep the per-championship list.
   const isEndurance = (c: ChampionshipContent) =>
     (c.formatTag ?? '').trim().toLowerCase() === 'endurance';
@@ -123,6 +131,8 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
             { label: 'Hot Lap (Seasonal)', href: `/${sim.slug}/leaderboards/seasonal` },
             { label: 'Hot Stint', href: `/${sim.slug}/leaderboards/hotstint` },
             { label: 'Hot Stint (Seasonal)', href: `/${sim.slug}/leaderboards/hotstint/seasonal` },
+            { label: 'Hot Stint Qualifying', href: `/${sim.slug}/leaderboards/hotstint-qualifying` },
+            { label: '#Jagoff', href: `/${sim.slug}/leaderboards/jagoff` },
             ...(hasEndurance
               ? [{ label: 'Hot Lap (Endurance)', href: `/${sim.slug}/leaderboards/endurance` }]
               : []),

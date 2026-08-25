@@ -6,7 +6,7 @@ import { SeasonSelect } from '@/components/SeasonSelect';
 import { GameLabel } from '@/components/GameLabel';
 import { hasEnduranceReleased } from '@/lib/seasonal-leaderboard';
 import { getHotStintSeasons, getSeasonStintTrackList } from '@/lib/acc/hotstint';
-import { hasHotStintQualifyingContent } from '@/lib/acc/hot-stint-store';
+import { hasHotStintQualifyingContent, hasJagoffContent } from '@/lib/acc/hot-stint-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +47,7 @@ export default async function SeasonalHotStintPage({
         showSeasonal={seasons.length > 0}
         showEndurance={await hasEnduranceReleased()}
         showHotStintQualifying={await hasHotStintQualifyingContent()}
+        showJagoff={await hasJagoffContent()}
       />
 
       {seasons.length === 0 || !selectedSeason ? (

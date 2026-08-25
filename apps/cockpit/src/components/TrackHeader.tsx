@@ -7,9 +7,14 @@ import { countryFlagUrl } from '@/lib/country-flag';
 export function TrackHeader({
   track,
   fastestLap,
+  label = 'Fastest lap',
 }: {
   track: TrackSummary;
   fastestLap: TrackTopEntry | null;
+  // "Fastest lap" for hot-lap boards, "Fastest stint" for hot-stint boards —
+  // this component is shared across both (see every [track]/page.tsx under
+  // leaderboards/), and a stint average isn't a lap.
+  label?: string;
 }) {
   return (
     <div className="relative w-full h-[220px] sm:h-[320px] border border-line overflow-hidden mb-10">
@@ -46,7 +51,7 @@ export function TrackHeader({
           {fastestLap && (
             <div className="mt-1 sm:mt-3 flex flex-col gap-1 sm:gap-2 min-w-0">
               <span className="font-mono text-[12px] sm:text-[15px] tracking-[.15em] uppercase text-white/60">
-                🏁 Fastest lap
+                🏁 {label}
               </span>
               <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
                 <span className="flex items-center gap-2 min-w-0">

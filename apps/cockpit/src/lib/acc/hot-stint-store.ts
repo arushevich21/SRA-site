@@ -32,12 +32,33 @@ export const PUBLIC_CLASSIFICATION_COLUMNS = [
   'first_name',
   'last_name',
   'hotstint_ms',
+  // Which car produced the driver's winning stint average — not PII, safe
+  // alongside the name/time columns above. See 20260825_classification_
+  // status_car_model.sql for where these come from (best_quali carries
+  // acc_hotstint_leaderboard's own car_model_id/car_model straight through —
+  // no separate join needed).
+  'car_model_id',
+  'car_model',
+  // Moved from admin-only 2026-08-25: the actual hard requirement was
+  // always just "lap counts stay hidden" (num_laps, below) — steam_id isn't
+  // PII in the sense that mattered here, and every other public ACC
+  // leaderboard already ships it over the wire (used for row identity and
+  // the "My Laps" filter — see HotLapBoard.tsx). Confirmed with the product
+  // owner before moving it; discord_id/driver_id/rating internals stayed
+  // admin-only on purpose, this wasn't a blanket loosening.
+  'steam_id',
+  // Per-sector average across the winning 5-lap stint (same meaning as
+  // hotstint_ms is the overall average), plus car_group/track_key needed to
+  // gate and compute the reference-time tier badge client-side — see
+  // lib/acc/reference-times.ts's classifyLapTier. None are PII.
+  'sectors_ms',
+  'car_group',
+  'track_key',
 ] as const;
 
 export const ADMIN_ONLY_CLASSIFICATION_COLUMNS = [
   'discord_id',
   'driver_id',
-  'steam_id',
   'has_signup',
   'has_account',
   'has_hotstint',
@@ -54,12 +75,34 @@ export const ADMIN_ONLY_CLASSIFICATION_COLUMNS = [
 // from PUBLIC/ADMIN_ONLY above. hot-stint-store.test.ts asserts PUBLIC ∪
 // ADMIN_ONLY equals this set exactly, so a column added to
 // classification_status without being classified into one of the two lists
-// above fails the test instead of silently landing in neither. (Deriving
-// this list from the other two would make that test vacuous — it must be
-// authored independently to catch a real drift.)
+// above fails the test instead of silently landing in neither. Deriving this
+// list from the other two would make that test vacuous — it MUST be
+// authored independently to catch a real drift. (Found already-vacuous
+// during the 2026-08-25 car-column change — this literal array is the fix,
+// not a spread of the two lists above.)
 export const ALL_CLASSIFICATION_STATUS_COLUMNS = [
-  ...PUBLIC_CLASSIFICATION_COLUMNS,
-  ...ADMIN_ONLY_CLASSIFICATION_COLUMNS,
+  'series',
+  'season',
+  'discord_id',
+  'driver_id',
+  'steam_id',
+  'first_name',
+  'last_name',
+  'has_signup',
+  'has_account',
+  'has_hotstint',
+  'eligible',
+  'hotstint_ms',
+  'num_laps',
+  'is_returning',
+  'srating_ordinal',
+  'composite',
+  'pace_pct',
+  'car_model_id',
+  'car_model',
+  'sectors_ms',
+  'car_group',
+  'track_key',
 ] as const;
 
 export type ClassificationScope = { series: string; season: number };
@@ -98,19 +141,35 @@ export async function hasHotStintQualifyingContent(): Promise<boolean> {
 
 export type PublicHotStintRow = {
   position: number;
+  steamId: string;
   driverName: string;
   hotstintMs: number;
+  // Naming matches AccHotLapEntry (shared-types/acc.ts): carModel is the raw
+  // numeric id (icon/logo lookups), carModelName the display string.
+  carModel: number | null;
+  carModelName: string | null;
+  sectorsMs: number[] | null;
+  carGroup: string | null;
+  trackKey: string | null;
 };
 
 // Public "Hot Stint Qualifying (seasonal)" leaderboard tab. Reads
 // classification_status_public (a view, not classification_status directly)
 // and is deliberately a separate query from getAdminClassificationHotStint,
 // not the same query with columns hidden in the UI, which would still ship
-// them in the network response. The view filters to eligible = true (has
-// completed signup, has a linked account, AND has a hotstint time) — not
-// just "hotstint_ms is not null" — so a driver who set a time without
-// completing classification signup doesn't show ranked here and then vanish
-// once divisions publish. See the view's migration for the full reasoning.
+// them in the network response.
+//
+// One row per (driver, car) qualifying stint — NOT collapsed to each
+// driver's single best (that collapse is HotLapBoard's client-side "Unique
+// Drivers" toggle, same as every other Hot Stint/Hot Lap board; baking it
+// into the query was a mistake caught and fixed 2026-08-25, see
+// 20260825b_classification_public_all_stints.sql). The view's join is what
+// gates who appears at all: a driver needs completed signup, a linked
+// steam_id, AND at least one qualifying stint (the inner join to
+// acc_hotstint_leaderboard itself is the has_hotstint condition) — a driver
+// who set a time without completing classification signup doesn't show
+// ranked here and then vanish once divisions publish. See the view's
+// migration for the full reasoning.
 export async function getPublicHotStintLeaderboard(
   series: string,
   season: number,
@@ -124,14 +183,101 @@ export async function getPublicHotStintLeaderboard(
   if (error) throw error;
 
   return ((data ?? []) as unknown as Array<{
+    steam_id: string;
     first_name: string | null;
     last_name: string | null;
     hotstint_ms: number;
+    car_model_id: number | null;
+    car_model: string | null;
+    sectors_ms: number[] | null;
+    car_group: string | null;
+    track_key: string | null;
   }>).map((r, i) => ({
     position: i + 1,
+    steamId: r.steam_id,
     driverName: [r.first_name, r.last_name].filter(Boolean).join(' ') || 'Unknown',
     hotstintMs: r.hotstint_ms,
+    carModel: r.car_model_id,
+    carModelName: r.car_model,
+    sectorsMs: r.sectors_ms,
+    carGroup: r.car_group,
+    trackKey: r.track_key,
   }));
+}
+
+// Emil Frey Jaguar G3 — see content/acc-car-model-map.ts's
+// ACC_CAR_MODEL_ID_BY_NAME (the human-confirmed source of truth for this
+// id). Hardcoded here rather than importing that map, which is keyed by
+// championships.ts's allowedCars picker strings and pulls in content-layer
+// deps this file has no other reason to depend on — the id itself is
+// unambiguous and stable (see acc-constants.ts).
+const JAGUAR_CAR_MODEL_ID = 14;
+
+export type JagoffRow = {
+  position: number;
+  steamId: string;
+  driverName: string;
+  hotstintMs: number;
+  sectorsMs: number[] | null;
+  trackKey: string | null;
+};
+
+// #Jagoff: an in-house side-competition for the fastest Hot Stint average
+// specifically in the Jaguar (car_model_id 14), scoped to the current
+// classification season — same season the main Hot Stint Qualifying board
+// uses, so "this season's Jagoff winner" means the same season as
+// everything else on the page. Reads acc_hotstint_leaderboard directly
+// rather than classification_status_public: this board isn't gated on
+// classification eligibility (has_signup/linked account) at all — it's a
+// fun side board open to anyone who set a qualifying Jaguar stint,
+// classified or not — and it's fixed to one car by construction, so there's
+// no "collapse across cars" question here the way there is on the main
+// board (see getPublicHotStintLeaderboard above).
+export async function getJagoffBoard(scope: ClassificationScope): Promise<JagoffRow[]> {
+  const { data, error } = await supabase
+    .from('acc_hotstint_leaderboard')
+    .select('steam_id, driver_name, best_stint_ms, sectors_ms, track_key')
+    .eq('board_scope', 'seasonal')
+    .eq('qualifying', true)
+    .eq('is_wet', false)
+    .eq('car_model_id', JAGUAR_CAR_MODEL_ID)
+    .eq('season', `S${scope.season}`)
+    .order('best_stint_ms', { ascending: true });
+  if (error) throw error;
+
+  // One row per driver — best Jaguar stint only. Rows already arrive
+  // best-first, so the first occurrence of a steam_id wins.
+  const seen = new Set<string>();
+  const rows: JagoffRow[] = [];
+  for (const r of (data ?? []) as Array<{
+    steam_id: string;
+    driver_name: string;
+    best_stint_ms: number;
+    sectors_ms: number[] | null;
+    track_key: string | null;
+  }>) {
+    if (seen.has(r.steam_id)) continue;
+    seen.add(r.steam_id);
+    rows.push({
+      position: rows.length + 1,
+      steamId: r.steam_id,
+      driverName: r.driver_name,
+      hotstintMs: r.best_stint_ms,
+      sectorsMs: r.sectors_ms,
+      trackKey: r.track_key,
+    });
+  }
+  return rows;
+}
+
+// Whether the #Jagoff tab should be shown: unlike Hot Stint Qualifying
+// (shown for the whole classification window, even empty), Jagoff is a
+// narrow side board — only worth a nav entry once someone has actually set
+// a qualifying Jaguar stint this season.
+export async function hasJagoffContent(): Promise<boolean> {
+  const scope = await getCurrentClassificationScope();
+  if (!scope) return false;
+  return (await getJagoffBoard(scope)).length > 0;
 }
 
 export type AdminHotStintRow = {
@@ -150,6 +296,11 @@ export type AdminHotStintRow = {
   sratingOrdinal: number | null;
   composite: number | null;
   pacePct: number | null;
+  carModel: number | null;
+  carModelName: string | null;
+  sectorsMs: number[] | null;
+  carGroup: string | null;
+  trackKey: string | null;
 };
 
 // Admin-only view of the full classification run for (series, season) —
@@ -187,5 +338,10 @@ export async function getAdminClassificationHotStint(
     sratingOrdinal: r.srating_ordinal as number | null,
     composite: r.composite as number | null,
     pacePct: r.pace_pct as number | null,
+    carModel: r.car_model_id as number | null,
+    carModelName: r.car_model as string | null,
+    sectorsMs: r.sectors_ms as number[] | null,
+    carGroup: r.car_group as string | null,
+    trackKey: r.track_key as string | null,
   }));
 }

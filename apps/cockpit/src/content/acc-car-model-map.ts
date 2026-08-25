@@ -47,10 +47,7 @@ export const ACC_CAR_MODEL_ID_BY_NAME: Readonly<Record<string, number>> = {
   'Lamborghini Huracán GT3 EVO2': 33, // Lamborghini Huracan Evo2 — not id 16 (evo 1) or id 4 (base)
   'McLaren 720S GT3': 22, // McLaren 720S GT3 (2019) — base, distinct from the Evo entry below
   'McLaren 720S GT3 Evo': 35, // McLaren 720S GT3 Evo 2023
-  'Porsche 991 II GT3 R': 23, // ACC_CAR_MODEL_NAMES has this as "911II" — believed to be a
-  // transcription typo in the Server Admin Handbook / this codebase's table
-  // ("991.II" is the real Porsche chassis code, "911II" is not a thing) —
-  // the car itself is unambiguous regardless.
+  'Porsche 991 II GT3 R': 23,
   'Reiter Engineering R-EX GT3': 13, // Lamborghini Gallardo R-EX — Reiter Engineering races this specific car in ACC
 
   // Settled by historical results data (see header) — not by reasoning alone.

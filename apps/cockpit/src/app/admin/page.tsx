@@ -1,7 +1,15 @@
 import Link from 'next/link';
-import { requireAdmin } from '@/lib/require-admin';
+import { getAdminAccess, ADMIN_PERMISSIONS, type AdminPermission } from '@/lib/require-admin';
 
-const ADMIN_SECTIONS = [
+// A tool with no `permission` is full-admin-only (the default every section
+// had before scoped permissions existed). A tool WITH one is visible to a
+// full admin OR anyone holding that specific permission — see
+// getAdminAccess() in lib/require-admin.ts.
+const ADMIN_SECTIONS: {
+  title: string;
+  description: string;
+  tools: { label: string; href: string; description: string; permission?: AdminPermission }[];
+}[] = [
   {
     title: 'Events',
     description: 'Create and manage championships/events shown on the site.',
@@ -65,6 +73,7 @@ const ADMIN_SECTIONS = [
         href: '/admin/bop',
         description:
           'Edit ballast & restrictor per track and car, then download an ACCSM-ready bop.json (or import an existing one).',
+        permission: ADMIN_PERMISSIONS.BOP,
       },
     ],
   },
@@ -95,8 +104,19 @@ const ADMIN_SECTIONS = [
 ];
 
 export default async function AdminIndexPage() {
-  // Defense in depth: gate at page render AND every server action
-  await requireAdmin();
+  // Defense in depth: gate at page render AND every server action. Unlike
+  // the old requireAdmin()-only gate, this also lets a non-admin holding a
+  // scoped permission (e.g. a BoP-only manager) reach this page at all —
+  // getAdminAccess() redirects only if the caller has neither is_admin nor
+  // any permission.
+  const { isAdmin, permissions } = await getAdminAccess();
+
+  const visibleSections = ADMIN_SECTIONS.map((section) => ({
+    ...section,
+    tools: section.tools.filter(
+      (tool) => isAdmin || (tool.permission != null && permissions.has(tool.permission)),
+    ),
+  })).filter((section) => section.tools.length > 0);
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -108,7 +128,7 @@ export default async function AdminIndexPage() {
       </h1>
 
       <div className="flex flex-col gap-10 max-w-[720px]">
-        {ADMIN_SECTIONS.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title}>
             <h2 className="font-display font-bold text-[22px] uppercase text-gold mb-1">
               {section.title}

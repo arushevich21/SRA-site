@@ -54,6 +54,7 @@ export default async function AdminHotStintQualifyingPage() {
                   {[
                     'Pos',
                     'Driver',
+                    'Car',
                     'Discord ID',
                     'Driver ID',
                     'Steam ID',
@@ -82,6 +83,7 @@ export default async function AdminHotStintQualifyingPage() {
                   <tr key={r.discordId} className="border-b border-line/50 last:border-b-0">
                     <td className="font-mono text-[12px] text-txt-3 px-4 py-2">{r.position}</td>
                     <td className="font-sans text-[13px] text-txt px-4 py-2">{r.driverName}</td>
+                    <td className="font-sans text-[12px] text-txt-2 px-4 py-2">{r.carModelName ?? '—'}</td>
                     <td className="font-mono text-[12px] text-txt-2 px-4 py-2">{r.discordId}</td>
                     <td className="font-mono text-[12px] text-txt-2 px-4 py-2">{r.driverId ?? '—'}</td>
                     <td className="font-mono text-[12px] text-txt-2 px-4 py-2">{r.steamId ?? '—'}</td>

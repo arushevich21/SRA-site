@@ -16,6 +16,13 @@ import { usePathname } from 'next/navigation';
 //                                  ingest — see lib/acc/hot-stint-store.ts).
 //                                  Shown only while a classification run is
 //                                  in progress (showHotStintQualifying).
+//   • #Jagoff                    — in-house side competition, fastest
+//                                  qualifying-window stint in the Jaguar G3
+//                                  only (see getJagoffBoard in
+//                                  lib/acc/hot-stint-store.ts). Shown only
+//                                  once someone has actually set a Jaguar
+//                                  time this season (showJagoff), unlike
+//                                  Hot Stint Qualifying which shows empty.
 // Hot Lap and Hot Stint are always on; the two Seasonal tabs show whenever
 // seasonal data exists (showSeasonal); Endurance is release-gated.
 export function LeaderboardTabs({
@@ -23,11 +30,13 @@ export function LeaderboardTabs({
   showSeasonal = false,
   showEndurance = false,
   showHotStintQualifying = false,
+  showJagoff = false,
 }: {
   simSlug: string;
   showSeasonal?: boolean;
   showEndurance?: boolean;
   showHotStintQualifying?: boolean;
+  showJagoff?: boolean;
 }) {
   const pathname = usePathname();
   const onStintSeasonal = pathname.includes('/leaderboards/hotstint/seasonal');
@@ -35,7 +44,9 @@ export function LeaderboardTabs({
   const onHotlapSeasonal = pathname.includes('/leaderboards/seasonal');
   const onEndurance = pathname.includes('/leaderboards/endurance');
   const onHotStintQualifying = pathname.includes('/leaderboards/hotstint-qualifying');
-  const onHotLap = !onStint && !onStintSeasonal && !onHotlapSeasonal && !onEndurance && !onHotStintQualifying;
+  const onJagoff = pathname.includes('/leaderboards/jagoff');
+  const onHotLap =
+    !onStint && !onStintSeasonal && !onHotlapSeasonal && !onEndurance && !onHotStintQualifying && !onJagoff;
 
   const tabs = [
     { label: 'Hot Lap', href: `/${simSlug}/leaderboards`, active: onHotLap, show: true },
@@ -44,6 +55,7 @@ export function LeaderboardTabs({
     { label: 'Hot Stint (Seasonal)', href: `/${simSlug}/leaderboards/hotstint/seasonal`, active: onStintSeasonal, show: showSeasonal },
     { label: 'Hot Lap (Endurance)', href: `/${simSlug}/leaderboards/endurance`, active: onEndurance, show: showEndurance },
     { label: 'Hot Stint Qualifying', href: `/${simSlug}/leaderboards/hotstint-qualifying`, active: onHotStintQualifying, show: showHotStintQualifying },
+    { label: '#Jagoff', href: `/${simSlug}/leaderboards/jagoff`, active: onJagoff, show: showJagoff },
   ].filter((t) => t.show);
 
   return (
