@@ -51,8 +51,15 @@ const nextConfig: NextConfig = {
     formats: ['image/webp'],
     remotePatterns: [
       {
+        // acc_tracks.splash_art_url values live under this fixed prefix (see
+        // migrations, e.g. 20260724b_watkins_glen_track.sql) — every known
+        // track's map/photo is already re-hosted locally (see
+        // TRACK_MAP_OVERRIDES/TRACK_PHOTO_OVERRIDES in lib/acc/tracks.ts) and
+        // this host's own TLS cert is expired, but the pattern stays scoped
+        // for any DB row not yet covered by an override.
         protocol: 'https',
         hostname: 'static.simracingalliance.com',
+        pathname: '/assets/images/tracks/**',
       },
       {
         protocol: 'https',
@@ -60,8 +67,12 @@ const nextConfig: NextConfig = {
         pathname: '/avatars/**',
       },
       {
+        // Flags are always requested unoptimized (see countryFlagUrl call
+        // sites) — kept scoped anyway as defense-in-depth against a future
+        // usage that forgets the unoptimized prop.
         protocol: 'https',
         hostname: 'flagcdn.com',
+        pathname: '/w40/**',
       },
       ...(supabaseHost
         ? [
