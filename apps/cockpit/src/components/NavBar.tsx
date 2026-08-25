@@ -597,7 +597,7 @@ export default function NavBar({
               {user.avatar_url && (
                 <Image
                   src={user.avatar_url}
-                  alt={user.display_name ?? ''}
+                  alt=''
                   width={32}
                   height={32}
                   className="rounded-full shrink-0"
