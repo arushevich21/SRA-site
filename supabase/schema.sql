@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict AuAo1r8k3U34UEOnIEJ4cnvQPPebe5DXbB9bOOQyyaXlKrSZ8IiB2bgD1m9amyj
+\restrict cRjYlhWKlTbxP4jGJOOmoJG7BA5IoZB1ItR0xXX076KCnwEqOCmYabXcfEs84W0
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -41,6 +41,26 @@ CREATE TYPE public.driver_tier AS ENUM (
     'gold',
     'silver'
 );
+
+
+--
+-- Name: has_admin_permission(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.has_admin_permission(perm text) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select
+    exists (
+      select 1 from drivers d
+      where d.user_id = auth.uid() and d.is_admin
+    )
+    or exists (
+      select 1 from admin_permissions p
+      where p.user_id = auth.uid() and p.permission = perm
+    );
+$$;
 
 
 SET default_tablespace = '';
@@ -94,9 +114,15 @@ BEGIN
     RAISE EXCEPTION 'EMPTY_ROSTER: at least one driver is required';
   END IF;
 
-  -- Pure reads, no race-sensitive content — done before the advisory lock
-  -- so the lock is only held across the cap-check/insert sequence below,
-  -- not this whole loop.
+  SELECT max_registrations INTO v_max
+  FROM championships
+  WHERE registration_key = p_championship_key
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'CHAMPIONSHIP_KEY_INVALID: %', p_championship_key;
+  END IF;
+
   FOR v_driver IN SELECT * FROM jsonb_array_elements(p_drivers)
   LOOP
     v_driver_id := (v_driver->>'driver_id')::uuid;
@@ -105,13 +131,6 @@ BEGIN
       v_registrant_found := true;
     END IF;
 
-    -- FOUND is set by the SELECT INTO immediately above it — distinguishes
-    -- "no drivers row at all" from "row exists but division_id is NULL",
-    -- which a single `IS NULL` check on v_driver_division cannot do (both
-    -- leave the variable NULL). Conflating the two was wrong in an earlier
-    -- draft of this function: it would have reported DRIVER_NOT_FOUND for
-    -- every driver in the normal pre-season case instead of the intended
-    -- DIVISION_UNASSIGNED.
     SELECT division_id INTO v_driver_division
     FROM drivers WHERE id = v_driver_id;
 
@@ -135,15 +154,7 @@ BEGIN
     RAISE EXCEPTION 'REGISTRANT_NOT_IN_ROSTER: %', p_registrant_driver_id;
   END IF;
 
-  -- Serializes concurrent registrations for THIS event only — released
-  -- automatically at transaction end (see 20260811b's header for the full
-  -- rationale; unchanged here).
   PERFORM pg_advisory_xact_lock(hashtextextended(p_championship_key || ':' || p_season, 0));
-
-  SELECT max_registrations INTO v_max
-  FROM championships
-  WHERE registration_key = p_championship_key
-  LIMIT 1;
 
   SELECT count(*) INTO v_confirmed_count
   FROM registrations
@@ -172,10 +183,6 @@ BEGIN
   )
   RETURNING * INTO v_row;
 
-  -- registration_drivers.championship_key/season are auto-derived by
-  -- registration_drivers_set_event_key (20260814d) from registration_id —
-  -- not set here, so there's no way for this insert to disagree with the
-  -- parent row it just created.
   FOR v_driver IN SELECT * FROM jsonb_array_elements(p_drivers)
   LOOP
     BEGIN
@@ -187,15 +194,20 @@ BEGIN
         coalesce((v_driver->>'slot')::integer, 0)
       );
     EXCEPTION WHEN unique_violation THEN
-      -- The constraint (registration_drivers_one_claim_per_event) is what
-      -- actually prevents the double-claim race atomically — this only
-      -- translates the generic 23505 into a message naming which driver,
-      -- for the UI. Re-raising here aborts the whole function call,
-      -- rolling back the registrations insert and any registration_drivers
-      -- rows already inserted earlier in this same loop.
       RAISE EXCEPTION 'DRIVER_ALREADY_CLAIMED: %', (v_driver->>'driver_id')::uuid;
     END;
   END LOOP;
+
+  -- Enqueue the ACCSM entrylist sync, same transaction. A pending job
+  -- already queued for this championship (bot_jobs_accsm_entrylist_sync_
+  -- pending_dedup) is fine — the consumer will pick up this registration
+  -- when it drains, no second job needed.
+  BEGIN
+    INSERT INTO bot_jobs (type, payload)
+    VALUES ('accsm_entrylist_sync', jsonb_build_object('championship_key', p_championship_key));
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
 
   RETURN v_row;
 END;
@@ -302,7 +314,8 @@ CREATE TABLE public.acc_hotstint_leaderboard (
     sectors_ms jsonb,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     total_laps integer DEFAULT 0 NOT NULL,
-    total_valid_laps integer DEFAULT 0 NOT NULL
+    total_valid_laps integer DEFAULT 0 NOT NULL,
+    stint_laps jsonb
 );
 
 
@@ -484,6 +497,18 @@ CREATE TABLE public.acevo_round_points_cache_v2 (
     race_session_date timestamp with time zone,
     qualify_session_date timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: admin_permissions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_permissions (
+    user_id uuid NOT NULL,
+    permission text NOT NULL,
+    granted_at timestamp with time zone DEFAULT now() NOT NULL,
+    granted_by uuid
 );
 
 
@@ -686,7 +711,12 @@ CREATE VIEW public.classification_status WITH (security_invoker='true') AS
          SELECT DISTINCT ON (acc_hotstint_leaderboard.season, acc_hotstint_leaderboard.steam_id) acc_hotstint_leaderboard.season,
             acc_hotstint_leaderboard.steam_id,
             acc_hotstint_leaderboard.best_stint_ms,
-            acc_hotstint_leaderboard.total_laps
+            acc_hotstint_leaderboard.total_laps,
+            acc_hotstint_leaderboard.car_model_id,
+            acc_hotstint_leaderboard.car_model,
+            acc_hotstint_leaderboard.sectors_ms,
+            acc_hotstint_leaderboard.car_group,
+            acc_hotstint_leaderboard.track_key
            FROM public.acc_hotstint_leaderboard
           WHERE ((acc_hotstint_leaderboard.board_scope = 'seasonal'::text) AND (acc_hotstint_leaderboard.qualifying = true) AND (acc_hotstint_leaderboard.is_wet = false) AND (acc_hotstint_leaderboard.best_stint_ms IS NOT NULL))
           ORDER BY acc_hotstint_leaderboard.season, acc_hotstint_leaderboard.steam_id, acc_hotstint_leaderboard.best_stint_ms
@@ -707,7 +737,12 @@ CREATE VIEW public.classification_status WITH (security_invoker='true') AS
     (r.player_id IS NOT NULL) AS is_returning,
     COALESCE(r.composite, r.os_ordinal) AS srating_ordinal,
     r.composite,
-    r.pace_pct
+    r.pace_pct,
+    bq.car_model_id,
+    bq.car_model,
+    bq.sectors_ms,
+    bq.car_group,
+    bq.track_key
    FROM (((public.classification c
      LEFT JOIN public.drivers d ON ((d.discord_id = c.discord_id)))
      LEFT JOIN best_quali bq ON (((bq.season = ('S'::text || c.season)) AND (bq.steam_id = ('S'::text || d.steam_id)))))
@@ -719,13 +754,21 @@ CREATE VIEW public.classification_status WITH (security_invoker='true') AS
 --
 
 CREATE VIEW public.classification_status_public WITH (security_invoker='true') AS
- SELECT series,
-    season,
-    first_name,
-    last_name,
-    hotstint_ms
-   FROM public.classification_status
-  WHERE ((eligible = true) AND (hotstint_ms IS NOT NULL));
+ SELECT c.series,
+    c.season,
+    d.first_name,
+    d.last_name,
+    bq.best_stint_ms AS hotstint_ms,
+    bq.car_model_id,
+    bq.car_model,
+    d.steam_id,
+    bq.sectors_ms,
+    bq.car_group,
+    bq.track_key
+   FROM ((public.classification c
+     JOIN public.drivers d ON ((d.discord_id = c.discord_id)))
+     JOIN public.acc_hotstint_leaderboard bq ON (((bq.season = ('S'::text || c.season)) AND (bq.steam_id = ('S'::text || d.steam_id)) AND (bq.board_scope = 'seasonal'::text) AND (bq.qualifying = true) AND (bq.is_wet = false) AND (bq.best_stint_ms IS NOT NULL))))
+  WHERE ((c.has_signup = true) AND (d.steam_id IS NOT NULL));
 
 
 --
@@ -773,6 +816,19 @@ CREATE TABLE public.registration_drivers (
     slot integer DEFAULT 0 NOT NULL,
     championship_key text NOT NULL,
     season text NOT NULL
+);
+
+
+--
+-- Name: server_status; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.server_status (
+    server_key text NOT NULL,
+    label text NOT NULL,
+    last_seen_at timestamp with time zone,
+    track_key text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1047,6 +1103,14 @@ ALTER TABLE ONLY public.acevo_round_points_cache_v2
 
 
 --
+-- Name: admin_permissions admin_permissions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_permissions
+    ADD CONSTRAINT admin_permissions_pkey PRIMARY KEY (user_id, permission);
+
+
+--
 -- Name: bop_config bop_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1215,6 +1279,14 @@ ALTER TABLE ONLY public.registrations
 
 
 --
+-- Name: server_status server_status_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.server_status
+    ADD CONSTRAINT server_status_pkey PRIMARY KEY (server_key);
+
+
+--
 -- Name: settings settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1348,6 +1420,13 @@ CREATE INDEX acc_race_sessions_staging_event_key_idx ON public.acc_race_sessions
 --
 
 CREATE INDEX acc_race_sessions_staging_session_date_idx ON public.acc_race_sessions_staging USING btree (session_date DESC);
+
+
+--
+-- Name: bot_jobs_accsm_entrylist_sync_pending_dedup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX bot_jobs_accsm_entrylist_sync_pending_dedup ON public.bot_jobs USING btree (((payload ->> 'championship_key'::text))) WHERE ((type = 'accsm_entrylist_sync'::text) AND (status = 'pending'::text));
 
 
 --
@@ -1579,6 +1658,22 @@ ALTER TABLE ONLY public.acevo_hotlap_cache_v2
 
 ALTER TABLE ONLY public.acevo_round_points_cache_v2
     ADD CONSTRAINT acevo_round_points_cache_v2_layout_key_fkey FOREIGN KEY (layout_key) REFERENCES public.track_layouts(layout_key);
+
+
+--
+-- Name: admin_permissions admin_permissions_granted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_permissions
+    ADD CONSTRAINT admin_permissions_granted_by_fkey FOREIGN KEY (granted_by) REFERENCES auth.users(id);
+
+
+--
+-- Name: admin_permissions admin_permissions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_permissions
+    ADD CONSTRAINT admin_permissions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -1856,16 +1951,36 @@ CREATE POLICY acevo_round_points_cache_v2_select_all ON public.acevo_round_point
 
 
 --
+-- Name: admin_permissions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.admin_permissions ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: bop_config; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.bop_config ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: bop_config bop_config_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY bop_config_write ON public.bop_config USING (public.has_admin_permission('bop'::text)) WITH CHECK (public.has_admin_permission('bop'::text));
+
+
+--
 -- Name: bop_entries; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.bop_entries ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: bop_entries bop_entries_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY bop_entries_write ON public.bop_entries USING (public.has_admin_permission('bop'::text)) WITH CHECK (public.has_admin_permission('bop'::text));
+
 
 --
 -- Name: bot_jobs; Type: ROW SECURITY; Schema: public; Owner: -
@@ -1984,6 +2099,19 @@ CREATE POLICY registrations_select_all ON public.registrations FOR SELECT USING 
 
 
 --
+-- Name: server_status; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.server_status ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: server_status server_status_select_all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY server_status_select_all ON public.server_status FOR SELECT USING (true);
+
+
+--
 -- Name: settings; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2062,5 +2190,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AuAo1r8k3U34UEOnIEJ4cnvQPPebe5DXbB9bOOQyyaXlKrSZ8IiB2bgD1m9amyj
+\unrestrict cRjYlhWKlTbxP4jGJOOmoJG7BA5IoZB1ItR0xXX076KCnwEqOCmYabXcfEs84W0
 
