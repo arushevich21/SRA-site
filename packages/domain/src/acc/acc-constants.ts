@@ -27,7 +27,7 @@ export const ACC_CAR_MODEL_NAMES: Readonly<Record<number, string>> = {
   20: 'AMR V8 Vantage (2019)',
   21: 'Honda NSX Evo (2019)',
   22: 'McLaren 720S GT3 (2019)',
-  23: 'Porsche 911II GT3 R (2019)',
+  23: 'Porsche 991 II GT3 R (2019)',
   24: 'Ferrari 488 GT3 Evo 2020',
   25: 'Mercedes-AMG GT3 2020',
   26: 'Ferrari 488 Challenge Evo',
