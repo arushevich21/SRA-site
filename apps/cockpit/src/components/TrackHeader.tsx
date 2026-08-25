@@ -19,7 +19,14 @@ export function TrackHeader({
   return (
     <div className="relative w-full h-[220px] sm:h-[320px] border border-line overflow-hidden mb-10">
       {track.splashArtUrl && (
-        <Image src={track.splashArtUrl} alt={track.displayName} fill className="object-cover" />
+        <Image
+          src={track.splashArtUrl}
+          alt={track.displayName}
+          fill
+          sizes="(min-width: 1280px) 1224px, 100vw"
+          priority
+          className="object-cover"
+        />
       )}
       <div className="absolute inset-0 bg-carbon/75" />
 
@@ -40,6 +47,8 @@ export function TrackHeader({
                     src={countryFlagUrl(track.country)}
                     alt={track.country}
                     fill
+                    sizes="24px"
+                    unoptimized
                     className="object-cover"
                   />
                 </span>
@@ -69,6 +78,8 @@ export function TrackHeader({
                         src={countryFlagUrl(fastestLap.country)}
                         alt={fastestLap.country}
                         fill
+                        sizes="24px"
+                        unoptimized
                         className="object-cover"
                       />
                     </span>
@@ -92,7 +103,7 @@ export function TrackHeader({
                 ) : (
                   fastestLap.manufacturerLogoUrl && (
                     <span className="relative w-7 h-7 shrink-0">
-                      <FallbackLogoImage src={fastestLap.manufacturerLogoUrl} alt="" />
+                      <FallbackLogoImage src={fastestLap.manufacturerLogoUrl} alt="" sizes="28px" />
                     </span>
                   )
                 )}
@@ -106,7 +117,13 @@ export function TrackHeader({
 
         <div className="hidden sm:block relative flex-1 h-full min-w-0">
           {track.mapUrl && (
-            <Image src={track.mapUrl} alt="" fill className="object-contain opacity-90" />
+            <Image
+              src={track.mapUrl}
+              alt=""
+              fill
+              sizes="(min-width: 640px) 600px, 0px"
+              className="object-contain opacity-90"
+            />
           )}
         </div>
       </div>

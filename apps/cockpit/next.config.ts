@@ -25,6 +25,16 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
+    // Defaults are 8 deviceSizes x 8 imageSizes (16 total variants Vercel's
+    // optimizer can generate per source image). Every <Image> on this site
+    // renders at a known, bounded size (icons/flags/badges are ~16-40px,
+    // manufacturer logos ~20-28px, track hero art tops out at this app's own
+    // max-w-[1280px] page container) — nothing here is ever full-viewport at
+    // 4K. Cut to what's actually used so each image needs far fewer
+    // transformations, which is what Vercel's Image Optimization quota
+    // counts against.
+    deviceSizes: [640, 828, 1280, 1920],
+    imageSizes: [16, 32, 48, 64, 128],
     remotePatterns: [
       {
         protocol: 'https',

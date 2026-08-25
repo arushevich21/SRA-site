@@ -2,6 +2,17 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  // Most traffic on a public leaderboard site is anonymous. getUser() is a
+  // network round-trip to Supabase's auth server on every request — skip it
+  // entirely when there's no Supabase auth cookie to refresh or check in the
+  // first place. A signed-in request always carries one of these (set by
+  // @supabase/ssr, chunked as "-auth-token" / "-auth-token.0" etc. for large
+  // sessions), so this can't false-negative a real session.
+  const hasAuthCookie = request.cookies.getAll().some((c) => c.name.includes('-auth-token'));
+  if (!hasAuthCookie) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

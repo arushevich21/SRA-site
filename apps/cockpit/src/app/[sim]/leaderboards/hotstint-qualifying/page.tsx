@@ -125,26 +125,33 @@ export default async function HotStintQualifyingPage({
   if (!sim) notFound();
   if (sim.game !== 'ACC') notFound();
 
-  const scope = await getCurrentClassificationScope();
-  const rows = scope ? await getPublicHotStintLeaderboard(scope.series, scope.season) : [];
-
-  const [showSeasonal, showEndurance, showJagoff, driverInfoMap, sraqStatus] = await Promise.all([
+  // showSeasonal/showEndurance/showJagoff/sraqStatus don't depend on the
+  // classification scope or its rows — fire them alongside scope instead of
+  // waiting until after rows resolves.
+  const [scope, showSeasonal, showEndurance, showJagoff, sraqStatus] = await Promise.all([
+    getCurrentClassificationScope(),
     hasSeasonalContent(),
     hasEnduranceReleased(),
     hasJagoffContent(),
-    getDriverInfoBySteamIds(rows.map((r) => r.steamId)),
     getSraqServerStatus(),
+  ]);
+  const rows = scope ? await getPublicHotStintLeaderboard(scope.series, scope.season) : [];
+  const trackKey = representativeTrackKey(rows);
+
+  // driverInfoMap and accTrack both depend only on rows/trackKey, not on each
+  // other — run them together rather than one after the other.
+  // toAccTrack (lib/acc/tracks.ts) already resolves splashArtUrl to the
+  // recovered hero photo, same as every other track page.
+  const [driverInfoMap, accTrack] = await Promise.all([
+    getDriverInfoBySteamIds(rows.map((r) => r.steamId)),
+    trackKey ? getAccTrack(trackKey) : Promise.resolve(null),
   ]);
 
   const entries = rows.map((r) => toHotLapEntry(r, driverInfoFor(driverInfoMap, r.steamId)));
-  const trackKey = representativeTrackKey(rows);
   const referenceLegend = trackKey ? getReferenceLegend(trackKey, 'stint') : null;
 
   // TrackHeader, same as the other Hot Stint boards' [track] pages — built
   // from the classification track (see representativeTrackKey above).
-  // toAccTrack (lib/acc/tracks.ts) already resolves splashArtUrl to the
-  // recovered hero photo, same as every other track page.
-  const accTrack = trackKey ? await getAccTrack(trackKey) : null;
   const trackSummary: TrackSummary | null = accTrack ? toTrackSummary(accTrack) : null;
   const fastestStint =
     rows.length > 0 ? toTrackTopEntry(rows[0], driverInfoFor(driverInfoMap, rows[0].steamId)) : null;

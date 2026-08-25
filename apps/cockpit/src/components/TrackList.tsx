@@ -16,20 +16,17 @@ export function TrackList({
   tracks,
   simSlug,
   basePath,
-  linkQuery,
 }: {
   tracks: TrackWithTopTimes[];
   simSlug: string;
   // Where each track card links. Defaults to the sim's Hot Lap track pages;
-  // the Hot Stint list passes `/${simSlug}/leaderboards/hotstint` so its cards
-  // open the stint detail page instead.
+  // the Hot Stint list passes `/${simSlug}/leaderboards/hotstint`, and the
+  // seasonal lists bake the season into this path (e.g.
+  // `/${simSlug}/leaderboards/seasonal/S18`) so its cards open that season's
+  // detail page instead.
   basePath?: string;
-  // Optional query string (without `?`) appended to each card href — the
-  // seasonal lists pass `season=S18` so the detail page knows which board.
-  linkQuery?: string;
 }) {
   const hrefBase = basePath ?? `/${simSlug}/leaderboards`;
-  const suffix = linkQuery ? `?${linkQuery}` : '';
   if (tracks.length === 0) {
     return (
       <div className="border border-line/50 bg-carbon-2 px-8 py-12 text-center">
@@ -45,7 +42,7 @@ export function TrackList({
       {tracks.map((track) => (
         <Link
           key={track.trackKey}
-          href={`${hrefBase}/${track.trackKey}${suffix}`}
+          href={`${hrefBase}/${track.trackKey}`}
           className="group relative flex flex-col sm:flex-row sm:items-center min-h-[130px] px-4 sm:px-6 py-4 sm:py-5 gap-3 sm:gap-6 overflow-hidden border border-line hover:bg-carbon-2/60 transition-colors"
         >
           {/* Full-bleed darkened splash art */}
@@ -54,6 +51,7 @@ export function TrackList({
               src={track.splashArtUrl}
               alt={track.displayName}
               fill
+              sizes="(min-width: 1280px) 1224px, 100vw"
               className="object-cover transition-transform duration-300 group-hover:scale-105"
             />
           )}
@@ -83,7 +81,13 @@ export function TrackList({
           <div className="hidden sm:flex relative flex-1 items-center justify-center min-w-0 h-full py-4">
             {track.mapUrl && (
               <div className="relative w-full max-w-[200px] h-full">
-                <Image src={track.mapUrl} alt="" fill className="object-contain opacity-90" />
+                <Image
+                  src={track.mapUrl}
+                  alt=""
+                  fill
+                  sizes="200px"
+                  className="object-contain opacity-90"
+                />
               </div>
             )}
           </div>
@@ -113,6 +117,8 @@ export function TrackList({
                         src={countryFlagUrl(entry.country)}
                         alt={entry.country}
                         fill
+                        sizes="16px"
+                        unoptimized
                         className="object-cover"
                       />
                     )}

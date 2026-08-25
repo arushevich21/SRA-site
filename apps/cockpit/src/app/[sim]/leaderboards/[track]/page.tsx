@@ -19,14 +19,15 @@ import {
 } from '@/lib/acc/tracks';
 import { AccTrackLeaderboard } from '@/components/AccTrackLeaderboard';
 
-// Reverted to force-dynamic: caching this route (ISR + generateStaticParams)
+// Was force-dynamic: caching this route (ISR + generateStaticParams) once
 // required capping entries per class to stay under Vercel's ISR page-size
-// limit (a busy track's full history serializes way past 19.07MB — see git
-// history for the numbers). Un-caching removes the build-time size check so
-// the site deploys again. The board itself is now query-level paginated (see
-// getAccTrackLeaderboard) rather than capped, so full history is still
-// reachable — just 300 rows at a time instead of one giant table.
-export const dynamic = 'force-dynamic';
+// limit (a busy track's full history serialized way past 19.07MB — see git
+// history for the numbers). That cause is gone — the board is now
+// query-level paginated (see getAccTrackLeaderboard) rather than capped, so
+// full history is still reachable at 300 rows a page, keeping each render
+// well under the size limit. Restored to ISR (2026-08-25) to cut Fast Origin
+// Transfer / Fluid CPU usage against Vercel's Hobby-plan quotas.
+export const revalidate = 300;
 
 export default async function TrackLeaderboardPage({
   params,
@@ -43,13 +44,16 @@ export default async function TrackLeaderboardPage({
   // component via the shared TrackSummary/TrackTopEntry shapes; only the
   // per-track full board (class-grouped for ACC, flat for AC Evo) differs.
   if (sim.game === 'ACC') {
-    const track = await getAccTrack(trackSlugParam);
+    // Independent queries (both keyed only on trackSlugParam) — parallelized
+    // rather than run one after the other.
+    const [track, board] = await Promise.all([
+      getAccTrack(trackSlugParam),
+      // Page 1, all classes — sorted best_lap_ms ascending, so entries[0] is
+      // already the outright fastest across every class combined (no separate
+      // query needed, unlike the old getAccTrackTopTimes call this replaced).
+      getAccTrackLeaderboard(trackSlugParam),
+    ]);
     if (!track) notFound();
-
-    // Page 1, all classes — sorted best_lap_ms ascending, so entries[0] is
-    // already the outright fastest across every class combined (no separate
-    // query needed, unlike the old getAccTrackTopTimes call this replaced).
-    const board = await getAccTrackLeaderboard(trackSlugParam);
     const fastest = board.entries[0];
 
     return (

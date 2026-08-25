@@ -210,7 +210,14 @@ export function HotLapBoard({
             ].join(' ')}
           >
             <span className="relative w-full h-full">
-              <Image src={`/badges/Division ${d}.png`} alt={`Division ${d}`} fill className="object-contain" />
+              <Image
+                src={`/badges/Division ${d}.png`}
+                alt={`Division ${d}`}
+                fill
+                sizes="44px"
+                unoptimized
+                className="object-contain"
+              />
             </span>
           </button>
         ))}
@@ -220,7 +227,14 @@ export function HotLapBoard({
             {referenceLegend.map(({ tier, time }) => (
               <span key={tier} className="flex items-center gap-1.5" title={LAP_TIER_BADGE[tier].label}>
                 <span className="relative w-4 h-4 shrink-0">
-                  <Image src={LAP_TIER_BADGE[tier].src} alt={LAP_TIER_BADGE[tier].label} fill className="object-contain" />
+                  <Image
+                    src={LAP_TIER_BADGE[tier].src}
+                    alt={LAP_TIER_BADGE[tier].label}
+                    fill
+                    sizes="16px"
+                    unoptimized
+                    className="object-contain"
+                  />
                 </span>
                 <span className="font-mono text-[12px] text-txt-3 tabular-nums">{time}</span>
               </span>
@@ -306,6 +320,8 @@ export function HotLapBoard({
                               src={countryFlagUrl(entry.country)}
                               alt={entry.country}
                               fill
+                              sizes="16px"
+                              unoptimized
                               className="object-cover"
                             />
                           )}
@@ -326,6 +342,8 @@ export function HotLapBoard({
                               src={LAP_TIER_BADGE[entry.lapTier].src}
                               alt={LAP_TIER_BADGE[entry.lapTier].label}
                               fill
+                              sizes="28px"
+                              unoptimized
                               className="object-contain"
                             />
                           </span>
@@ -339,7 +357,14 @@ export function HotLapBoard({
                           if (tierBadge) {
                             return (
                               <span className="relative w-7 h-7 shrink-0" title={tierBadge.label}>
-                                <Image src={tierBadge.src} alt={tierBadge.label} fill className="object-contain" />
+                                <Image
+                                  src={tierBadge.src}
+                                  alt={tierBadge.label}
+                                  fill
+                                  sizes="28px"
+                                  unoptimized
+                                  className="object-contain"
+                                />
                               </span>
                             );
                           }

@@ -52,6 +52,7 @@ export function GT3TeamStandings({
           alt={`Division ${division}${badgeSuffix}`}
           width={48}
           height={48}
+          unoptimized
           className="w-[44px] h-[44px] shrink-0 object-contain"
         />
         <div className="flex gap-2">
