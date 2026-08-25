@@ -404,7 +404,7 @@ export default function NavBar({
                 {user.avatar_url && (
                   <Image
                     src={user.avatar_url}
-                    alt={user.display_name ?? ''}
+                    alt=''
                     width={28}
                     height={28}
                     className="rounded-full shrink-0"
