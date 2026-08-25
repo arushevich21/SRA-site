@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cRjYlhWKlTbxP4jGJOOmoJG7BA5IoZB1ItR0xXX076KCnwEqOCmYabXcfEs84W0
+\restrict geKHnEd7giU7s0kph85wGUOq0SlIuJYi5MNZasr7cLuYrb8qFq2f9mcBcGuhaa9
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -43,187 +43,6 @@ CREATE TYPE public.driver_tier AS ENUM (
 );
 
 
-SET default_tablespace = '';
-
-SET default_table_access_method = heap;
-
---
--- Name: registrations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.registrations (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    series text NOT NULL,
-    season text NOT NULL,
-    championship_key text NOT NULL,
-    division_id integer,
-    team_id uuid,
-    car_model_id integer,
-    race_number integer,
-    entry_class text,
-    meta jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    status text DEFAULT 'confirmed'::text NOT NULL,
-    waitlist_position integer,
-    CONSTRAINT registrations_status_check CHECK ((status = ANY (ARRAY['confirmed'::text, 'waitlisted'::text]))),
-    CONSTRAINT registrations_waitlist_position_check CHECK ((((status = 'confirmed'::text) AND (waitlist_position IS NULL)) OR ((status = 'waitlisted'::text) AND (waitlist_position IS NOT NULL))))
-);
-
-
---
--- Name: register_entry(text, text, text, uuid, integer, integer, text, uuid, jsonb); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.register_entry(p_series text, p_season text, p_championship_key text, p_team_id uuid, p_car_model_id integer, p_race_number integer, p_entry_class text, p_registrant_driver_id uuid, p_drivers jsonb) RETURNS public.registrations
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-  v_max               integer;
-  v_confirmed_count    integer;
-  v_status             text;
-  v_waitlist_position  integer;
-  v_row                registrations;
-  v_division_id        integer;
-  v_driver             jsonb;
-  v_driver_id          uuid;
-  v_driver_division    integer;
-  v_registrant_found   boolean := false;
-BEGIN
-  IF p_drivers IS NULL OR jsonb_array_length(p_drivers) = 0 THEN
-    RAISE EXCEPTION 'EMPTY_ROSTER: at least one driver is required';
-  END IF;
-
-  -- Pure reads, no race-sensitive content — done before the advisory lock
-  -- so the lock is only held across the cap-check/insert sequence below,
-  -- not this whole loop.
-  FOR v_driver IN SELECT * FROM jsonb_array_elements(p_drivers)
-  LOOP
-    v_driver_id := (v_driver->>'driver_id')::uuid;
-
-    IF v_driver_id = p_registrant_driver_id THEN
-      v_registrant_found := true;
-    END IF;
-
-    -- FOUND is set by the SELECT INTO immediately above it — distinguishes
-    -- "no drivers row at all" from "row exists but division_id is NULL",
-    -- which a single `IS NULL` check on v_driver_division cannot do (both
-    -- leave the variable NULL). Conflating the two was wrong in an earlier
-    -- draft of this function: it would have reported DRIVER_NOT_FOUND for
-    -- every driver in the normal pre-season case instead of the intended
-    -- DIVISION_UNASSIGNED.
-    SELECT division_id INTO v_driver_division
-    FROM drivers WHERE id = v_driver_id;
-
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'DRIVER_NOT_FOUND: %', v_driver_id;
-    END IF;
-
-    IF v_driver_division IS NULL THEN
-      RAISE EXCEPTION 'DIVISION_UNASSIGNED: %', v_driver_id;
-    END IF;
-
-    IF v_division_id IS NULL THEN
-      v_division_id := v_driver_division;
-    ELSIF v_division_id != v_driver_division THEN
-      RAISE EXCEPTION 'DIVISION_MISMATCH: driver % is division %, expected %',
-        v_driver_id, v_driver_division, v_division_id;
-    END IF;
-  END LOOP;
-
-  IF NOT v_registrant_found THEN
-    RAISE EXCEPTION 'REGISTRANT_NOT_IN_ROSTER: %', p_registrant_driver_id;
-  END IF;
-
-  -- Serializes concurrent registrations for THIS event only — released
-  -- automatically at transaction end (see 20260811b's header for the full
-  -- rationale; unchanged here).
-  PERFORM pg_advisory_xact_lock(hashtextextended(p_championship_key || ':' || p_season, 0));
-
-  SELECT max_registrations INTO v_max
-  FROM championships
-  WHERE registration_key = p_championship_key
-  LIMIT 1;
-
-  SELECT count(*) INTO v_confirmed_count
-  FROM registrations
-  WHERE championship_key = p_championship_key
-    AND season = p_season
-    AND status = 'confirmed';
-
-  IF v_max IS NOT NULL AND v_confirmed_count >= v_max THEN
-    v_status := 'waitlisted';
-    SELECT coalesce(max(waitlist_position), 0) + 1 INTO v_waitlist_position
-    FROM registrations
-    WHERE championship_key = p_championship_key
-      AND season = p_season
-      AND status = 'waitlisted';
-  ELSE
-    v_status := 'confirmed';
-    v_waitlist_position := NULL;
-  END IF;
-
-  INSERT INTO registrations (
-    series, season, championship_key, division_id, team_id,
-    car_model_id, race_number, entry_class, status, waitlist_position
-  ) VALUES (
-    p_series, p_season, p_championship_key, v_division_id, p_team_id,
-    p_car_model_id, p_race_number, p_entry_class, v_status, v_waitlist_position
-  )
-  RETURNING * INTO v_row;
-
-  -- registration_drivers.championship_key/season are auto-derived by
-  -- registration_drivers_set_event_key (20260814d) from registration_id —
-  -- not set here, so there's no way for this insert to disagree with the
-  -- parent row it just created.
-  FOR v_driver IN SELECT * FROM jsonb_array_elements(p_drivers)
-  LOOP
-    BEGIN
-      INSERT INTO registration_drivers (registration_id, driver_id, driver_category, slot)
-      VALUES (
-        v_row.id,
-        (v_driver->>'driver_id')::uuid,
-        coalesce((v_driver->>'driver_category')::integer, 1),
-        coalesce((v_driver->>'slot')::integer, 0)
-      );
-    EXCEPTION WHEN unique_violation THEN
-      -- The constraint (registration_drivers_one_claim_per_event) is what
-      -- actually prevents the double-claim race atomically — this only
-      -- translates the generic 23505 into a message naming which driver,
-      -- for the UI. Re-raising here aborts the whole function call,
-      -- rolling back the registrations insert and any registration_drivers
-      -- rows already inserted earlier in this same loop.
-      RAISE EXCEPTION 'DRIVER_ALREADY_CLAIMED: %', (v_driver->>'driver_id')::uuid;
-    END;
-  END LOOP;
-
-  RETURN v_row;
-END;
-$$;
-
-
---
--- Name: registration_drivers_set_event_key(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.registration_drivers_set_event_key() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-begin
-  select championship_key, season
-    into new.championship_key, new.season
-  from public.registrations
-  where id = new.registration_id;
-
-  if new.championship_key is null then
-    raise exception 'registration_drivers: no registrations row for registration_id %', new.registration_id;
-  end if;
-
-  return new;
-end;
-$$;
-
-
 --
 -- Name: has_admin_permission(text); Type: FUNCTION; Schema: public; Owner: -
 --
@@ -235,11 +54,11 @@ CREATE FUNCTION public.has_admin_permission(perm text) RETURNS boolean
   select
     exists (
       select 1 from drivers d
-      where d.user_id = auth.uid() and d.is_admin
+      where d.user_id = (select auth.uid()) and d.is_admin
     )
     or exists (
       select 1 from admin_permissions p
-      where p.user_id = auth.uid() and p.permission = perm
+      where p.user_id = (select auth.uid()) and p.permission = perm
     );
 $$;
 
@@ -1646,6 +1465,13 @@ CREATE INDEX drivers_source_id_idx ON public.drivers USING btree (source_id);
 
 
 --
+-- Name: drivers_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX drivers_user_id_idx ON public.drivers USING btree (user_id);
+
+
+--
 -- Name: registration_drivers_championship_season_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2237,21 +2063,21 @@ ALTER TABLE public.drivers ENABLE ROW LEVEL SECURITY;
 -- Name: drivers drivers_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY drivers_insert_own ON public.drivers FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY drivers_insert_own ON public.drivers FOR INSERT WITH CHECK ((( SELECT auth.uid() AS uid) = user_id));
 
 
 --
 -- Name: drivers drivers_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY drivers_select_own ON public.drivers FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY drivers_select_own ON public.drivers FOR SELECT USING ((( SELECT auth.uid() AS uid) = user_id));
 
 
 --
 -- Name: drivers drivers_update_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY drivers_update_own ON public.drivers FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY drivers_update_own ON public.drivers FOR UPDATE USING ((( SELECT auth.uid() AS uid) = user_id));
 
 
 --
@@ -2371,5 +2197,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cRjYlhWKlTbxP4jGJOOmoJG7BA5IoZB1ItR0xXX076KCnwEqOCmYabXcfEs84W0
+\unrestrict geKHnEd7giU7s0kph85wGUOq0SlIuJYi5MNZasr7cLuYrb8qFq2f9mcBcGuhaa9
 
