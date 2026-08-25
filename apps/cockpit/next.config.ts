@@ -35,6 +35,20 @@ const nextConfig: NextConfig = {
     // counts against.
     deviceSizes: [640, 828, 1280, 1920],
     imageSizes: [16, 32, 48, 64, 128],
+    // Default minimumCacheTTL is 60s — every optimized image (track hero
+    // photos, the sitewide logo, srating/championship logos) was getting
+    // re-transformed and re-billed against the quota roughly every minute a
+    // cache miss occurred, regardless of whether the source ever changed.
+    // None of these change more than monthly: local /public assets only
+    // change on redeploy, and admin-uploaded championship logos get a fresh
+    // crypto.randomUUID() path per upload (see uploadChampionshipLogo in
+    // admin/events/actions.ts) rather than overwriting an existing URL, so a
+    // long TTL can never serve stale content under a reused URL.
+    minimumCacheTTL: 2678400, // 31 days, per Vercel's own usage-reduction guidance
+    // Default is ['image/avif', 'image/webp'] — two encodes (and two cache
+    // entries) per size variant. webp alone still has effectively universal
+    // browser support and roughly halves the remaining transformation count.
+    formats: ['image/webp'],
     remotePatterns: [
       {
         protocol: 'https',
