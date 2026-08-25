@@ -46,6 +46,85 @@ type AccTrackRow = {
   location: string | null;
 };
 
+// acc_tracks.splash_art_url points at static.simracingalliance.com, whose
+// TLS cert expired 2026-08-25 (a 90-day Let's Encrypt cert whose renewal
+// automation broke — see the server's own certbot state, out of this repo's
+// control). Every browser refuses the connection, so every track's map
+// graphic silently failed to load — not a missing-image problem, a cert
+// problem, and one increasingly bad since only Vercel's already-cached
+// image-optimizer copies still worked as the cache aged. Downloaded all 24
+// distinct map_*.png files (25 rows, nurburgring/nurburgring_24h share one
+// file) straight from that domain 2026-08-25 (still serves real bytes over
+// plain HTTP/curl — only browser TLS validation rejects it) and re-hosted
+// them locally so this doesn't depend on that cert ever getting fixed.
+// Remove once the cert is renewed for good, if `row.splash_art_url` should
+// resume being the source of truth — until then this always wins.
+const TRACK_MAP_OVERRIDES: Readonly<Record<string, string>> = {
+  barcelona: '/tracks/maps/map_barcelona.png',
+  brands_hatch: '/tracks/maps/map_brands_hatch.png',
+  cota: '/tracks/maps/map_cota.png',
+  donington: '/tracks/maps/map_donington.png',
+  hungaroring: '/tracks/maps/map_hungaroring.png',
+  imola: '/tracks/maps/map_imola.png',
+  indianapolis: '/tracks/maps/map_indianapolis.png',
+  kyalami: '/tracks/maps/map_kyalami.png',
+  laguna_seca: '/tracks/maps/map_laguna_seca.png',
+  misano: '/tracks/maps/map_misano.png',
+  monza: '/tracks/maps/map_monza.png',
+  mount_panorama: '/tracks/maps/map_mount_panorama.png',
+  nurburgring: '/tracks/maps/map_nurburgring.png',
+  nurburgring_24h: '/tracks/maps/map_nurburgring.png',
+  oulton_park: '/tracks/maps/map_oulton_park.png',
+  paul_ricard: '/tracks/maps/map_paul_ricard.png',
+  red_bull_ring: '/tracks/maps/map_red_bull_ring.png',
+  silverstone: '/tracks/maps/map_silverstone.png',
+  snetterton: '/tracks/maps/map_snetterton.png',
+  spa: '/tracks/maps/map_spa.png',
+  suzuka: '/tracks/maps/map_suzuka.png',
+  valencia: '/tracks/maps/map_valencia.png',
+  watkins_glen: '/tracks/maps/map_watkins_glen.png',
+  zandvoort: '/tracks/maps/map_zandvoort.png',
+  zolder: '/tracks/maps/map_zolder.png',
+};
+
+// The track preview PHOTOS (photo_*.jpg) 404 directly from
+// static.simracingalliance.com — genuinely gone (confirmed 2026-08-25,
+// bypassing the expired-cert issue above with curl -k: still a real 404,
+// not a TLS failure), unlike the map graphics. Recovered all 24 from the
+// Wayback Machine's archived copies of the same URLs (closest snapshot per
+// track, mostly 2026-06-13; a couple of downloads came back truncated on
+// the first pass — re-verified every file's JPEG EOF marker (FFD9) before
+// keeping any of them) and re-hosted locally, same reasoning as
+// TRACK_MAP_OVERRIDES above. nurburgring_24h shares nurburgring's photo —
+// same real-world venue, no separate capture exists.
+const TRACK_PHOTO_OVERRIDES: Readonly<Record<string, string>> = {
+  barcelona: '/tracks/photos/photo_barcelona.jpg',
+  brands_hatch: '/tracks/photos/photo_brands_hatch.jpg',
+  cota: '/tracks/photos/photo_cota.jpg',
+  donington: '/tracks/photos/photo_donington.jpg',
+  hungaroring: '/tracks/photos/photo_hungaroring.jpg',
+  imola: '/tracks/photos/photo_imola.jpg',
+  indianapolis: '/tracks/photos/photo_indianapolis.jpg',
+  kyalami: '/tracks/photos/photo_kyalami.jpg',
+  laguna_seca: '/tracks/photos/photo_laguna_seca.jpg',
+  misano: '/tracks/photos/photo_misano.jpg',
+  monza: '/tracks/photos/photo_monza.jpg',
+  mount_panorama: '/tracks/photos/photo_mount_panorama.jpg',
+  nurburgring: '/tracks/photos/photo_nurburgring.jpg',
+  nurburgring_24h: '/tracks/photos/photo_nurburgring.jpg',
+  oulton_park: '/tracks/photos/photo_oulton_park.jpg',
+  paul_ricard: '/tracks/photos/photo_paul_ricard.jpg',
+  red_bull_ring: '/tracks/photos/photo_red_bull_ring.jpg',
+  silverstone: '/tracks/photos/photo_silverstone.jpg',
+  snetterton: '/tracks/photos/photo_snetterton.jpg',
+  spa: '/tracks/photos/photo_spa.jpg',
+  suzuka: '/tracks/photos/photo_suzuka.jpg',
+  valencia: '/tracks/photos/photo_valencia.jpg',
+  watkins_glen: '/tracks/photos/photo_watkins_glen.jpg',
+  zandvoort: '/tracks/photos/photo_zandvoort.jpg',
+  zolder: '/tracks/photos/photo_zolder.jpg',
+};
+
 // track_key -> curated display name, for the few tracks named in track_layouts.
 // Small (a handful of rows); used only to prettify names.
 async function getCuratedTrackNames(): Promise<Map<string, string>> {
@@ -60,20 +139,14 @@ async function getCuratedTrackNames(): Promise<Map<string, string>> {
   return new Map((data ?? []).map((r) => [r.layout_key as string, r.display_name as string]));
 }
 
-// The track preview PHOTOS (photo_*.jpg) were lost when the old website's
-// static host was taken down — they 404 now and aren't coming back on their
-// own, so there's no background image. What survives on the CDN is the track
-// MAP graphic (map_*.png), which acc_tracks.splash_art_url currently holds; we
-// render it in the card's centered map slot (mapUrl), not as a stretched
-// background. Leaving splashArtUrl null until real photos are re-hosted.
 function toAccTrack(row: AccTrackRow, curatedNames: Map<string, string>): AccTrack {
   return {
     trackKey: row.track_key,
     displayName: curatedNames.get(row.track_key) ?? row.display_name,
-    splashArtUrl: null,
+    splashArtUrl: TRACK_PHOTO_OVERRIDES[row.track_key] ?? null,
     country: row.country ?? null,
     location: row.location ?? null,
-    mapUrl: row.splash_art_url ?? null,
+    mapUrl: TRACK_MAP_OVERRIDES[row.track_key] ?? row.splash_art_url ?? null,
   };
 }
 

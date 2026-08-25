@@ -26,13 +26,29 @@ describe('PUBLIC_CLASSIFICATION_COLUMNS', () => {
     }
   });
 
-  it('is exactly the public-safe column set — scoping + display name + time only', () => {
+  it('is exactly the public-safe column set — scoping + display name + time + car + sectors + steam_id only', () => {
     // A change to this list is exactly the kind of change that should force
     // a human to re-read the privacy requirement before merging. No
-    // steam_id, no discord_id, no driver_id, no rating internals — the same
-    // PII enumeration the classification_status leak exposed.
+    // discord_id, no driver_id, no rating internals, no num_laps (the one
+    // column that's permanently admin-only, confirmed 2026-08-25) — the
+    // same PII/lap-count enumeration the classification_status leak
+    // exposed. car_model(_id), sectors_ms, car_group, track_key, and
+    // steam_id are not in that category — see
+    // 20260825_classification_status_car_model.sql.
     expect([...PUBLIC_CLASSIFICATION_COLUMNS].sort()).toEqual(
-      ['first_name', 'hotstint_ms', 'last_name', 'season', 'series'].sort(),
+      [
+        'car_model',
+        'car_model_id',
+        'car_group',
+        'first_name',
+        'hotstint_ms',
+        'last_name',
+        'season',
+        'series',
+        'sectors_ms',
+        'steam_id',
+        'track_key',
+      ].sort(),
     );
   });
 

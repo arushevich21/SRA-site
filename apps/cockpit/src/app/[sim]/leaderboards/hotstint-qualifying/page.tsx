@@ -1,12 +1,23 @@
 import { notFound } from 'next/navigation';
-import { msToLaptime } from '@sra/domain';
+import { accCarManufacturerIconName, msToLaptime } from '@sra/domain';
 import { getSimBySlug } from '@/content/sims';
 import { LeaderboardTabs } from '@/components/LeaderboardTabs';
 import { GameLabel } from '@/components/GameLabel';
+import { HotLapBoard, type HotLapBoardEntry } from '@/components/HotLapBoard';
+import { TrackHeader } from '@/components/TrackHeader';
+import { SraqServerStatus } from '@/components/SraqServerStatus';
+import type { TrackSummary, TrackTopEntry } from '@/lib/track-summary';
+import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
+import { getAccTrack, toTrackSummary } from '@/lib/acc/tracks';
+import { getSraqServerStatus } from '@/lib/acc/server-status';
+import { getDriverInfoBySteamIds, driverInfoFor } from '@/lib/driver-lookup';
+import { classifyLapTier, getReferenceLegend } from '@/lib/acc/reference-times';
 import { hasSeasonalContent, hasEnduranceReleased } from '@/lib/seasonal-leaderboard';
 import {
   getCurrentClassificationScope,
   getPublicHotStintLeaderboard,
+  hasJagoffContent,
+  type PublicHotStintRow,
 } from '@/lib/acc/hot-stint-store';
 
 // Data is written by an external bot on its own schedule, not a cron in this
@@ -16,15 +27,94 @@ import {
 // force-dynamic disables caching entirely for no benefit.
 export const revalidate = 300;
 
-// Hot Stint Qualifying: the pre-season classification board. Public columns
-// are position, driver name, and hotstint_ms ONLY — no lap counts, no
-// SteamID/Discord ID, no rating internals (composite/pace_pct/
-// srating_ordinal), and no "last improved" timestamp (classification_status
-// has no per-driver improvement timestamp to show one — see
-// lib/acc/hot-stint-store.ts). All of that is admin-only, permanently: this
-// board decides division placement, and revealing how many laps someone
-// needed to set their time would cause exactly the placement disputes that
-// rule exists to prevent.
+// Hot Stint Qualifying reuses HotLapBoard, same as every other Hot Stint
+// board — full visual parity, not just the same component shell:
+//   - steam_id is public here (see 20260825_classification_status_car_
+//     model.sql: confirmed 2026-08-25 that the actual hard requirement was
+//     only ever "lap counts stay hidden", not steamId), so the component's
+//     row keying and "My Laps" filter work unmodified.
+//   - sectors_ms is the per-sector average across the winning 5-lap stint
+//     (acc_hotstint_leaderboard already stores this, same meaning as
+//     hotstint_ms being the overall average) — carried straight through.
+//   - lapTier is computed per row via classifyLapTier, same gate
+//     (carGroup === 'GT3' && dry) and the same 'stint' variant
+//     lib/acc/hotstint.ts uses for the other Hot Stint boards.
+// num_laps remains permanently admin-only — see
+// app/admin/hot-stint-qualifying/page.tsx.
+//
+// One row per (driver, car) qualifying stint, same as the Hot Stint
+// (Seasonal) board — NOT collapsed to each driver's single best. A driver
+// who set qualifying stints in three different cars shows three rows here
+// by default; HotLapBoard's own "Unique Drivers" toggle is what collapses
+// that to their single best regardless of car (see hot-stint-store.ts's
+// getPublicHotStintLeaderboard and 20260825b_classification_public_all_
+// stints.sql — an earlier version of this baked that collapse into the SQL
+// itself, which was wrong). #Jagoff (its own tab, see app/[sim]/
+// leaderboards/jagoff/page.tsx) is a Jaguar-only view of the same
+// underlying stints, useful for a focused ranking rather than because
+// Jaguar attempts are otherwise hidden here — they aren't, anymore.
+function toHotLapEntry(
+  entry: PublicHotStintRow,
+  driverInfo: ReturnType<typeof driverInfoFor>,
+): HotLapBoardEntry {
+  const iconName = entry.carModel != null ? accCarManufacturerIconName(entry.carModel) : null;
+  const lapTier =
+    entry.carGroup === 'GT3' && entry.trackKey != null
+      ? classifyLapTier(entry.hotstintMs, entry.trackKey, 'stint')
+      : null;
+  return {
+    rank: entry.position,
+    steamId: entry.steamId,
+    driverName: entry.driverName,
+    carModel: entry.carModelName,
+    bestLapMs: entry.hotstintMs,
+    bestLap: msToLaptime(entry.hotstintMs) ?? '—',
+    sectorsMs: entry.sectorsMs,
+    manufacturerIconName: iconName,
+    manufacturerLogoUrl:
+      !iconName && entry.carModel != null ? accCarManufacturerLogoUrl(entry.carModel) : null,
+    driverNumber: driverInfo.driverNumber,
+    country: driverInfo.country,
+    isSralien: driverInfo.isSralien,
+    division: driverInfo.division,
+    tier: driverInfo.tier,
+    lapTier,
+  };
+}
+
+// The legend strip shown above the board (and the TrackHeader below) need
+// one trackKey to build cutoff times / hero art against. Almost every
+// season classifies on a single fixed track (see the migration header), so
+// the top-ranked entry's track is the representative choice — same track
+// every other entry's own per-row badge (above) was computed against, in
+// the overwhelmingly common case where they all share one.
+function representativeTrackKey(rows: PublicHotStintRow[]): string | null {
+  return rows[0]?.trackKey ?? null;
+}
+
+// Mirrors lib/acc/tracks.ts's toAccTrackTopEntry — same shape, built from
+// the classification leaderboard's #1 row instead of a per-track hot-lap/
+// hot-stint board query. rows is already sorted by hotstint_ms ascending
+// (see getPublicHotStintLeaderboard), so rows[0] is the outright quickest.
+function toTrackTopEntry(
+  entry: PublicHotStintRow,
+  driverInfo: ReturnType<typeof driverInfoFor>,
+): TrackTopEntry {
+  const iconName = entry.carModel != null ? accCarManufacturerIconName(entry.carModel) : null;
+  return {
+    rank: entry.position,
+    steamId: entry.steamId,
+    driverName: entry.driverName,
+    carLabel: entry.carModelName,
+    manufacturerIconName: iconName,
+    manufacturerLogoUrl:
+      !iconName && entry.carModel != null ? accCarManufacturerLogoUrl(entry.carModel) : null,
+    bestLap: msToLaptime(entry.hotstintMs) ?? '—',
+    driverNumber: driverInfo.driverNumber,
+    country: driverInfo.country,
+  };
+}
+
 export default async function HotStintQualifyingPage({
   params,
 }: {
@@ -36,12 +126,28 @@ export default async function HotStintQualifyingPage({
   if (sim.game !== 'ACC') notFound();
 
   const scope = await getCurrentClassificationScope();
-  const entries = scope ? await getPublicHotStintLeaderboard(scope.series, scope.season) : [];
+  const rows = scope ? await getPublicHotStintLeaderboard(scope.series, scope.season) : [];
 
-  const [showSeasonal, showEndurance] = await Promise.all([
+  const [showSeasonal, showEndurance, showJagoff, driverInfoMap, sraqStatus] = await Promise.all([
     hasSeasonalContent(),
     hasEnduranceReleased(),
+    hasJagoffContent(),
+    getDriverInfoBySteamIds(rows.map((r) => r.steamId)),
+    getSraqServerStatus(),
   ]);
+
+  const entries = rows.map((r) => toHotLapEntry(r, driverInfoFor(driverInfoMap, r.steamId)));
+  const trackKey = representativeTrackKey(rows);
+  const referenceLegend = trackKey ? getReferenceLegend(trackKey, 'stint') : null;
+
+  // TrackHeader, same as the other Hot Stint boards' [track] pages — built
+  // from the classification track (see representativeTrackKey above).
+  // toAccTrack (lib/acc/tracks.ts) already resolves splashArtUrl to the
+  // recovered hero photo, same as every other track page.
+  const accTrack = trackKey ? await getAccTrack(trackKey) : null;
+  const trackSummary: TrackSummary | null = accTrack ? toTrackSummary(accTrack) : null;
+  const fastestStint =
+    rows.length > 0 ? toTrackTopEntry(rows[0], driverInfoFor(driverInfoMap, rows[0].steamId)) : null;
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -60,14 +166,21 @@ export default async function HotStintQualifyingPage({
         showSeasonal={showSeasonal}
         showEndurance={showEndurance}
         showHotStintQualifying
+        showJagoff={showJagoff}
       />
 
-      <p className="font-sans text-[15px] text-txt-2 leading-relaxed max-w-[640px] mb-8 -mt-4">
+      <p className="font-sans text-[15px] text-txt-2 leading-relaxed max-w-[640px] mb-4">
         Hot Stint Qualifying ranks each driver by the{' '}
         <span className="text-txt">average of their best 5 consecutive valid laps</span> set
         during the pre-season classification window — used to assign divisions before the
         season begins.
       </p>
+
+      <SraqServerStatus servers={sraqStatus} />
+
+      {trackSummary && (
+        <TrackHeader track={trackSummary} fastestLap={fastestStint} label="Fastest stint" />
+      )}
 
       {entries.length === 0 ? (
         <div className="border border-line/50 bg-carbon-2 px-8 py-16 text-center">
@@ -78,34 +191,7 @@ export default async function HotStintQualifyingPage({
           </p>
         </div>
       ) : (
-        <div className="border border-line overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-line bg-carbon-2">
-                <th className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 px-5 py-3">
-                  Pos
-                </th>
-                <th className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 px-5 py-3">
-                  Driver
-                </th>
-                <th className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 px-5 py-3">
-                  Stint Avg
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry) => (
-                <tr key={entry.position} className="border-b border-line/50 last:border-b-0">
-                  <td className="font-mono text-[13px] text-txt-3 px-5 py-3">{entry.position}</td>
-                  <td className="font-sans text-[14px] text-txt px-5 py-3">{entry.driverName}</td>
-                  <td className="font-mono text-[13px] text-txt px-5 py-3">
-                    {msToLaptime(entry.hotstintMs)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <HotLapBoard entries={entries} timeLabel="Stint Avg" referenceLegend={referenceLegend} />
       )}
     </section>
   );

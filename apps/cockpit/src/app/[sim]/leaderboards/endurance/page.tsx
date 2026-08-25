@@ -3,7 +3,7 @@ import { getSimBySlug } from '@/content/sims';
 import { LeaderboardTabs } from '@/components/LeaderboardTabs';
 import { GameLabel } from '@/components/GameLabel';
 import { hasSeasonalContent } from '@/lib/seasonal-leaderboard';
-import { hasHotStintQualifyingContent } from '@/lib/acc/hot-stint-store';
+import { hasHotStintQualifyingContent, hasJagoffContent } from '@/lib/acc/hot-stint-store';
 // showEndurance is forced true here — you're on the endurance page.
 
 // See [sim]/leaderboards/page.tsx — same cron-driven refresh cadence.
@@ -37,6 +37,7 @@ export default async function EnduranceLeaderboardsPage({
         showSeasonal={await hasSeasonalContent()}
         showEndurance
         showHotStintQualifying={await hasHotStintQualifyingContent()}
+        showJagoff={await hasJagoffContent()}
       />
 
       <div className="border border-line/50 bg-carbon-2 px-8 py-16 text-center">

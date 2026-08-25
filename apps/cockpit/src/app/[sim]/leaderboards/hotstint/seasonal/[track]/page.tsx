@@ -63,6 +63,7 @@ export default async function SeasonalHotStintTrackPage({
       <TrackHeader
         track={isWet ? { ...trackSummary, displayName: `${trackSummary.displayName} (Wet)` } : trackSummary}
         fastestLap={fastest ? toAccTrackTopEntry(fastest) : null}
+        label="Fastest stint"
       />
 
       <AccTrackLeaderboard

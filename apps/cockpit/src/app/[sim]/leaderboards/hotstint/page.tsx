@@ -6,7 +6,7 @@ import { GameLabel } from '@/components/GameLabel';
 import { hasSeasonalContent, hasEnduranceReleased } from '@/lib/seasonal-leaderboard';
 import { getAccTracks, toTrackSummary, toTrackTopEntry } from '@/lib/acc/tracks';
 import { getAccTrackTopStints, getAccStintTrackStats } from '@/lib/acc/hotstint';
-import { hasHotStintQualifyingContent } from '@/lib/acc/hot-stint-store';
+import { hasHotStintQualifyingContent, hasJagoffContent } from '@/lib/acc/hot-stint-store';
 
 // See [sim]/leaderboards/page.tsx — same cron-driven refresh cadence.
 export const revalidate = 300;
@@ -57,6 +57,7 @@ export default async function SimHotStintPage({
         showSeasonal={await hasSeasonalContent()}
         showEndurance={await hasEnduranceReleased()}
         showHotStintQualifying={await hasHotStintQualifyingContent()}
+        showJagoff={await hasJagoffContent()}
       />
 
       <p className="font-sans text-[15px] text-txt-2 leading-relaxed max-w-[640px] mb-8 -mt-4">

@@ -47,6 +47,7 @@ export default async function TrackHotStintPage({
       <TrackHeader
         track={toAccTrackSummary(track)}
         fastestLap={fastest ? toAccTrackTopEntry(fastest) : null}
+        label="Fastest stint"
       />
 
       <AccTrackLeaderboard
