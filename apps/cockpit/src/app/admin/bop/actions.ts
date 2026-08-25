@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireAdmin } from '@/lib/require-admin';
+import { requirePermission, ADMIN_PERMISSIONS } from '@/lib/require-admin';
 import { supabase } from '@/lib/supabase';
 import { clampBallast, clampRestrictor } from '@/content/bop';
 
@@ -21,7 +21,7 @@ export type SaveBopResult = { ok: true } | { ok: false; error: string };
  * simpler and safer than diffing.
  */
 export async function saveBop(entries: BopEntry[]): Promise<SaveBopResult> {
-  await requireAdmin();
+  await requirePermission(ADMIN_PERMISSIONS.BOP);
 
   const rows = entries
     .map((e) => ({

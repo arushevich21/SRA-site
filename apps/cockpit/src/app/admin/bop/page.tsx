@@ -1,12 +1,12 @@
 import Link from 'next/link';
-import { requireAdmin } from '@/lib/require-admin';
+import { requirePermission, ADMIN_PERMISSIONS } from '@/lib/require-admin';
 import { supabase } from '@/lib/supabase';
 import BopEditor, { type BopCell } from './BopEditor';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminBopPage() {
-  await requireAdmin();
+  await requirePermission(ADMIN_PERMISSIONS.BOP);
 
   const [{ data: config }, { data: entries }] = await Promise.all([
     supabase.from('bop_config').select('bop_id, name, updated_at').eq('id', 'default').maybeSingle(),
