@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { deleteTeam, removeMember, setEntryClass } from './actions';
+import { deleteRegistration, removeMember, setEntryClass } from './actions';
 
 export type AdminMember = {
   driver_id: string;
@@ -13,12 +13,16 @@ export type AdminMember = {
 };
 
 export type AdminTeam = {
+  // A `registrations` row id (one entry / one car in one event) — not a
+  // `teams.id`. The admin actions key off this.
   id: string;
   team_name: string;
   car: string;
   division_id: number | null;
   division_name: string | null;
   entryClass: string | null;
+  status: 'confirmed' | 'waitlisted';
+  waitlistPosition: number | null;
   members: AdminMember[];
 };
 
@@ -28,7 +32,9 @@ export type AdminChampionship = {
   title: string;
   maxTeamSize: number;
   registrationOpen: boolean;
-  grouping: 'division' | 'class';
+  // 'none' = the championship doesn't grade its entries, so there is nothing
+  // to bucket by and every entry shows in one list.
+  grouping: 'division' | 'class' | 'none';
   teams: AdminTeam[];
 };
 
@@ -41,11 +47,16 @@ const DIVISION_GROUPS = [
 const ENDURANCE_CLASSES = ['Open', 'Silver', 'Bronze'];
 const CLASS_GROUPS = ENDURANCE_CLASSES.map((c) => ({ key: c, label: c }));
 
+const ALL_GROUP = [{ key: 'all', label: 'All Entries' }];
+
 function groupsFor(champ: AdminChampionship) {
-  return champ.grouping === 'class' ? CLASS_GROUPS : DIVISION_GROUPS;
+  if (champ.grouping === 'class') return CLASS_GROUPS;
+  if (champ.grouping === 'none') return ALL_GROUP;
+  return DIVISION_GROUPS;
 }
 function teamGroupKey(champ: AdminChampionship, team: AdminTeam): string | null {
   if (champ.grouping === 'class') return team.entryClass;
+  if (champ.grouping === 'none') return 'all';
   return team.division_id != null ? String(team.division_id) : null;
 }
 
@@ -95,7 +106,7 @@ export default function RegistrationsAdmin({
       )
     )
       return;
-    run(team.id, () => deleteTeam(team.id));
+    run(team.id, () => deleteRegistration(team.id));
   }
 
   function onRemoveMember(team: AdminTeam, m: AdminMember) {
@@ -294,9 +305,17 @@ function TeamRow({
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-        ) : (
+        ) : champ.grouping === 'division' ? (
           <p className="font-mono text-[10px] text-txt-3/60 mt-0.5">
             {team.division_name ?? '—'}
+          </p>
+        ) : null}
+        {/* Waitlisted entries appear here but not on the public entry list —
+            this page exists to act on them, so say which they are. */}
+        {team.status === 'waitlisted' && (
+          <p className="font-mono text-[10px] text-gold-deep mt-0.5">
+            Waitlisted
+            {team.waitlistPosition != null ? ` #${team.waitlistPosition}` : ''}
           </p>
         )}
       </div>
