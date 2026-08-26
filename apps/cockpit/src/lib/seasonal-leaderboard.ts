@@ -207,13 +207,27 @@ export async function hasSeasonalContent(): Promise<boolean> {
 // admin has flipped `hotlapReleased` on are visible on the seasonal
 // leaderboards; every earlier season is shown in full straight from the DB.
 // (See [[leaderboard-seasonal-release]].)
-export type SeasonGate = { gatedSeason: string | null; releasedTrackKeys: Set<string> };
+export type SeasonGate = {
+  gatedSeason: string | null;
+  /** Rounds of the gated season an admin has revealed. */
+  releasedTrackKeys: Set<string>;
+  /**
+   * EVERY round of the gated season, revealed or not. The gate hides the
+   * difference between these two sets — an unrevealed round — and nothing
+   * else. A seasonal track that is not a round at all (the hot-stint
+   * qualifier, run before the season at a track the season never visits) is
+   * not the gate's business and stays visible.
+   */
+  scheduledTrackKeys: Set<string>;
+};
 
 export async function getSeasonGate(): Promise<SeasonGate> {
   const champs = (await getChampionships()).filter(
     (c) => c.game === 'ACC' && !isEnduranceChampionship(c) && (c.registrationSeason ?? '') !== '',
   );
-  if (champs.length === 0) return { gatedSeason: null, releasedTrackKeys: new Set() };
+  if (champs.length === 0) {
+    return { gatedSeason: null, releasedTrackKeys: new Set(), scheduledTrackKeys: new Set() };
+  }
 
   // Newest season = the live one under reveal control.
   const current = champs
@@ -224,12 +238,14 @@ export async function getSeasonGate(): Promise<SeasonGate> {
 
   const gatedSeason = (current.registrationSeason ?? '').toUpperCase();
   const releasedTrackKeys = new Set<string>();
+  const scheduledTrackKeys = new Set<string>();
   for (const r of current.schedule) {
-    if (!r.hotlapReleased) continue;
     const key = accTrackKeyForDisplay(r.track);
-    if (key) releasedTrackKeys.add(key);
+    if (!key) continue;
+    scheduledTrackKeys.add(key);
+    if (r.hotlapReleased) releasedTrackKeys.add(key);
   }
-  return { gatedSeason, releasedTrackKeys };
+  return { gatedSeason, releasedTrackKeys, scheduledTrackKeys };
 }
 
 // Track keys that have seasonal rows for `season` on the given table, with the
@@ -254,7 +270,20 @@ export async function seasonalTrackKeys(
   }
 
   let keys = [...new Set((data ?? []).map((r) => r.track_key as string))];
-  if (season === gate.gatedSeason) keys = keys.filter((k) => gate.releasedTrackKeys.has(k));
+  // Hide UNREVEALED ROUNDS, not "everything that isn't a revealed round".
+  //
+  // The old rule was the latter, which silently hid any seasonal track that
+  // wasn't in the championship's schedule at all. The hot-stint qualifier is
+  // exactly that: run before the season at a track the season itself never
+  // visits (Zandvoort for S19), so it could never be revealed — there was no
+  // round to flip. It also meant a season with NO rounds entered yet hid
+  // every one of its tracks, which is how 72 hot-lap and 39 hot-stint rows for
+  // S19 became invisible while the bot was happily posting them to Discord.
+  if (season === gate.gatedSeason) {
+    keys = keys.filter(
+      (k) => !gate.scheduledTrackKeys.has(k) || gate.releasedTrackKeys.has(k),
+    );
+  }
   return keys;
 }
 
