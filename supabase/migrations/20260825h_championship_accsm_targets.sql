@@ -40,18 +40,34 @@
 -- championships.registration_key first. That index is independently correct:
 -- two championships sharing a registration_key would already break
 -- register_entry()'s `SELECT ... WHERE registration_key = ... LIMIT 1` (it
--- would silently pick one at random for the max_registrations cap). Partial
--- on NOT NULL because most championships have no registration at all.
+-- would silently pick one at random for the max_registrations cap).
+--
+-- The index is deliberately NOT partial. An earlier draft wrote
+-- `WHERE registration_key IS NOT NULL`, which Postgres refuses to accept as
+-- an FK target:
+--
+--   42830: there is no unique constraint matching given keys for referenced
+--          table "championships"
+--
+-- A referenced key must be covered by a NON-partial unique index — a partial
+-- one can't prove uniqueness across the whole table. Dropping the predicate
+-- costs nothing here: a plain unique index treats NULLs as distinct
+-- (NULLS DISTINCT is the default), so the many championships with no
+-- registration_key at all remain perfectly legal, and only duplicate
+-- NON-null keys are rejected. That is exactly the rule we wanted.
 --
 -- Verified safe before writing: exactly two non-null registration_keys exist
 -- today ('acc-gt3-s19', 'gt3-liaw'), already distinct.
 
 BEGIN;
 
+-- Clean up the partial index if a previous attempt at this migration created
+-- it before failing on the FK. Harmless when it was never created.
+DROP INDEX IF EXISTS public.championships_registration_key_unique;
+
 -- Prerequisite for the FK below, and a correctness fix in its own right.
-CREATE UNIQUE INDEX IF NOT EXISTS championships_registration_key_unique
-  ON public.championships (registration_key)
-  WHERE registration_key IS NOT NULL;
+CREATE UNIQUE INDEX championships_registration_key_unique
+  ON public.championships (registration_key);
 
 CREATE TABLE IF NOT EXISTS public.championship_accsm_targets (
   -- The ACCSM championship GUID, as it appears in
