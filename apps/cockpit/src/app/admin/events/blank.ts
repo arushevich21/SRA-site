@@ -15,7 +15,7 @@ export function blankInput(): ChampionshipInput {
     rulesBullets: [], discordLinks: [], resultsUrl: '', resultsLabel: '',
     emperorChampionshipId: '', simgridId: '', standingsKey: '',
     registrationKey: '', registrationSeason: '', registrationOpen: false,
-    maxTeamSize: '', maxRegistrations: '', allowedCars: [], teaserOnly: false, concluded: false,
+    maxTeamSize: '', maxRegistrations: '', allowedCars: [], requiresDivision: true, teaserOnly: false, concluded: false,
     sortOrder: 0, rounds: [],
   };
 }

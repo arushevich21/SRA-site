@@ -42,6 +42,11 @@ export type ChampionshipContent = {
   registrationOpen?: boolean;    // false/absent = form hidden
   maxTeamSize?: number;          // 2 for GT3 Sprint, 1-4 for Endurance
   allowedCars?: string[];        // car picker options
+  // Whether entries are graded into divisions. True for the GT3 Team Series;
+  // false for single-grid events like League in a Week, where a driver needs
+  // no division assigned to sign up. Defaults true — see migration
+  // 20260826_optional_divisions.sql.
+  requiresDivision?: boolean;
   // Forces "coming soon" display everywhere (championship cards, sim overview)
   // even if a real schedule is populated — for series teased ahead of launch.
   teaserOnly?: boolean;

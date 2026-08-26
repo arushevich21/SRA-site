@@ -29,6 +29,7 @@ export function rowToInput(row: ChampionshipRow & { id: string }): ChampionshipI
     maxTeamSize: row.max_team_size != null ? String(row.max_team_size) : '',
     maxRegistrations: row.max_registrations != null ? String(row.max_registrations) : '',
     allowedCars: row.allowed_cars ?? [],
+    requiresDivision: row.requires_division ?? true,
     teaserOnly: row.teaser_only,
     concluded: row.concluded,
     sortOrder: row.sort_order,

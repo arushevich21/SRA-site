@@ -37,6 +37,7 @@ export type ChampionshipRow = {
   max_team_size: number | null;
   max_registrations: number | null;
   allowed_cars: string[] | null;
+  requires_division?: boolean | null;
   teaser_only: boolean;
   concluded: boolean;
   sort_order: number;
@@ -87,5 +88,9 @@ export function mapChampionship(row: ChampionshipRow): ChampionshipContent {
     ...(row.registration_season ? { registrationSeason: row.registration_season } : {}),
     ...(row.max_team_size != null ? { maxTeamSize: row.max_team_size } : {}),
     ...(row.allowed_cars ? { allowedCars: row.allowed_cars } : {}),
+    // Explicit boolean, not spread-on-truthy: `false` is the meaningful value
+    // here and must survive to the UI. Missing column (older row shape) falls
+    // back to true, matching the DB default.
+    requiresDivision: row.requires_division ?? true,
   };
 }
