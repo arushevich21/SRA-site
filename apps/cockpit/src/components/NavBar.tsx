@@ -304,7 +304,15 @@ export default function NavBar({
           </Link>
 
           {/* Desktop nav — hidden on mobile */}
-          <nav className="hidden md:flex items-center gap-1" aria-label="Primary navigation">
+          {/* xl (1280px), not md (768px). The header is `position: fixed`, so
+              anything that overflows this row is unreachable — a fixed element
+              doesn't grow the page's scrollable width, so there is no way to
+              scroll across to it. Between 768px and ~1200px the full row (brand
+              + sim selector + 7 nav items + user block) is wider than the
+              viewport, which silently cut off the right-hand end: on a phone in
+              desktop mode the sign-out control was simply gone. Below xl the
+              hamburger panel carries the same links and sign-out. */}
+          <nav className="hidden xl:flex items-center gap-1" aria-label="Primary navigation">
             {/* Sim selector pills — shown on main pages */}
             {!sim && (
               <div className="flex items-center gap-1 mr-2">
@@ -446,7 +454,7 @@ export default function NavBar({
 
           {/* Mobile hamburger */}
           <button
-            className="md:hidden p-2 -mr-2"
+            className="xl:hidden p-2 -mr-2"
             onClick={() => setMenuOpen((o) => !o)}
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
@@ -459,7 +467,7 @@ export default function NavBar({
       {/* Mobile drawer */}
       <div
         className={[
-          'md:hidden fixed top-[76px] left-0 right-0 bottom-0 z-[99]',
+          'xl:hidden fixed top-[76px] left-0 right-0 bottom-0 z-[99]',
           'bg-[rgba(9,10,13,.98)] overflow-y-auto border-t border-line',
           'transition-[opacity,visibility] duration-200',
           menuOpen ? 'opacity-100 visible' : 'opacity-0 invisible',

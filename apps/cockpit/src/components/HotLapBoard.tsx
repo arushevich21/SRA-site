@@ -328,6 +328,31 @@ export function HotLapBoard({
                         </span>
                         <span className="truncate min-w-0">{entry.driverName}</span>
                       </span>
+                      {/* Below lg the Car column is dropped for width, which
+                          left no way to see what anyone drove — the single
+                          most-asked-for field on a phone. Repeat it compactly
+                          under the driver name instead, and hide it again once
+                          the real column returns. */}
+                      {/* pl-16 = the 4rem the driver name is indented by: the
+                          w-8 number slot + gap-2 + w-4 flag slot + gap-2. */}
+                      <span className="lg:hidden flex items-center gap-1.5 mt-0.5 pl-16 text-txt-3">
+                        <span className="relative w-4 h-4 shrink-0 flex items-center justify-center">
+                          {entry.manufacturerIconName ? (
+                            <Icon name={entry.manufacturerIconName as IconName} size={14} />
+                          ) : (
+                            entry.manufacturerLogoUrl && (
+                              <FallbackLogoImage
+                                src={entry.manufacturerLogoUrl}
+                                alt={entry.carModel ?? ''}
+                                sizes="16px"
+                              />
+                            )
+                          )}
+                        </span>
+                        <span className="font-sans text-[13px] truncate min-w-0">
+                          {entry.carModel ?? '—'}
+                        </span>
+                      </span>
                     </td>
                     <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 hidden lg:table-cell">
                       <div className="flex items-center gap-2">
