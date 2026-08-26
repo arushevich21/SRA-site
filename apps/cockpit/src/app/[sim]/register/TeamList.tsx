@@ -12,8 +12,10 @@ export type Team = {
   id: string;
   team_name: string;
   car: string;
-  division_id: number;
-  division_name: string;
+  // NULL on a championship that doesn't grade its entries — see
+  // championships.requires_division.
+  division_id: number | null;
+  division_name: string | null;
   members: Member[];
 };
 
@@ -24,9 +26,13 @@ const DIVISIONS = [1, 2, 3, 4] as const;
 export default function TeamList({
   teams,
   maxTeamSize,
+  // Drives whether the division tiles, tabs and per-row badges appear at all.
+  // On a single-grid event they'd be four empty tiles and four empty tabs.
+  showDivisions = true,
 }: {
   teams: Team[];
   maxTeamSize: number;
+  showDivisions?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>('all');
 
@@ -60,19 +66,22 @@ export default function TeamList({
           value={totalSlots > 0 ? `${totalMembers} / ${totalSlots}` : String(totalMembers)}
           sub={totalSlots > 0 ? `${Math.round((totalMembers / totalSlots) * 100)}% filled` : undefined}
         />
-        {divStats.map((ds) => (
-          <StatBox
-            key={ds.div}
-            label={`Division ${ds.div}`}
-            value={`${ds.teams} teams`}
-            sub={`${ds.members} drivers`}
-          />
-        ))}
+        {showDivisions &&
+          divStats.map((ds) => (
+            <StatBox
+              key={ds.div}
+              label={`Division ${ds.div}`}
+              value={`${ds.teams} teams`}
+              sub={`${ds.members} drivers`}
+            />
+          ))}
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-line overflow-x-auto">
-        {(['all', 1, 2, 3, 4, 'breakdown'] as Tab[]).map((t) => (
+        {((showDivisions
+          ? ['all', 1, 2, 3, 4, 'breakdown']
+          : ['all', 'breakdown']) as Tab[]).map((t) => (
           <button
             key={String(t)}
             onClick={() => setTab(t)}
@@ -91,7 +100,7 @@ export default function TeamList({
       </div>
 
       {tab === 'breakdown' ? (
-        <BreakdownTable teams={teams} />
+        <BreakdownTable teams={teams} showDivisions={showDivisions} />
       ) : (
         <div className="border border-line border-t-0">
           {visibleTeams.length === 0 ? (
@@ -165,10 +174,13 @@ function TeamRow({
         </p>
       </div>
 
-      {/* Division */}
-      <p className="font-mono text-[10px] text-txt-3/60 w-[80px] shrink-0">
-        {team.division_name}
-      </p>
+      {/* Division — omitted entirely on an ungraded championship rather than
+          left as an empty 80px gutter. */}
+      {team.division_name && (
+        <p className="font-mono text-[10px] text-txt-3/60 w-[80px] shrink-0">
+          {team.division_name}
+        </p>
+      )}
 
       {/* Drivers */}
       <div className="flex flex-wrap gap-4 flex-1">
@@ -177,7 +189,10 @@ function TeamRow({
             <span className="font-mono text-[12px] text-txt-2">
               {m.display_name ?? '—'}
             </span>
-            {m.tier && (
+            {/* Badge art is per-division ("Division 3 Gold.png"), so there is
+                no badge to show for an ungraded entry — division_id NULL would
+                request /badges/Division null Gold.png. */}
+            {m.tier && team.division_id != null && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={`/badges/Division ${team.division_id} ${m.tier === 'gold' ? 'Gold' : 'Silver'}.png`}
@@ -197,9 +212,19 @@ function TeamRow({
   );
 }
 
-function BreakdownTable({ teams }: { teams: Team[] }) {
+function BreakdownTable({
+  teams,
+  showDivisions,
+}: {
+  teams: Team[];
+  showDivisions: boolean;
+}) {
+  // Keyed by division on a graded championship. Ungraded entries have a NULL
+  // division_id, which would land in a column no header renders and total to
+  // zero — so those get the car-only table below instead.
   const counts: Record<string, Partial<Record<number, number>>> = {};
   for (const team of teams) {
+    if (team.division_id == null) continue;
     counts[team.car] = counts[team.car] ?? {};
     counts[team.car][team.division_id] =
       (counts[team.car][team.division_id] ?? 0) + 1;
@@ -211,6 +236,56 @@ function BreakdownTable({ teams }: { teams: Team[] }) {
     return (
       <div className="border border-line border-t-0 px-5 py-6">
         <p className="font-mono text-[12px] text-txt-3">No entries yet.</p>
+      </div>
+    );
+  }
+
+  // Single-grid championship: car counts are the whole breakdown.
+  if (!showDivisions) {
+    const carCounts = cars
+      .map((car) => ({ car, n: teams.filter((t) => t.car === car).length }))
+      .sort((a, b) => b.n - a.n || a.car.localeCompare(b.car));
+
+    return (
+      <div className="border border-line border-t-0 overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b border-line">
+              <th className="text-left px-5 py-3 font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 font-normal">
+                Car
+              </th>
+              <th className="text-center px-4 py-3 font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 font-normal">
+                Entries
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {carCounts.map(({ car, n }, i) => (
+              <tr
+                key={car}
+                className={[
+                  'border-b border-line/30 last:border-b-0',
+                  i % 2 === 1 ? 'bg-panel-2/20' : '',
+                ].join(' ')}
+              >
+                <td className="px-5 py-2.5 font-mono text-[12px] text-txt">
+                  {car}
+                </td>
+                <td className="text-center px-4 py-2.5 font-mono text-[12px] font-bold text-txt">
+                  {n}
+                </td>
+              </tr>
+            ))}
+            <tr className="border-t border-line">
+              <td className="px-5 py-2.5 font-mono text-[10px] tracking-[.25em] uppercase text-txt-3">
+                Total
+              </td>
+              <td className="text-center px-4 py-2.5 font-mono text-[12px] font-bold text-gold">
+                {teams.length}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     );
   }

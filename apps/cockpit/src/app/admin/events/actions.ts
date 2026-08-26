@@ -43,6 +43,7 @@ export type ChampionshipInput = {
   maxTeamSize: string;
   maxRegistrations: string; // '' -> NULL (unlimited)
   allowedCars: string[];
+  requiresDivision: boolean;
   teaserOnly: boolean;
   concluded: boolean;
   sortOrder: number;
@@ -85,6 +86,7 @@ function toRow(input: ChampionshipInput) {
     max_team_size: intOrNull(input.maxTeamSize),
     max_registrations: intOrNull(input.maxRegistrations),
     allowed_cars: input.allowedCars.length > 0 ? input.allowedCars : null,
+    requires_division: input.requiresDivision,
     teaser_only: input.teaserOnly,
     concluded: input.concluded,
     sort_order: input.sortOrder,

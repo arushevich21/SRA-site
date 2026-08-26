@@ -302,6 +302,16 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
             onChange={(v) => set('registrationOpen', v)} /></div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="flex items-end"><Check label="Uses divisions" value={f.requiresDivision}
+            onChange={(v) => set('requiresDivision', v)} /></div>
+        </div>
+        <p className="font-sans text-[12px] text-txt-3 -mt-3">
+          On for the GT3 Team Series: entries are graded into divisions, drivers need one
+          assigned before they can register, and teammates must share it. Turn OFF for a
+          single-grid event like League in a Week — ungraded drivers can then sign up, and
+          the entry list drops its division tabs and badges.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <label className={labelCls}>
             Max registrations
             <input type="number" min={1} step={1} className={inputCls} value={f.maxRegistrations}

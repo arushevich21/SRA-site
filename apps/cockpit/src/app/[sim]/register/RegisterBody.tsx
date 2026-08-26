@@ -18,7 +18,7 @@ type RawRegistrationJoin = {
   id: string;
   team_id: string;
   car_model_id: number | null;
-  division_id: number;
+  division_id: number | null;
   teams: { name: string } | { name: string }[] | null;
   divisions: { name: string } | { name: string }[] | null;
   registration_drivers: RawMemberJoin[] | null;
@@ -88,7 +88,11 @@ export async function RegisterBody({
       team_name: one(r.teams)?.name ?? 'Unnamed Team',
       car: (r.car_model_id != null ? accCarModelName(r.car_model_id) : null) ?? 'Unknown Car',
       division_id: r.division_id,
-      division_name: one(r.divisions)?.name ?? `Division ${r.division_id}`,
+      // NULL division => ungraded entry; no name to fall back to.
+      division_name:
+        r.division_id == null
+          ? null
+          : (one(r.divisions)?.name ?? `Division ${r.division_id}`),
       members: (r.registration_drivers ?? []).map((m) => ({
         driver_id: m.driver_id,
         display_name: m.drivers?.display_name ?? null,
@@ -139,7 +143,42 @@ export async function RegisterBody({
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (!driver?.division_id) {
+    // Divisions are a GT3 Team Series concept. A championship that doesn't
+    // grade its entries (League in a Week and friends) has one grid, so an
+    // ungraded driver is a perfectly valid registrant — gating them out was
+    // locking everyone outside the team series out of every event.
+    const requiresDivision = champ.requiresDivision !== false;
+
+    // No drivers row at all is a different problem from being ungraded, and it
+    // blocks registration for EVERY championship — register_entry() would
+    // raise DRIVER_NOT_FOUND. Previously `!driver?.division_id` conflated the
+    // two; now that the division half is conditional, this needs saying
+    // separately or an account with no driver record would fall through to the
+    // form and crash on driver.id.
+    if (!driver) {
+      userSection = (
+        <div className="max-w-[480px] border border-line bg-panel px-6 py-5">
+          <p className="font-mono text-[11px] tracking-[.3em] uppercase text-gold-deep mb-3">
+            Driver Record Missing
+          </p>
+          <p className="font-mono text-[13px] text-txt-2 leading-relaxed">
+            We couldn&apos;t find a driver profile for your account. Ping an
+            admin in the #admin-help channel and they&apos;ll get you sorted.
+          </p>
+          <a
+            href="https://discord.com/channels/915686674833498203/1012438472189026404"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block mt-4 font-mono text-[11px] tracking-[.2em] uppercase text-gold hover:text-gold-soft transition-colors"
+          >
+            Open #admin-help →
+          </a>
+          <p className="font-mono text-[11px] text-txt-3 mt-3">
+            Signed in as <span className="text-txt">{user.email}</span>
+          </p>
+        </div>
+      );
+    } else if (requiresDivision && !driver.division_id) {
       userSection = (
         <div className="max-w-[480px] border border-line bg-panel px-6 py-5">
           <p className="font-mono text-[11px] tracking-[.3em] uppercase text-gold-deep mb-3">
@@ -194,12 +233,27 @@ export async function RegisterBody({
           />
         );
       } else {
-        const { data: divisionDrivers } = await adminClient
+        // Teammate pool. Same-division only where divisions exist —
+        // register_entry() enforces DIVISION_MISMATCH there, so offering
+        // anyone else would just produce a rejected submit. Where they don't,
+        // every driver is eligible and the filter would wrongly exclude
+        // ungraded ones (division_id NULL matches no `.eq`).
+        //
+        // Only reached when maxTeamSize > 1; a solo championship never renders
+        // a teammate picker.
+        let teammateQuery = adminClient
           .from('drivers')
           .select('id, display_name, tier')
-          .eq('division_id', driver.division_id)
-          .neq('id', driver.id)
-          .order('display_name', { nullsFirst: false });
+          .neq('id', driver.id);
+
+        if (requiresDivision) {
+          teammateQuery = teammateQuery.eq('division_id', driver.division_id);
+        }
+
+        const { data: divisionDrivers } = await teammateQuery.order(
+          'display_name',
+          { nullsFirst: false },
+        );
 
         const availableDrivers = (
           (divisionDrivers ?? []) as {
@@ -247,7 +301,11 @@ export async function RegisterBody({
         <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3 mb-8">
           Entry List
         </p>
-        <TeamList teams={teams} maxTeamSize={champ.maxTeamSize} />
+        <TeamList
+          teams={teams}
+          maxTeamSize={champ.maxTeamSize}
+          showDivisions={champ.requiresDivision !== false}
+        />
       </div>
     </>
   );
