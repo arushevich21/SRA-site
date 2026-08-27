@@ -280,6 +280,45 @@ export async function hasJagoffContent(): Promise<boolean> {
   return (await getJagoffBoard(scope)).length > 0;
 }
 
+// Per-driver nudge for the public Hot Stint Qualifying page: which half of
+// classification a specific driver is missing, if either. Reads
+// classification_status directly (not classification_status_public), since
+// has_signup/has_hotstint are admin-only columns — safe here ONLY because
+// every call site resolves steamId from the caller's own auth session
+// server-side first (see hotstint-qualifying/actions.ts's
+// getMyClassificationSignupNotice) and never accepts it as client input;
+// this function itself does no such check, same trust boundary as every
+// other function in this file that reads classification_status directly.
+export type ClassificationSignupState =
+  | 'signed_up_no_stint'
+  | 'stint_no_signup'
+  | 'complete'
+  | null;
+
+export async function getClassificationSignupState(
+  steamId: string,
+  series: string,
+  season: number,
+): Promise<ClassificationSignupState> {
+  const { data, error } = await supabase
+    .from('classification_status')
+    .select('has_signup, has_hotstint')
+    .eq('steam_id', steamId)
+    .eq('series', series)
+    .eq('season', season)
+    .maybeSingle();
+  if (error) {
+    console.error('Classification signup state lookup failed:', error);
+    return null;
+  }
+  if (!data) return null;
+  const { has_signup, has_hotstint } = data as { has_signup: boolean; has_hotstint: boolean };
+  if (has_signup && has_hotstint) return 'complete';
+  if (has_signup && !has_hotstint) return 'signed_up_no_stint';
+  if (!has_signup && has_hotstint) return 'stint_no_signup';
+  return null;
+}
+
 export type AdminHotStintRow = {
   position: number;
   driverName: string;

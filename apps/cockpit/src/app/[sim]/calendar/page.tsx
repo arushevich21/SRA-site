@@ -8,6 +8,7 @@ import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid'
 import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
 import { AccServerStatus } from '@/components/AccServerStatus';
+import { getCalendarEvents } from '@/lib/calendar-events-store';
 
 export default async function SimCalendarPage({
   params,
@@ -18,7 +19,10 @@ export default async function SimCalendarPage({
   const sim = getSimBySlug(slug);
   if (!sim) notFound();
 
-  const championships = await getChampionships();
+  const [championships, calendarEvents] = await Promise.all([
+    getChampionships(),
+    getCalendarEvents(),
+  ]);
   const teasedChamps = championships.filter(
     (c) => c.game === sim.game && c.teaserOnly,
   );
@@ -36,6 +40,17 @@ export default async function SimCalendarPage({
         color: sim.accentColor,
       })),
   );
+
+  // Admin-managed, non-race entries scoped to this sim (game must match
+  // exactly — null-game events are cumulative-calendar-only, see /calendar).
+  for (const e of calendarEvents.filter((e) => e.game === sim.game)) {
+    gridEvents.push({
+      iso: e.eventDate,
+      title: e.title,
+      href: e.href ?? `/${slug}/calendar`,
+      color: e.color ?? sim.accentColor,
+    });
+  }
 
   return (
     <>

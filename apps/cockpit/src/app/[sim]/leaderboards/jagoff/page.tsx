@@ -6,6 +6,7 @@ import { GameLabel } from '@/components/GameLabel';
 import { HotLapBoard, type HotLapBoardEntry } from '@/components/HotLapBoard';
 import { TrackHeader } from '@/components/TrackHeader';
 import { SraqServerStatus } from '@/components/SraqServerStatus';
+import { HotStintDeadlineCountdown } from '@/components/HotStintDeadlineCountdown';
 import type { TrackSummary, TrackTopEntry } from '@/lib/track-summary';
 import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
 import { getAccTrack, toTrackSummary } from '@/lib/acc/tracks';
@@ -19,6 +20,8 @@ import {
   hasHotStintQualifyingContent,
   type JagoffRow,
 } from '@/lib/acc/hot-stint-store';
+import { getCalendarEventBySlug } from '@/lib/calendar-events-store';
+import { HOT_STINT_QUALIFYING_DEADLINE_SLUG } from '@/lib/acc/hot-stint-deadline';
 
 // Same id getJagoffBoard filters on — see hot-stint-store.ts for why it's
 // hardcoded rather than imported from the content-layer car-name map.
@@ -86,13 +89,14 @@ export default async function JagoffPage({ params }: { params: Promise<{ sim: st
   // showSeasonal/showEndurance/showHotStintQualifying/sraqStatus don't depend
   // on the classification scope or its rows — fire them alongside scope
   // instead of waiting until after jagoffRows resolves.
-  const [scope, showSeasonal, showEndurance, showHotStintQualifying, sraqStatus] =
+  const [scope, showSeasonal, showEndurance, showHotStintQualifying, sraqStatus, deadlineEvent] =
     await Promise.all([
       getCurrentClassificationScope(),
       hasSeasonalContent(),
       hasEnduranceReleased(),
       hasHotStintQualifyingContent(),
       getSraqServerStatus(),
+      getCalendarEventBySlug(HOT_STINT_QUALIFYING_DEADLINE_SLUG),
     ]);
   const jagoffRows = scope ? await getJagoffBoard(scope) : [];
   const trackKey = jagoffRows[0]?.trackKey ?? null;
@@ -138,6 +142,13 @@ export default async function JagoffPage({ params }: { params: Promise<{ sim: st
         <span className="text-txt">In-house side competition:</span> fastest Hot Stint average of
         the season, Jaguar G3 only.
       </p>
+
+      {deadlineEvent && (
+        <HotStintDeadlineCountdown
+          deadlineIso={deadlineEvent.eventDate}
+          opensIso={deadlineEvent.opensAt}
+        />
+      )}
 
       <SraqServerStatus servers={sraqStatus} />
 

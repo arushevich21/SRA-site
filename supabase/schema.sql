@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict geKHnEd7giU7s0kph85wGUOq0SlIuJYi5MNZasr7cLuYrb8qFq2f9mcBcGuhaa9
+\restrict eg63ZvTdL66hdOKe19jJ39mheWp7zCpCztVSPkbWx7Sik941KuRt6rAi4xdi1vn
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -100,6 +100,7 @@ CREATE FUNCTION public.register_entry(p_series text, p_season text, p_championsh
     AS $$
 DECLARE
   v_max               integer;
+  v_requires_division boolean;
   v_confirmed_count    integer;
   v_status             text;
   v_waitlist_position  integer;
@@ -108,13 +109,15 @@ DECLARE
   v_driver             jsonb;
   v_driver_id          uuid;
   v_driver_division    integer;
+  v_driver_exists      boolean;
   v_registrant_found   boolean := false;
 BEGIN
   IF p_drivers IS NULL OR jsonb_array_length(p_drivers) = 0 THEN
     RAISE EXCEPTION 'EMPTY_ROSTER: at least one driver is required';
   END IF;
 
-  SELECT max_registrations INTO v_max
+  SELECT max_registrations, requires_division
+    INTO v_max, v_requires_division
   FROM championships
   WHERE registration_key = p_championship_key
   LIMIT 1;
@@ -131,22 +134,25 @@ BEGIN
       v_registrant_found := true;
     END IF;
 
-    SELECT division_id INTO v_driver_division
+    SELECT division_id, true INTO v_driver_division, v_driver_exists
     FROM drivers WHERE id = v_driver_id;
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'DRIVER_NOT_FOUND: %', v_driver_id;
     END IF;
 
-    IF v_driver_division IS NULL THEN
-      RAISE EXCEPTION 'DIVISION_UNASSIGNED: %', v_driver_id;
-    END IF;
+    -- Grading checks only apply to a championship that grades.
+    IF v_requires_division THEN
+      IF v_driver_division IS NULL THEN
+        RAISE EXCEPTION 'DIVISION_UNASSIGNED: %', v_driver_id;
+      END IF;
 
-    IF v_division_id IS NULL THEN
-      v_division_id := v_driver_division;
-    ELSIF v_division_id != v_driver_division THEN
-      RAISE EXCEPTION 'DIVISION_MISMATCH: driver % is division %, expected %',
-        v_driver_id, v_driver_division, v_division_id;
+      IF v_division_id IS NULL THEN
+        v_division_id := v_driver_division;
+      ELSIF v_division_id != v_driver_division THEN
+        RAISE EXCEPTION 'DIVISION_MISMATCH: driver % is division %, expected %',
+          v_driver_id, v_driver_division, v_division_id;
+      END IF;
     END IF;
   END LOOP;
 
@@ -197,17 +203,6 @@ BEGIN
       RAISE EXCEPTION 'DRIVER_ALREADY_CLAIMED: %', (v_driver->>'driver_id')::uuid;
     END;
   END LOOP;
-
-  -- Enqueue the ACCSM entrylist sync, same transaction. A pending job
-  -- already queued for this championship (bot_jobs_accsm_entrylist_sync_
-  -- pending_dedup) is fine — the consumer will pick up this registration
-  -- when it drains, no second job needed.
-  BEGIN
-    INSERT INTO bot_jobs (type, payload)
-    VALUES ('accsm_entrylist_sync', jsonb_build_object('championship_key', p_championship_key));
-  EXCEPTION WHEN unique_violation THEN
-    NULL;
-  END;
 
   RETURN v_row;
 END;
@@ -553,6 +548,48 @@ CREATE TABLE public.bot_jobs (
 
 
 --
+-- Name: calendar_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.calendar_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    title text NOT NULL,
+    description text,
+    event_date text NOT NULL,
+    game text,
+    event_type text DEFAULT 'event'::text NOT NULL,
+    href text,
+    color text,
+    sort_order integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    slug text,
+    opens_at text,
+    CONSTRAINT calendar_events_event_type_check CHECK ((event_type = ANY (ARRAY['event'::text, 'deadline'::text, 'stream'::text, 'announcement'::text])))
+);
+
+
+--
+-- Name: championship_accsm_targets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.championship_accsm_targets (
+    emperor_championship_id uuid NOT NULL,
+    registration_key text NOT NULL,
+    division_id integer,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: COLUMN championship_accsm_targets.division_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.championship_accsm_targets.division_id IS 'Which division''s entries belong on this ACCSM grid. NULL = every entry for this registration_key (a championship with requires_division = false).';
+
+
+--
 -- Name: championship_rounds; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -603,8 +640,16 @@ CREATE TABLE public.championships (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     max_registrations integer,
+    requires_division boolean DEFAULT true NOT NULL,
     CONSTRAINT championships_max_registrations_positive CHECK (((max_registrations IS NULL) OR (max_registrations > 0)))
 );
+
+
+--
+-- Name: COLUMN championships.requires_division; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.championships.requires_division IS 'Whether entries are graded into divisions. TRUE for the GT3 Team Series; FALSE for single-grid events like League in a Week, whose registrants need no division assignment.';
 
 
 --
@@ -754,28 +799,29 @@ CREATE VIEW public.classification_status WITH (security_invoker='true') AS
 --
 
 CREATE VIEW public.classification_status_public WITH (security_invoker='true') AS
- SELECT c.series,
-    c.season,
-    d.first_name,
+ SELECT w.series,
+    w.season,
+    COALESCE(d.first_name, bq.driver_name) AS first_name,
     d.last_name,
     bq.best_stint_ms AS hotstint_ms,
     bq.car_model_id,
     bq.car_model,
-    d.steam_id,
+    COALESCE(d.steam_id, SUBSTRING(bq.steam_id FROM 2)) AS steam_id,
     bq.sectors_ms,
     bq.car_group,
     bq.track_key
-   FROM ((public.classification c
-     JOIN public.drivers d ON ((d.discord_id = c.discord_id)))
-     JOIN public.acc_hotstint_leaderboard bq ON (((bq.season = ('S'::text || c.season)) AND (bq.steam_id = ('S'::text || d.steam_id)) AND (bq.board_scope = 'seasonal'::text) AND (bq.qualifying = true) AND (bq.is_wet = false) AND (bq.best_stint_ms IS NOT NULL))))
-  WHERE ((c.has_signup = true) AND (d.steam_id IS NOT NULL));
+   FROM ((( SELECT DISTINCT classification.series,
+            classification.season
+           FROM public.classification) w
+     JOIN public.acc_hotstint_leaderboard bq ON (((bq.season = ('S'::text || w.season)) AND (bq.board_scope = 'seasonal'::text) AND (bq.qualifying = true) AND (bq.is_wet = false) AND (bq.best_stint_ms IS NOT NULL))))
+     LEFT JOIN public.drivers d ON ((('S'::text || d.steam_id) = bq.steam_id)));
 
 
 --
 -- Name: VIEW classification_status_public; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON VIEW public.classification_status_public IS 'Public-safe projection of classification_status for the Hot Stint Qualifying leaderboard tab. Never adds steam_id, discord_id, driver_id, num_laps, or rating internals (composite/pace_pct/srating_ordinal) — those stay admin-only, permanently. The admin view reads classification_status directly through the service-role client; no separate admin view is needed since that table is already RLS/grant-protected.';
+COMMENT ON VIEW public.classification_status_public IS 'Public Hot Stint Qualifying board: EVERY qualifying stint set in a season that has a classification window, regardless of whether the driver has a classification row or has ticked signup (changed 2026-08-26 — people sign up throughout the window, often after setting times, and their laps must not be invisible until they do). `classification` is read only for the (series, season) pairs that define a window, never per driver. Eligibility for division assignment is a separate question and still lives in classification_status, which admin reads directly. Never adds discord_id, driver_id, num_laps, or rating internals (composite/pace_pct/srating_ordinal) — those stay admin-only, permanently.';
 
 
 --
@@ -785,6 +831,23 @@ COMMENT ON VIEW public.classification_status_public IS 'Public-safe projection o
 CREATE TABLE public.divisions (
     id integer NOT NULL,
     name text NOT NULL
+);
+
+
+--
+-- Name: orientation; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.orientation (
+    steam_id text NOT NULL,
+    driver_id uuid,
+    discord_id text,
+    status text DEFAULT 'oriented'::text NOT NULL,
+    source text,
+    notes text,
+    oriented_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT orientation_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'oriented'::text, 'failed'::text, 'revoked'::text])))
 );
 
 
@@ -1135,6 +1198,38 @@ ALTER TABLE ONLY public.bot_jobs
 
 
 --
+-- Name: calendar_events calendar_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.calendar_events
+    ADD CONSTRAINT calendar_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: calendar_events calendar_events_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.calendar_events
+    ADD CONSTRAINT calendar_events_slug_key UNIQUE (slug);
+
+
+--
+-- Name: championship_accsm_targets championship_accsm_targets_emperor_championship_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_accsm_targets
+    ADD CONSTRAINT championship_accsm_targets_emperor_championship_id_key UNIQUE (emperor_championship_id);
+
+
+--
+-- Name: championship_accsm_targets championship_accsm_targets_key_division_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_accsm_targets
+    ADD CONSTRAINT championship_accsm_targets_key_division_unique UNIQUE NULLS NOT DISTINCT (registration_key, division_id);
+
+
+--
 -- Name: championship_rounds championship_rounds_championship_id_round_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1244,6 +1339,14 @@ ALTER TABLE ONLY public.drivers
 
 ALTER TABLE ONLY public.drivers
     ADD CONSTRAINT drivers_steam_id_key UNIQUE (steam_id);
+
+
+--
+-- Name: orientation orientation_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orientation
+    ADD CONSTRAINT orientation_pkey PRIMARY KEY (steam_id);
 
 
 --
@@ -1423,13 +1526,6 @@ CREATE INDEX acc_race_sessions_staging_session_date_idx ON public.acc_race_sessi
 
 
 --
--- Name: bot_jobs_accsm_entrylist_sync_pending_dedup; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX bot_jobs_accsm_entrylist_sync_pending_dedup ON public.bot_jobs USING btree (((payload ->> 'championship_key'::text))) WHERE ((type = 'accsm_entrylist_sync'::text) AND (status = 'pending'::text));
-
-
---
 -- Name: bot_jobs_pending; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1441,6 +1537,13 @@ CREATE INDEX bot_jobs_pending ON public.bot_jobs USING btree (created_at) WHERE 
 --
 
 CREATE INDEX championship_rounds_championship_id_idx ON public.championship_rounds USING btree (championship_id);
+
+
+--
+-- Name: championships_registration_key_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX championships_registration_key_unique ON public.championships USING btree (registration_key);
 
 
 --
@@ -1469,6 +1572,20 @@ CREATE INDEX drivers_source_id_idx ON public.drivers USING btree (source_id);
 --
 
 CREATE INDEX drivers_user_id_idx ON public.drivers USING btree (user_id);
+
+
+--
+-- Name: orientation_discord_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX orientation_discord_idx ON public.orientation USING btree (discord_id);
+
+
+--
+-- Name: orientation_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX orientation_status_idx ON public.orientation USING btree (status);
 
 
 --
@@ -1567,6 +1684,13 @@ CREATE TRIGGER acc_race_sessions_set_updated_at BEFORE UPDATE ON public.acc_race
 --
 
 CREATE TRIGGER acc_race_sessions_staging_set_updated_at BEFORE UPDATE ON public.acc_race_sessions_staging FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: championship_accsm_targets championship_accsm_targets_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER championship_accsm_targets_updated_at BEFORE UPDATE ON public.championship_accsm_targets FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
@@ -1684,6 +1808,22 @@ ALTER TABLE ONLY public.admin_permissions
 
 
 --
+-- Name: championship_accsm_targets championship_accsm_targets_division_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_accsm_targets
+    ADD CONSTRAINT championship_accsm_targets_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.divisions(id);
+
+
+--
+-- Name: championship_accsm_targets championship_accsm_targets_registration_key_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_accsm_targets
+    ADD CONSTRAINT championship_accsm_targets_registration_key_fkey FOREIGN KEY (registration_key) REFERENCES public.championships(registration_key) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+
+--
 -- Name: championship_rounds championship_rounds_championship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1713,6 +1853,14 @@ ALTER TABLE ONLY public.drivers
 
 ALTER TABLE ONLY public.drivers
     ADD CONSTRAINT drivers_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: orientation orientation_driver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orientation
+    ADD CONSTRAINT orientation_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES public.drivers(id);
 
 
 --
@@ -1996,6 +2144,25 @@ CREATE POLICY bop_entries_write ON public.bop_entries USING (public.has_admin_pe
 ALTER TABLE public.bot_jobs ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: calendar_events; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.calendar_events ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: calendar_events calendar_events_select_all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY calendar_events_select_all ON public.calendar_events FOR SELECT USING (true);
+
+
+--
+-- Name: championship_accsm_targets; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.championship_accsm_targets ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: championship_rounds; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2079,6 +2246,12 @@ CREATE POLICY drivers_select_own ON public.drivers FOR SELECT USING ((( SELECT a
 
 CREATE POLICY drivers_update_own ON public.drivers FOR UPDATE USING ((( SELECT auth.uid() AS uid) = user_id));
 
+
+--
+-- Name: orientation; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.orientation ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: ref_times; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2197,5 +2370,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict geKHnEd7giU7s0kph85wGUOq0SlIuJYi5MNZasr7cLuYrb8qFq2f9mcBcGuhaa9
+\unrestrict eg63ZvTdL66hdOKe19jJ39mheWp7zCpCztVSPkbWx7Sik941KuRt6rAi4xdi1vn
 

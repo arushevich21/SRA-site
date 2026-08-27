@@ -197,10 +197,11 @@ export function ComboField({
 // The native pickers write local wall-clock, which IS the Eastern value we
 // store (interpreted DST-aware downstream by lib/event-time.ts).
 export function RoundStartField({
-  value, onChange,
+  value, onChange, label = 'Starts at (Eastern; blank = TBA)',
 }: {
   value: string;
   onChange: (v: string) => void;
+  label?: string;
 }) {
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
   const [timeTba, setTimeTba] = useState(isDateOnly);
@@ -216,7 +217,7 @@ export function RoundStartField({
 
   return (
     <div className={labelCls}>
-      Starts at (Eastern; blank = TBA)
+      {label}
       <div className="mt-2 flex flex-wrap items-center gap-3">
         {timeTba ? (
           <input
