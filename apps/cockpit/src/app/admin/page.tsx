@@ -23,6 +23,18 @@ const ADMIN_SECTIONS: {
     ],
   },
   {
+    title: 'Calendar Events',
+    description: 'Manage non-race calendar entries — deadlines, streams, announcements.',
+    tools: [
+      {
+        label: 'Manage Calendar Events',
+        href: '/admin/calendar-events',
+        description:
+          'Create, edit, and delete calendar entries not tied to a championship round (classification deadlines, reveal streams, announcements). Shows on the cumulative calendar and, optionally, one sim’s own calendar.',
+      },
+    ],
+  },
+  {
     title: 'Divisions',
     description: 'Manage driver division and tier assignments.',
     tools: [

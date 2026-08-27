@@ -180,6 +180,12 @@ body::after {
   animation: live-pulse 1.8s infinite;
 }
 
+/* ── hot stint deadline countdown glow ────────────────────────────── */
+@keyframes hsq-glow {
+  0%, 100% { text-shadow: 0 0 18px rgba(224, 64, 64, .55); }
+  50%      { text-shadow: 0 0 28px rgba(224, 64, 64, .85); }
+}
+
 /* ── excited shake ────────────────────────────────────────────────── */
 @keyframes shake {
   0% { transform: translateX(0); }

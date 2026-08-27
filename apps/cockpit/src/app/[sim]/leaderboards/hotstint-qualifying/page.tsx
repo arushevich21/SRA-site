@@ -6,6 +6,8 @@ import { GameLabel } from '@/components/GameLabel';
 import { HotLapBoard, type HotLapBoardEntry } from '@/components/HotLapBoard';
 import { TrackHeader } from '@/components/TrackHeader';
 import { SraqServerStatus } from '@/components/SraqServerStatus';
+import { ClassificationSignupNotice } from '@/components/ClassificationSignupNotice';
+import { HotStintDeadlineCountdown } from '@/components/HotStintDeadlineCountdown';
 import type { TrackSummary, TrackTopEntry } from '@/lib/track-summary';
 import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
 import { getAccTrack, toTrackSummary } from '@/lib/acc/tracks';
@@ -19,6 +21,8 @@ import {
   hasJagoffContent,
   type PublicHotStintRow,
 } from '@/lib/acc/hot-stint-store';
+import { getCalendarEventBySlug } from '@/lib/calendar-events-store';
+import { HOT_STINT_QUALIFYING_DEADLINE_SLUG } from '@/lib/acc/hot-stint-deadline';
 
 // Data is written by an external bot on its own schedule, not a cron in this
 // app (see lib/acc/hot-stint-store.ts) — revalidate, not force-dynamic, same
@@ -128,13 +132,15 @@ export default async function HotStintQualifyingPage({
   // showSeasonal/showEndurance/showJagoff/sraqStatus don't depend on the
   // classification scope or its rows — fire them alongside scope instead of
   // waiting until after rows resolves.
-  const [scope, showSeasonal, showEndurance, showJagoff, sraqStatus] = await Promise.all([
-    getCurrentClassificationScope(),
-    hasSeasonalContent(),
-    hasEnduranceReleased(),
-    hasJagoffContent(),
-    getSraqServerStatus(),
-  ]);
+  const [scope, showSeasonal, showEndurance, showJagoff, sraqStatus, deadlineEvent] =
+    await Promise.all([
+      getCurrentClassificationScope(),
+      hasSeasonalContent(),
+      hasEnduranceReleased(),
+      hasJagoffContent(),
+      getSraqServerStatus(),
+      getCalendarEventBySlug(HOT_STINT_QUALIFYING_DEADLINE_SLUG),
+    ]);
   const rows = scope ? await getPublicHotStintLeaderboard(scope.series, scope.season) : [];
   const trackKey = representativeTrackKey(rows);
 
@@ -182,6 +188,15 @@ export default async function HotStintQualifyingPage({
         during the pre-season classification window — used to assign divisions before the
         season begins.
       </p>
+
+      {deadlineEvent && (
+        <HotStintDeadlineCountdown
+          deadlineIso={deadlineEvent.eventDate}
+          opensIso={deadlineEvent.opensAt}
+        />
+      )}
+
+      <ClassificationSignupNotice />
 
       <SraqServerStatus servers={sraqStatus} />
 

@@ -6,9 +6,13 @@ import { SIMS } from '@/content/sims';
 import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid';
 import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
+import { getCalendarEvents } from '@/lib/calendar-events-store';
 
 export default async function CalendarPage() {
-  const championships = await getChampionships();
+  const [championships, calendarEvents] = await Promise.all([
+    getChampionships(),
+    getCalendarEvents(),
+  ]);
   const teasedChamps = championships.filter((c) => c.teaserOnly);
   const realChamps = championships.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
 
@@ -23,6 +27,19 @@ export default async function CalendarPage() {
         color: sim?.accentColor,
       }));
   });
+
+  // Admin-managed, non-race entries (deadlines, streams, announcements) —
+  // every calendar_events row shows on the cumulative calendar regardless of
+  // its `game`; /[sim]/calendar filters to that sim's own events only.
+  for (const e of calendarEvents) {
+    const sim = e.game ? SIMS.find((s) => s.game === e.game) : undefined;
+    gridEvents.push({
+      iso: e.eventDate,
+      title: e.title,
+      href: e.href ?? '/calendar',
+      color: e.color ?? sim?.accentColor,
+    });
+  }
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
