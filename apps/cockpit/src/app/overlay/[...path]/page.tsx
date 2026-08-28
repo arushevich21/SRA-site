@@ -11,6 +11,7 @@ import { RaceInformationOverlay } from '@/components/stream/RaceInformationOverl
 import { IntermissionOverlay } from '@/components/stream/IntermissionOverlay';
 import { SponsorsOverlay } from '@/components/stream/SponsorsOverlay';
 import { PartnersOverlay } from '@/components/stream/PartnersOverlay';
+import { CommentatorsOverlay } from '@/components/stream/CommentatorsOverlay';
 
 type OverlayProps = {
   params: Promise<{ path: string[] }>;
@@ -140,6 +141,10 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
   }
 
   if (scene === 'commentators') {
+    return <OverlayCanvas className="stream-transparent-content-canvas"><CommentatorsOverlay /></OverlayCanvas>;
+  }
+
+  if (scene === 'commentators' && query.mode === '__legacy_placeholder__') {
     return <OverlayCanvas><OverlayHeader title={`Commentators · Division ${division}`} /><OverlayPanel className="stream-commentator-placeholder"><p>Commentator browser source placeholder</p></OverlayPanel></OverlayCanvas>;
   }
 
