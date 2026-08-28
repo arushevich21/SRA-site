@@ -29,6 +29,7 @@
     #race .race-layout .panel:first-child h2{font-size:0}
     #race .race-layout .panel:first-child h2:after{content:'OVERALL';font-size:.85vw}
     #race .ticker{z-index:4;right:auto;width:45%}
+    #race .ticker{font-size:1.5vw}
     #race .race-layout{display:none}
     #race:after{display:none}
     .preview-race-label{position:absolute;z-index:5;top:4%;left:50%;width:max-content;max-width:50%;transform:translateX(-50%);padding:.28em .9em .42em;background:#000;border-radius:0 0 .55em .55em;box-shadow:0 2px 0 rgba(0,0,0,.45);text-align:center;font-size:1.2vw;font-weight:700}
@@ -55,7 +56,7 @@
   </style>
   <style>
     .points{display:grid;grid-template-columns:4ch 4.5ch;justify-content:start;align-items:baseline;gap:.2em;text-align:right}.points-value{text-align:right}.points small{text-align:left;white-space:nowrap}
-    .sponsors{height:58%}.sponsors .panel{display:flex;flex-direction:column;min-height:0}.sponsors .panel h2{flex:0 0 auto;margin-bottom:3%}
+    .sponsors{height:58%}.sponsors .panel{display:flex;flex-direction:column;min-height:0}.sponsors .panel h2{flex:0 0 auto;margin-bottom:3%}.facts{padding:2% 3%}
   </style>
 </head>
 <body>
@@ -101,7 +102,7 @@
     };
     weekPicker.querySelector('select').addEventListener('change',syncPreviewWeekAcrossScenes); syncPreviewWeekAcrossScenes();
     document.querySelectorAll('.ticker').forEach(ticker=>{const message='<b class="gold">SPONSORS:</b> Trackside VIP <span class="gold">•</span> Documize <span class="gold">•</span> Trak Racer <span class="gold">•</span> Triple Stint <span class="gold">•</span> GO Setups <span class="gold">•</span> Armamentario <span class="gold">•</span> AT3D Sim Shop <span class="gold">•</span> Castle Cauldron <span class="gold">•</span> Echoes of Nox <span class="gold">•</span> KP Concepts <span class="gold">•</span> Retro Saga <span class="gold">•</span> Thank you to all of our league partners and community supporters'; ticker.innerHTML=`<div class="ticker-track"><span>${message}</span><span aria-hidden="true">${message}</span></div>`;});
-    document.querySelectorAll('.ticker').forEach(ticker=>{const label=document.createElement('b');label.className='ticker-fixed-label gold';label.textContent='SPONSORS:';ticker.prepend(label);ticker.querySelectorAll('.ticker-track b.gold').forEach(x=>x.remove());const track=ticker.querySelector('.ticker-track');const windowEl=document.createElement('div');windowEl.className='ticker-window';track.replaceWith(windowEl);windowEl.append(track);});
+    document.querySelectorAll('.ticker').forEach(ticker=>{const label=document.createElement('b');label.className='ticker-fixed-label gold';label.textContent='SUPPORTERS:';ticker.prepend(label);ticker.querySelectorAll('.ticker-track b.gold').forEach(x=>x.remove());const track=ticker.querySelector('.ticker-track');const windowEl=document.createElement('div');windowEl.className='ticker-window';track.replaceWith(windowEl);windowEl.append(track);const message=names.map((name,i)=>(i?' • ':'')+name).join('')+' • Thank you for supporting SRA';track.innerHTML=`<span>${message}</span><span aria-hidden="true">${message}</span>`;});
     const partnerAssets=['apps/cockpit/public/sponsors/partners/armamentario/ARMA-white.png','apps/cockpit/public/sponsors/sliders/at3d-sim-shop.png','apps/cockpit/public/sponsors/sliders/castlecauldron.png','apps/cockpit/public/sponsors/sliders/documize-com.png','apps/cockpit/public/sponsors/sliders/echoes_of_nox.png','apps/cockpit/public/sponsors/sliders/go-setups.png','apps/cockpit/public/sponsors/sliders/kp_concepts.png','apps/cockpit/public/sponsors/sliders/retro-saga-ca.png','apps/cockpit/public/sponsors/sliders/TS_Logo_White_SVG.png','apps/cockpit/public/sponsors/partners/trak-racer/logo-new.png','apps/cockpit/public/sponsors/partners/triple-stint/White%20Text/Logo.png'];
     const partnerPreview=document.createElement('div'); partnerPreview.className='partner-preview'; partnerPreview.innerHTML=partnerAssets.map(src=>`<img src="${src}" alt="">`).join(''); document.querySelector('#race').append(partnerPreview);
     document.querySelectorAll('[data-scene]').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.scene').forEach(s=>s.classList.toggle('active',s.id===btn.dataset.scene));document.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===btn));});

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import Image from 'next/image';
+import { SUPPORTERS } from '@/content/supporters';
 
 export function OverlayCanvas({ children, className = '', opacity }: { children: ReactNode; className?: string; opacity?: number }) {
   const style: CSSProperties | undefined = opacity === undefined ? undefined : { opacity };
@@ -11,8 +12,8 @@ export function OverlayHeader({ title, subtitle, logoSrc = '/badges/GT3TSAsset_w
 }
 
 export function SponsorTicker() {
-  const message = <>Trackside VIP <span>•</span> Documize <span>•</span> Trak Racer <span>•</span> Triple Stint <span>•</span> GO Setups <span>•</span> Armamentario <span>•</span> AT3D Sim Shop <span>•</span> Castle Cauldron <span>•</span> Echoes of Nox <span>•</span> KP Concepts <span>•</span> Retro Saga <span>•</span> Thank you to all of our league partners and community supporters</>;
-  return <div className="stream-sponsor-ticker"><strong className="stream-sponsor-ticker-label">SPONSORS:</strong><div className="stream-sponsor-ticker-window"><div className="stream-sponsor-ticker-track"><span>{message}</span><span aria-hidden="true">{message}</span></div></div></div>;
+  const message = <>{SUPPORTERS.map((name, index) => <span key={name}>{index > 0 && ' • '}{name}</span>)}<span> • Thank you for supporting SRA</span></>;
+  return <div className="stream-sponsor-ticker"><strong className="stream-sponsor-ticker-label">SUPPORTERS:</strong><div className="stream-sponsor-ticker-window"><div className="stream-sponsor-ticker-track"><span>{message}</span><span aria-hidden="true">{message}</span></div></div></div>;
 }
 
 export function OverlayPanel({ children, className = '' }: { children: ReactNode; className?: string }) {
