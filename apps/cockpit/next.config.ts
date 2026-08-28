@@ -14,6 +14,9 @@ const supabaseHost = (() => {
 })();
 
 const nextConfig: NextConfig = {
+  // Browser sources are broadcast graphics; Next's dev indicator must not be
+  // composited into the corner of a stream asset during local testing.
+  devIndicators: false,
   transpilePackages: ['@sra/shared-types', '@sra/simgrid-client', '@sra/domain', '@sra/emperor-client'],
   // Logo uploads go through a Server Action, whose request body defaults to a
   // 1 MB cap. uploadChampionshipLogo accepts images up to 2 MB, so raise the

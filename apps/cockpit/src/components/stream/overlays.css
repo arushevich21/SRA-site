@@ -97,8 +97,15 @@ body:has(.stream-transparent-content-canvas)::after { display: none; }
 .stream-commentator-list { display: grid; gap: 5%; padding-top: 5%; }
 .stream-commentator { display: flex; align-items: center; gap: 4%; min-width: 0; }
 .stream-commentator-copy { display: flex; min-width: 0; flex-direction: column; gap: .2em; }
-.stream-commentator-copy strong { overflow: hidden; color: #fff; font-size: clamp(14px, 1vw, 25px); text-overflow: ellipsis; white-space: nowrap; }
+.stream-commentator-copy strong { overflow: hidden; color: #fff; font-family: var(--font-display, 'Saira Condensed'), sans-serif; font-size: clamp(14px, 1vw, 25px); font-weight: 700; letter-spacing: .02em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .stream-commentator-copy small { color: #9da8ba; font-family: var(--font-mono, ui-monospace, monospace); font-size: clamp(9px, .58vw, 15px); text-transform: uppercase; }
+.stream-intermission-1 { grid-template-columns: minmax(0, 1fr); max-width: 52%; margin-inline: auto; }
+.stream-intermission-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.stream-intermission-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stream-intermission .stream-panel { display: flex; flex-direction: column; justify-content: center; min-height: 0; padding: 7% 5%; }
+.stream-intermission .stream-panel h2 { margin: 8% 0 2%; color: #fff; font-size: clamp(22px, 2.2vw, 56px); line-height: .95; }
+.stream-intermission .stream-panel > strong { color: #9da8ba; font-family: var(--font-mono, ui-monospace, monospace); font-size: clamp(11px, .85vw, 22px); letter-spacing: .08em; text-transform: uppercase; }
+.stream-booth-status { display: flex; align-items: center; gap: .7em; color: #e4b83f; font-family: var(--font-mono, ui-monospace, monospace); font-size: clamp(10px, .7vw, 18px); font-weight: 700; letter-spacing: .12em; }
 .stream-points { display: grid; grid-template-columns: 4ch 4.5ch; justify-content: start; align-items: baseline; gap: .2em; text-align: right; }
 .stream-points-value { text-align: right; }
 .stream-points small { text-align: left; white-space: nowrap; }
@@ -106,3 +113,26 @@ body:has(.stream-transparent-content-canvas)::after { display: none; }
 .stream-standings-heading h2, .stream-sponsor-ticker, .stream-round-heading strong { font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace; letter-spacing: .04em; }
 .stream-supporter-list { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); flex: 1; min-height: 0; gap: 2%; align-content: stretch; padding: 1% 5% 5%; }
 .stream-supporter-list strong { display: grid; place-items: center; min-width: 0; color: #f5f5f5; font-family: var(--font-mono, ui-monospace, monospace); font-size: clamp(18px, 1.35vw, 34px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Use the site's typography hierarchy across every stream graphic. */
+.overlay-canvas h1,
+.overlay-canvas h2,
+.overlay-canvas h3,
+.stream-round-heading b,
+.stream-driver b,
+.stream-order-row b,
+.stream-track-facts strong,
+.stream-intermission strong,
+.stream-map-placeholder {
+  font-family: var(--font-display, 'Saira Condensed'), sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.overlay-canvas h1,
+.overlay-canvas h2,
+.overlay-canvas h3 { letter-spacing: .01em; }
+.overlay-canvas h1,
+.stream-map-placeholder { font-weight: 900; }
+.stream-standings-heading h2,
+.stream-sponsor-ticker,
+.stream-race-top > strong { font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace; }

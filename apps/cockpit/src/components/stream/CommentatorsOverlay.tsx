@@ -1,12 +1,5 @@
 import { OverlayPanel } from './OverlayPrimitives';
-
-type Commentator = { name: string; role: string };
-
-// Temporary booth lineup until the live commentator feed is wired in.
-const MOCK_COMMENTATORS: Commentator[] = [
-  { name: 'Taylor Johnston', role: 'Lead commentator' },
-  { name: 'Matt Higgs', role: 'Race analyst' },
-];
+import { MOCK_COMMENTATORS } from './commentator-data';
 
 export function CommentatorsOverlay() {
   return (
