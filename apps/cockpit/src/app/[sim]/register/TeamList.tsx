@@ -12,6 +12,11 @@ export type Team = {
   id: string;
   team_name: string;
   car: string;
+  // Raw id behind `car` above — kept alongside the display string so the
+  // edit-registration form (CurrentTeam) can pre-select the right <option>
+  // via allowedCarNameForModelId(), which accCarModelName()'s display string
+  // can't do (see that helper's comment). Not used for display.
+  carModelId: number | null;
   // NULL on a championship that doesn't grade its entries — see
   // championships.requires_division.
   division_id: number | null;

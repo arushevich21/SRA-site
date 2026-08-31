@@ -56,3 +56,17 @@ export const ACC_CAR_MODEL_ID_BY_NAME: Readonly<Record<string, number>> = {
   'Mercedes-AMG GT3 EVO': 25, // "2020" — 65 occurrences vs. 8 for the base 2016 car (id 1), which
   // only appears in one ~45-minute window, not recurring use
 };
+
+// Reverse of the map above, id -> allowedCars picker string. Needed anywhere
+// a form needs to pre-select a driver's current car from their stored
+// car_model_id (e.g. the edit-registration form) — accCarModelName()
+// (packages/domain) returns ACC's own internal name, which for 14 of these
+// 21 cars does NOT match the picker string (see this file's header), so it
+// can't be used to find the right <option>.
+const CAR_NAME_BY_MODEL_ID: Readonly<Record<number, string>> = Object.fromEntries(
+  Object.entries(ACC_CAR_MODEL_ID_BY_NAME).map(([name, id]) => [id, name]),
+);
+
+export function allowedCarNameForModelId(carModelId: number | null): string | null {
+  return carModelId != null ? (CAR_NAME_BY_MODEL_ID[carModelId] ?? null) : null;
+}
