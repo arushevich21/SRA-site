@@ -12,6 +12,12 @@ export type DriverInfo = {
   isSralien: boolean;
   division: number | null; // 1-4, from drivers.division_id — null if unassigned
   tier: DriverTier | null; // null if unassigned
+  // Live drivers.display_name — null if the steamId has no drivers row
+  // (guest/unlinked). Callers that key a board's display name off a bot-
+  // written snapshot column should prefer this when present, so a nickname
+  // change is reflected immediately instead of only on the next bot write —
+  // see jagoff/page.tsx, which used to skip this and show stale names.
+  displayName: string | null;
 };
 
 const EMPTY_DRIVER_INFO: DriverInfo = {
@@ -20,6 +26,7 @@ const EMPTY_DRIVER_INFO: DriverInfo = {
   isSralien: false,
   division: null,
   tier: null,
+  displayName: null,
 };
 
 // Batch-fetch driver_number, nationality, and division/tier/SRAlien status
@@ -39,7 +46,7 @@ export async function getDriverInfoBySteamIds(
 
   const { data, error } = await supabase
     .from('drivers')
-    .select('steam_id, driver_number, country, is_champion, is_sralien, division_id, tier')
+    .select('steam_id, driver_number, country, is_champion, is_sralien, division_id, tier, display_name')
     .in('steam_id', unique);
 
   if (error) {
@@ -62,6 +69,7 @@ export async function getDriverInfoBySteamIds(
         isSralien: r.is_sralien as boolean,
         division: r.division_id as number | null,
         tier: r.tier as DriverTier | null,
+        displayName: r.display_name as string | null,
       },
     ]),
   );

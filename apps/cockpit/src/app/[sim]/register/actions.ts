@@ -215,6 +215,18 @@ export async function leaveTeam(
     .maybeSingle();
   if (!membership) return;
 
+  // The registrations row for this team+event — needed below to clean it up
+  // once it has no drivers left. Not every team has one yet (e.g. a teammate
+  // slot claimed via team_members before the event was ever registered for),
+  // so `registration` can be null.
+  const { data: registration } = await adminClient
+    .from('registrations')
+    .select('id')
+    .eq('team_id', teamId)
+    .eq('championship_key', championshipKey)
+    .eq('season', season)
+    .maybeSingle();
+
   // ── 4. Two deletes, per the roster/entry split ─────────────────────────────
   // team_members: remove from the persistent roster.
   // registration_drivers: remove the ACTIVE claim for this specific
@@ -235,6 +247,41 @@ export async function leaveTeam(
     .eq('driver_id', driver.id)
     .eq('championship_key', championshipKey)
     .eq('season', season);
+
+  // ── 5. Clean up now-empty parents ──────────────────────────────────────────
+  // Deleting the last driver's registration_drivers row above does NOT delete
+  // the parent registrations row (no cascade in that direction) — left alone,
+  // a solo (or now fully-vacated) entry keeps showing in the public entry
+  // list with zero members, and keeps occupying a max_registrations slot
+  // forever. This is what made "Leave Team" look like it did nothing: the
+  // driver's own claim was gone, but their team's ghost entry stayed visible.
+  if (registration) {
+    const { count } = await adminClient
+      .from('registration_drivers')
+      .select('driver_id', { count: 'exact', head: true })
+      .eq('registration_id', registration.id);
+    if ((count ?? 0) === 0) {
+      await adminClient.from('registrations').delete().eq('id', registration.id);
+    }
+  }
+
+  // Same idea for the team roster itself: once nobody is left on it anywhere
+  // (not just this one event), release the name so a driver can register
+  // again under it — e.g. re-entering LIAW with a different car — instead of
+  // hitting teams_unique_name_per_season against their own abandoned team.
+  const [{ count: memberCount }, { count: registrationCount }] = await Promise.all([
+    adminClient
+      .from('team_members')
+      .select('driver_id', { count: 'exact', head: true })
+      .eq('team_id', teamId),
+    adminClient
+      .from('registrations')
+      .select('id', { count: 'exact', head: true })
+      .eq('team_id', teamId),
+  ]);
+  if ((memberCount ?? 0) === 0 && (registrationCount ?? 0) === 0) {
+    await adminClient.from('teams').delete().eq('id', teamId);
+  }
 
   revalidatePath(`/${simSlug}/register`);
 }
