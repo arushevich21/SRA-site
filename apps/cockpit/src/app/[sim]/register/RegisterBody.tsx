@@ -3,10 +3,11 @@ import Link from 'next/link';
 import { accCarModelName } from '@sra/domain';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabase as adminClient } from '@/lib/supabase';
-import type { ChampionshipContent } from '@/content/championships';
+import type { ChampionshipContent, ScheduleRound } from '@/content/championships';
 import type { SimConfig } from '@/content/sims';
+import { eventInstant, eventDateTimeParts, hasEventTime, EVENT_SOURCE_TIMEZONE } from '@/lib/event-time';
 import RegisterForm from './RegisterForm';
-import CurrentTeam from './CurrentTeam';
+import CurrentTeam, { type NextRoundInfo } from './CurrentTeam';
 import TeamList, { type Team } from './TeamList';
 
 // Supabase FK join inference — cast via as unknown as
@@ -26,6 +27,35 @@ type RawRegistrationJoin = {
 
 function one<T>(rel: T | T[] | null): T | null {
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
+}
+
+// Sort key for a schedule entry — the real instant for a timed entry,
+// midnight UTC of the authored calendar date for a date-only one (good
+// enough for ordering "which round is next"; event-time.ts's DST-aware
+// instant is reserved for entries that actually carry a time).
+function roundSortKey(date: string): number {
+  if (hasEventTime(date)) return eventInstant(date);
+  const [y, m, d] = date.split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+// The soonest not-yet-happened round on the schedule, or null if every round
+// is undated or already past — CurrentTeam simply omits the panel then
+// rather than showing a stale or empty one.
+function findNextRound(schedule: ScheduleRound[]): ScheduleRound | null {
+  const now = Date.now();
+  return (
+    schedule
+      .filter((r): r is ScheduleRound & { date: string } => r.date != null)
+      .map((r) => ({ round: r, key: roundSortKey(r.date) }))
+      .filter((r) => r.key >= now)
+      .sort((a, b) => a.key - b.key)[0]?.round ?? null
+  );
+}
+
+function toNextRoundInfo(round: ScheduleRound): NextRoundInfo {
+  const { date, time } = eventDateTimeParts(round.date, EVENT_SOURCE_TIMEZONE);
+  return { round: round.round, track: round.track, raceLength: round.raceLength, date, time };
 }
 
 export async function RegisterBody({
@@ -123,6 +153,11 @@ export async function RegisterBody({
   } = await supabase.auth.getUser();
 
   let userSection: ReactNode;
+  // Captured inside the branch below (only known once we've resolved a
+  // driver record) and read afterward by TeamList's "mine" row highlight —
+  // undefined for a signed-out viewer or one with no driver record, which
+  // simply never matches any entry-list row.
+  let currentDriverId: string | undefined;
 
   if (!user) {
     userSection = (
@@ -143,6 +178,7 @@ export async function RegisterBody({
       .select('id, display_name, division_id')
       .eq('user_id', user.id)
       .maybeSingle();
+    currentDriverId = driver?.id;
 
     // Divisions are a GT3 Team Series concept. A championship that doesn't
     // grade its entries (League in a Week and friends) has one grid, so an
@@ -219,12 +255,14 @@ export async function RegisterBody({
       );
 
       if (myTeam) {
+        const nextRound = findNextRound(champ.schedule);
         userSection = (
           <CurrentTeam
             teamId={myTeam.id}
             teamName={myTeam.team_name}
             car={myTeam.car}
             carModelId={myTeam.carModelId}
+            divisionId={myTeam.division_id}
             divisionName={myTeam.division_name}
             members={myTeam.members}
             currentDriverId={driver.id}
@@ -234,6 +272,7 @@ export async function RegisterBody({
             championshipKey={champ.registrationKey}
             season={champ.registrationSeason}
             allowedCars={champ.allowedCars}
+            nextRound={nextRound ? toNextRoundInfo(nextRound) : null}
           />
         );
       } else {
@@ -309,6 +348,7 @@ export async function RegisterBody({
           teams={teams}
           maxTeamSize={champ.maxTeamSize}
           showDivisions={champ.requiresDivision !== false}
+          currentDriverId={currentDriverId}
         />
       </div>
     </>
