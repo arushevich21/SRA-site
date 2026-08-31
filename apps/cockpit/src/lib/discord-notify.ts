@@ -60,7 +60,15 @@ export async function notifyDiscordProfileUpdated(
   discordId: string | number | null | undefined,
 ): Promise<void> {
   const url = process.env.DISCORD_INTEGRATION_WEBHOOK_URL;
-  if (!url) return; // integration not configured — nothing to do
+  if (!url) {
+    // Silent no-op here previously left zero trace in logs when this var was
+    // missing in an environment that should have it (e.g. Production) —
+    // indistinguishable from "the bot resynced and did nothing new". Warn so
+    // a stuck-nickname report is diagnosable from Vercel logs instead of
+    // requiring a guess-and-check of env var configuration.
+    console.warn('[discord-notify] skipped: DISCORD_INTEGRATION_WEBHOOK_URL not configured');
+    return;
+  }
 
   const id = String(discordId ?? '').trim();
   // Snowflakes only: the bot parses this out of the message content, so keep
