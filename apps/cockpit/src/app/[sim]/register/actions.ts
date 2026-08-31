@@ -100,6 +100,14 @@ export async function registerTeam(
   // that actually needs to be correct belongs in register_entry(), not here
   // (that's exactly the mistake this whole registration path is being
   // rebuilt to get away from).
+  //
+  // Division agreement is gated on requiresDivision, same as the teammate
+  // picker above (RegisterBody.tsx) and register_entry() itself (only raises
+  // DIVISION_MISMATCH `IF v_requires_division`). This check used to run
+  // unconditionally, which meant a division-less championship (LIAW,
+  // Endurance) rejected perfectly legal cross-division pairings client-side
+  // before register_entry() — which would have allowed them — ever ran.
+  const requiresDivision = champ.requiresDivision !== false;
   for (const teammateId of teammateIds) {
     if (teammateId === driver.id) {
       return { error: 'Cannot add yourself as a teammate' };
@@ -112,7 +120,7 @@ export async function registerTeam(
       .maybeSingle();
 
     if (!teammate) return { error: 'Selected teammate not found' };
-    if (teammate.division_id !== driver.division_id) {
+    if (requiresDivision && teammate.division_id !== driver.division_id) {
       return { error: 'All teammates must be in the same division as you' };
     }
   }
@@ -206,19 +214,8 @@ export async function leaveTeam(
     .maybeSingle();
   if (!driver) return;
 
-  // ── 3. Verify driver is on this team (prevents cross-team tampering) ──────
-  const { data: membership } = await adminClient
-    .from('team_members')
-    .select('team_id')
-    .eq('team_id', teamId)
-    .eq('driver_id', driver.id)
-    .maybeSingle();
-  if (!membership) return;
-
-  // The registrations row for this team+event — needed below to clean it up
-  // once it has no drivers left. Not every team has one yet (e.g. a teammate
-  // slot claimed via team_members before the event was ever registered for),
-  // so `registration` can be null.
+  // The registrations row for this team+event — needed for both the
+  // membership check below and the cleanup in step 5.
   const { data: registration } = await adminClient
     .from('registrations')
     .select('id')
@@ -226,9 +223,31 @@ export async function leaveTeam(
     .eq('championship_key', championshipKey)
     .eq('season', season)
     .maybeSingle();
+  if (!registration) return;
+
+  // ── 3. Verify driver is on this team (prevents cross-team tampering) ──────
+  // Was checking team_members here, which register_entry() has never
+  // actually written to — the migration meant to fold that write in
+  // (20260814f) is explicitly marked "PROPOSED — NOT RUN" in its own header,
+  // and schema.sql's live register_entry() confirms it: no INSERT INTO
+  // team_members anywhere in the function body. So team_members is empty for
+  // every real registrant, this check always missed, and the whole function
+  // no-op'd for everyone who clicked "Leave Team" — the bug looked like a
+  // ghost-registration cleanup issue but was actually never reaching the
+  // deletes at all. registration_drivers is what register_entry() actually
+  // writes, so check that instead.
+  const { data: membership } = await adminClient
+    .from('registration_drivers')
+    .select('driver_id')
+    .eq('registration_id', registration.id)
+    .eq('driver_id', driver.id)
+    .maybeSingle();
+  if (!membership) return;
 
   // ── 4. Two deletes, per the roster/entry split ─────────────────────────────
-  // team_members: remove from the persistent roster.
+  // team_members: best-effort — register_entry() doesn't actually populate
+  // this table today (see the membership check above), so this is normally a
+  // no-op, but harmless to run in case a handful of legacy rows exist.
   // registration_drivers: remove the ACTIVE claim for this specific
   // championship+season (a DELETE, not a status flag — a soft-delete would
   // leave the unique constraint permanently blocking re-registration; see
@@ -253,22 +272,19 @@ export async function leaveTeam(
   // the parent registrations row (no cascade in that direction) — left alone,
   // a solo (or now fully-vacated) entry keeps showing in the public entry
   // list with zero members, and keeps occupying a max_registrations slot
-  // forever. This is what made "Leave Team" look like it did nothing: the
-  // driver's own claim was gone, but their team's ghost entry stayed visible.
-  if (registration) {
-    const { count } = await adminClient
-      .from('registration_drivers')
-      .select('driver_id', { count: 'exact', head: true })
-      .eq('registration_id', registration.id);
-    if ((count ?? 0) === 0) {
-      await adminClient.from('registrations').delete().eq('id', registration.id);
-    }
+  // forever.
+  const { count } = await adminClient
+    .from('registration_drivers')
+    .select('driver_id', { count: 'exact', head: true })
+    .eq('registration_id', registration.id);
+  if ((count ?? 0) === 0) {
+    await adminClient.from('registrations').delete().eq('id', registration.id);
   }
 
   // Same idea for the team roster itself: once nobody is left on it anywhere
   // (not just this one event), release the name so a driver can register
   // again under it — e.g. re-entering LIAW with a different car — instead of
-  // hitting teams_unique_name_per_season against their own abandoned team.
+  // hitting teams_name_unique against their own abandoned team.
   const [{ count: memberCount }, { count: registrationCount }] = await Promise.all([
     adminClient
       .from('team_members')
@@ -284,4 +300,101 @@ export async function leaveTeam(
   }
 
   revalidatePath(`/${simSlug}/register`);
+}
+
+export type UpdateRegistrationState = { error: string } | { success: true } | null;
+
+// Lets an already-registered driver change their team's name and/or car
+// without leaving and re-registering — e.g. swapping cars mid-LIAW. Deliberately
+// separate from registerTeam()/register_entry(): this only ever touches an
+// EXISTING team's own registrations/teams rows, never creates a new claim, so
+// none of register_entry()'s claim/division/roster invariants are relevant
+// here — a plain update is enough.
+export async function updateRegistration(
+  _prevState: UpdateRegistrationState,
+  formData: FormData,
+): Promise<UpdateRegistrationState> {
+  // ── 1. Auth ───────────────────────────────────────────────────────────────
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'You must be signed in' };
+
+  // ── 2. Resolve championship (for allowedCars validation + registrationKey) ─
+  const champKey = formData.get('championship_key') as string | null;
+  const champ = (await getChampionships()).find((c) => c.registrationKey === champKey);
+  if (!champ?.registrationKey || !champ.registrationSeason || !champ.allowedCars) {
+    return { error: 'Championship configuration error — contact an admin' };
+  }
+  const simSlug = (formData.get('sim_slug') as string | null) ?? 'acc';
+  const teamId = formData.get('team_id') as string | null;
+  if (!teamId) return { error: 'Missing team' };
+
+  // ── 3. Driver + membership check — same as leaveTeam(): the driver must be
+  // one of this registration's actual claimed drivers (registration_drivers,
+  // not team_members — see leaveTeam()'s comment on why team_members can't
+  // be trusted for this).
+  const { data: driver } = await adminClient
+    .from('drivers')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!driver) return { error: 'Driver record not found — contact an admin' };
+
+  const { data: registration } = await adminClient
+    .from('registrations')
+    .select('id')
+    .eq('team_id', teamId)
+    .eq('championship_key', champ.registrationKey)
+    .eq('season', champ.registrationSeason)
+    .maybeSingle();
+  if (!registration) return { error: 'Registration not found' };
+
+  const { data: membership } = await adminClient
+    .from('registration_drivers')
+    .select('driver_id')
+    .eq('registration_id', registration.id)
+    .eq('driver_id', driver.id)
+    .maybeSingle();
+  if (!membership) return { error: "You're not on this team" };
+
+  // ── 4. Validate + apply the car change ─────────────────────────────────────
+  const car = formData.get('car') as string | null;
+  if (!car || !champ.allowedCars.includes(car)) {
+    return { error: 'Invalid car selection' };
+  }
+  const carModelId = ACC_CAR_MODEL_ID_BY_NAME[car];
+  if (carModelId === undefined) {
+    return {
+      error: `"${car}" isn't mapped to an ACC car ID yet — an admin needs to add it to ACC_CAR_MODEL_ID_BY_NAME before this car can be selected`,
+    };
+  }
+
+  const { error: carError } = await adminClient
+    .from('registrations')
+    .update({ car_model_id: carModelId })
+    .eq('id', registration.id);
+  if (carError) return { error: 'Failed to update car — contact an admin' };
+
+  // ── 5. Validate + apply the team name change ───────────────────────────────
+  const teamName = (formData.get('team_name') as string | null)?.trim();
+  if (!teamName) return { error: 'Team name is required' };
+
+  const { error: nameError } = await adminClient
+    .from('teams')
+    .update({ name: teamName })
+    .eq('id', teamId);
+  if (nameError) {
+    // teams_name_unique — a case-insensitive UNIQUE INDEX on
+    // (series, season, lower(name)); not tied to any one migration (predates
+    // the tracked migrations directory) but confirmed live in schema.sql.
+    if (nameError.code === '23505') {
+      return { error: 'A team with that name already exists — choose a different name' };
+    }
+    return { error: 'Failed to update team name — contact an admin' };
+  }
+
+  revalidatePath(`/${simSlug}/register`);
+  return { success: true };
 }

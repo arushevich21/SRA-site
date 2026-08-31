@@ -87,6 +87,7 @@ export async function RegisterBody({
       id: r.team_id,
       team_name: one(r.teams)?.name ?? 'Unnamed Team',
       car: (r.car_model_id != null ? accCarModelName(r.car_model_id) : null) ?? 'Unknown Car',
+      carModelId: r.car_model_id,
       division_id: r.division_id,
       // NULL division => ungraded entry; no name to fall back to.
       division_name:
@@ -223,13 +224,16 @@ export async function RegisterBody({
             teamId={myTeam.id}
             teamName={myTeam.team_name}
             car={myTeam.car}
+            carModelId={myTeam.carModelId}
             divisionName={myTeam.division_name}
             members={myTeam.members}
             currentDriverId={driver.id}
+            currentDriverName={driver.display_name}
             simSlug={simSlug}
             maxTeamSize={champ.maxTeamSize}
             championshipKey={champ.registrationKey}
             season={champ.registrationSeason}
+            allowedCars={champ.allowedCars}
           />
         );
       } else {
