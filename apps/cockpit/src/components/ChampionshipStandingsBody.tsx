@@ -1,5 +1,5 @@
 import { getStandingsKey, type ChampionshipContent } from '@/content/championships';
-import { getAcEvoStandings } from '@/lib/acevo-standings';
+import { getAcEvoStandings, getAccStandings } from '@/lib/emperor-standings';
 import { getRoundPoints } from '@/lib/acevo-hotlaps';
 import { readStandings } from '@/lib/standings-store';
 import { EmperorStandingsTable } from './EmperorStandingsTable';
@@ -54,7 +54,15 @@ async function LocalStandingsSection({ champ }: { champ: ChampionshipContent }) 
 }
 
 async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) {
-  const result = await getAcEvoStandings(champ.emperorChampionshipId!);
+  // ACC's emperor_championship_id lives on one of 7 ACCSM instances (there's
+  // no single well-known ACC Emperor host the way AC Evo has one) — see
+  // lib/emperor-standings.ts's getAccStandings for how that's resolved.
+  // Component name is legacy (predates ACC using this same section); not
+  // worth a rename churn on its own.
+  const result =
+    champ.game === 'AC Evo'
+      ? await getAcEvoStandings(champ.emperorChampionshipId!)
+      : await getAccStandings(champ.emperorChampionshipId!);
 
   if (!result.ok) {
     return (
