@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { CarIcon } from '@/components/CarIcon';
+import { Icon, type IconName } from '@cardog-icons/react';
+import { FallbackLogoImage } from '@/components/FallbackLogoImage';
 
 export type Member = {
   driver_id: string;
@@ -18,6 +19,12 @@ export type Team = {
   // via allowedCarNameForModelId(), which accCarModelName()'s display string
   // can't do (see that helper's comment). Not used for display.
   carModelId: number | null;
+  // Resolved server-side (RegisterBody, via accCarManufacturerIconName /
+  // accCarManufacturerLogoUrl) — same manufacturer icon/logo every other car
+  // display on the site uses. At most one is non-null; both null means
+  // neither exists, same as HotLapBoard's own fallback (no generic glyph).
+  manufacturerIconName: string | null;
+  manufacturerLogoUrl: string | null;
   // NULL on a championship that doesn't grade its entries — see
   // championships.requires_division.
   division_id: number | null;
@@ -236,7 +243,17 @@ function TeamRow({
 
       <td className="py-2.5 pr-3 align-middle">
         <span className="flex items-center gap-2 font-sans text-[13px] text-txt-3">
-          <CarIcon className="w-3.5 h-3.5 shrink-0" />
+          {team.manufacturerIconName ? (
+            <span className="relative w-4 h-4 shrink-0 flex items-center justify-center">
+              <Icon name={team.manufacturerIconName as IconName} size={16} />
+            </span>
+          ) : (
+            team.manufacturerLogoUrl && (
+              <span className="relative w-4 h-4 shrink-0">
+                <FallbackLogoImage src={team.manufacturerLogoUrl} alt={team.car} sizes="16px" />
+              </span>
+            )
+          )}
           {team.car}
         </span>
       </td>

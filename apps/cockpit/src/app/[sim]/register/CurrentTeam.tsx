@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState, useTransition } from 'react';
+import { Icon, type IconName } from '@cardog-icons/react';
 import { allowedCarNameForModelId } from '@/content/acc-car-model-map';
-import { CarIcon } from '@/components/CarIcon';
+import { FallbackLogoImage } from '@/components/FallbackLogoImage';
 import { leaveTeam, updateRegistration, type UpdateRegistrationState } from './actions';
 
 type Member = {
@@ -26,6 +27,8 @@ type Props = {
   teamName: string;
   car: string;
   carModelId: number | null;
+  manufacturerIconName: string | null;
+  manufacturerLogoUrl: string | null;
   divisionId: number | null;
   divisionName: string | null;
   members: Member[];
@@ -44,6 +47,8 @@ export default function CurrentTeam({
   teamName,
   car,
   carModelId,
+  manufacturerIconName,
+  manufacturerLogoUrl,
   divisionId,
   divisionName,
   members,
@@ -173,7 +178,17 @@ export default function CurrentTeam({
                   {teamName}
                 </p>
                 <p className="flex items-center gap-1.5 font-mono text-[12px] text-txt-3 mt-2">
-                  <CarIcon className="w-[15px] h-[15px] shrink-0" />
+                  {manufacturerIconName ? (
+                    <span className="relative w-4 h-4 shrink-0 flex items-center justify-center">
+                      <Icon name={manufacturerIconName as IconName} size={16} />
+                    </span>
+                  ) : (
+                    manufacturerLogoUrl && (
+                      <span className="relative w-4 h-4 shrink-0">
+                        <FallbackLogoImage src={manufacturerLogoUrl} alt={car} sizes="16px" />
+                      </span>
+                    )
+                  )}
                   {car}
                 </p>
                 {divisionName && (
