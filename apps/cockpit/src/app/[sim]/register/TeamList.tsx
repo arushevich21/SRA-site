@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CarIcon } from '@/components/CarIcon';
 
 export type Member = {
   driver_id: string;
@@ -34,10 +35,15 @@ export default function TeamList({
   // Drives whether the division tiles, tabs and per-row badges appear at all.
   // On a single-grid event they'd be four empty tiles and four empty tabs.
   showDivisions = true,
+  // Highlights the signed-in viewer's own team row, same idea as HotLapBoard's
+  // "My Laps" tint — undefined for a signed-out viewer, which simply never
+  // matches any row.
+  currentDriverId,
 }: {
   teams: Team[];
   maxTeamSize: number;
   showDivisions?: boolean;
+  currentDriverId?: string;
 }) {
   const [tab, setTab] = useState<Tab>('all');
 
@@ -82,46 +88,99 @@ export default function TeamList({
           ))}
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-line overflow-x-auto">
-        {((showDivisions
-          ? ['all', 1, 2, 3, 4, 'breakdown']
-          : ['all', 'breakdown']) as Tab[]).map((t) => (
-          <button
-            key={String(t)}
-            onClick={() => setTab(t)}
-            className={[
-              'font-mono text-[10px] tracking-[.2em] uppercase px-5 py-3 border-r border-line whitespace-nowrap transition-colors shrink-0',
-              tab === t ? 'bg-panel-2 text-txt' : 'text-txt-3 hover:text-txt',
-            ].join(' ')}
-          >
-            {t === 'all'
-              ? 'All Teams'
-              : t === 'breakdown'
-                ? 'Breakdown'
-                : `Div ${t}`}
-          </button>
-        ))}
+      {/* Filters — pill buttons + square division-badge buttons, same
+          language as HotLapBoard's filter row rather than an underline tab
+          strip, so this leaderboard-adjacent list reads consistently with
+          every other board on the site. */}
+      <div className="flex items-center gap-2 flex-wrap mb-5">
+        <button
+          onClick={() => setTab('all')}
+          className={[
+            'font-mono text-[13px] tracking-[.15em] uppercase px-3 py-1.5 border transition-colors',
+            tab === 'all'
+              ? 'border-gold text-gold'
+              : 'border-line/50 text-txt-3 hover:text-txt hover:border-line',
+          ].join(' ')}
+        >
+          All Teams
+        </button>
+        <button
+          onClick={() => setTab('breakdown')}
+          className={[
+            'font-mono text-[13px] tracking-[.15em] uppercase px-3 py-1.5 border transition-colors',
+            tab === 'breakdown'
+              ? 'border-gold text-gold'
+              : 'border-line/50 text-txt-3 hover:text-txt hover:border-line',
+          ].join(' ')}
+        >
+          Breakdown
+        </button>
+        {showDivisions &&
+          DIVISIONS.map((d) => (
+            <button
+              key={d}
+              type="button"
+              title={`Division ${d}`}
+              onClick={() => setTab((cur) => (cur === d ? 'all' : d))}
+              className={[
+                'flex items-center justify-center w-11 h-[30px] shrink-0 px-1.5 border transition-colors cursor-pointer',
+                tab === d
+                  ? 'border-gold bg-gold/[.14]'
+                  : 'border-line/50 bg-carbon hover:border-line hover:bg-carbon-2',
+              ].join(' ')}
+            >
+              {/* Tierless — this is a filter control, not a driver's own
+                  standing, so it uses the plain Division N badge, not a
+                  gold/silver variant. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/badges/Division ${d}.png`}
+                alt={`Division ${d}`}
+                className="w-full h-full object-contain"
+              />
+            </button>
+          ))}
       </div>
 
       {tab === 'breakdown' ? (
         <BreakdownTable teams={teams} showDivisions={showDivisions} />
+      ) : visibleTeams.length === 0 ? (
+        <div className="border border-line px-5 py-6">
+          <p className="font-mono text-[12px] text-txt-3">No teams registered yet.</p>
+        </div>
       ) : (
-        <div className="border border-line border-t-0">
-          {visibleTeams.length === 0 ? (
-            <p className="font-mono text-[12px] text-txt-3 px-5 py-6">
-              No teams registered yet.
-            </p>
-          ) : (
-            visibleTeams.map((team, i) => (
-              <TeamRow
-                key={team.id}
-                team={team}
-                maxTeamSize={maxTeamSize}
-                stripe={i % 2 === 1}
-              />
-            ))
-          )}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="border-b border-line">
+                <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3">
+                  Team
+                </th>
+                <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3">
+                  Car
+                </th>
+                {showDivisions && (
+                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3">
+                    Division
+                  </th>
+                )}
+                <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2">
+                  Drivers
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleTeams.map((team) => (
+                <TeamRow
+                  key={team.id}
+                  team={team}
+                  maxTeamSize={maxTeamSize}
+                  showDivisions={showDivisions}
+                  isMine={team.members.some((m) => m.driver_id === currentDriverId)}
+                />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
@@ -155,65 +214,69 @@ function StatBox({
 function TeamRow({
   team,
   maxTeamSize,
-  stripe,
+  showDivisions,
+  isMine,
 }: {
   team: Team;
   maxTeamSize: number;
-  stripe: boolean;
+  showDivisions: boolean;
+  isMine: boolean;
 }) {
   const spotsOpen = maxTeamSize - team.members.length;
   return (
-    <div
-      className={[
-        'flex items-center gap-4 px-5 py-3 border-b border-line/30 last:border-b-0 flex-wrap',
-        stripe ? 'bg-panel-2/20' : '',
-      ].join(' ')}
+    <tr
+      className="border-b border-line/30 last:border-b-0"
+      style={isMine ? { backgroundColor: 'color-mix(in srgb, var(--sim-accent) 12%, transparent)' } : undefined}
     >
-      {/* Team + car */}
-      <div className="w-[220px] shrink-0">
-        <p className="font-display font-bold text-[13px] uppercase text-txt leading-tight">
+      <td className="py-2.5 pr-3 align-middle">
+        <p className="font-display font-bold text-[15px] uppercase text-txt leading-tight">
           {team.team_name}
         </p>
-        <p className="font-mono text-[10px] text-txt-3 mt-0.5 leading-tight">
+      </td>
+
+      <td className="py-2.5 pr-3 align-middle">
+        <span className="flex items-center gap-2 font-sans text-[13px] text-txt-3">
+          <CarIcon className="w-3.5 h-3.5 shrink-0" />
           {team.car}
-        </p>
-      </div>
+        </span>
+      </td>
 
       {/* Division — omitted entirely on an ungraded championship rather than
-          left as an empty 80px gutter. */}
-      {team.division_name && (
-        <p className="font-mono text-[10px] text-txt-3/60 w-[80px] shrink-0">
-          {team.division_name}
-        </p>
+          rendering an empty column. */}
+      {showDivisions && (
+        <td className="py-2.5 pr-3 align-middle font-mono text-[13px] text-txt-3/75">
+          {team.division_name ?? '—'}
+        </td>
       )}
 
-      {/* Drivers */}
-      <div className="flex flex-wrap gap-4 flex-1">
-        {team.members.map((m) => (
-          <div key={m.driver_id} className="flex items-center gap-2">
-            <span className="font-mono text-[12px] text-txt-2">
-              {m.display_name ?? '—'}
+      <td className="py-2.5 align-middle">
+        <div className="flex flex-wrap gap-4">
+          {team.members.map((m) => (
+            <div key={m.driver_id} className="flex items-center gap-2">
+              {/* Badge art is per-division ("Division 3 Gold.png"), so there
+                  is no badge to show for an ungraded entry — division_id
+                  NULL would request /badges/Division null Gold.png. */}
+              {m.tier && team.division_id != null && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/badges/Division ${team.division_id} ${m.tier === 'gold' ? 'Gold' : 'Silver'}.png`}
+                  alt={`Div ${team.division_id} ${m.tier}`}
+                  className="h-6 w-auto"
+                />
+              )}
+              <span className="font-display font-bold text-[13px] uppercase text-txt">
+                {m.display_name ?? '—'}
+              </span>
+            </div>
+          ))}
+          {spotsOpen > 0 && (
+            <span className="font-mono text-[10px] text-txt-3/40 italic self-center">
+              {spotsOpen} open
             </span>
-            {/* Badge art is per-division ("Division 3 Gold.png"), so there is
-                no badge to show for an ungraded entry — division_id NULL would
-                request /badges/Division null Gold.png. */}
-            {m.tier && team.division_id != null && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={`/badges/Division ${team.division_id} ${m.tier === 'gold' ? 'Gold' : 'Silver'}.png`}
-                alt={`Div ${team.division_id} ${m.tier}`}
-                className="h-5 w-auto"
-              />
-            )}
-          </div>
-        ))}
-        {spotsOpen > 0 && (
-          <span className="font-mono text-[10px] text-txt-3/40 italic self-center">
-            {spotsOpen} open
-          </span>
-        )}
-      </div>
-    </div>
+          )}
+        </div>
+      </td>
+    </tr>
   );
 }
 
