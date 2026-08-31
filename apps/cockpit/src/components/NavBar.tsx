@@ -59,10 +59,16 @@ function tabNavItem(
   // Whether the parent label links to the tab index (see NavItem.clickParent).
   // The tab index then replaces the "All" head as the way to reach it.
   clickableParent = false,
+  // Keep rendering a dropdown even with exactly one championship, instead of
+  // collapsing to a plain link straight to it. Standings/Register want this
+  // so the affordance stays consistent (and already wired) as soon as a
+  // second championship opens, rather than the nav shape changing shape
+  // underneath users the moment that happens.
+  alwaysDropdown = false,
 ): NavItem {
   const href = `/${sim.slug}/${tab}`;
   if (champs.length === 0) return { label, href };
-  if (champs.length === 1) {
+  if (champs.length === 1 && !alwaysDropdown) {
     // A dropdown of one is redundant. If the parent isn't itself a link and
     // has no "all" head, point straight at the lone championship (Register);
     // otherwise fall back to the tab index (clickable parent still reaches it).
@@ -90,8 +96,13 @@ function tabNavItem(
 function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavItem[] {
   const champsForSim = championships.filter((c) => c.game === sim.game);
   const calendarChamps = champsForSim.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
+  // !teaserOnly gates BOTH sources now — it used to only guard the local
+  // (getStandingsKey) branch, so a teaser championship with an
+  // emperor_championship_id already set (e.g. GT3 Team Series S19, wired up
+  // ahead of actually going live) slipped into the dropdown as a second,
+  // stale entry alongside the one real active championship.
   const standingsChamps = champsForSim.filter(
-    (c) => c.emperorChampionshipId || (!c.teaserOnly && getStandingsKey(c)),
+    (c) => !c.teaserOnly && (c.emperorChampionshipId || getStandingsKey(c)),
   );
   const leaderboardChamps = champsForSim.filter((c) => c.emperorChampionshipId);
   // Only championships with registration currently OPEN belong in the Register
@@ -147,10 +158,13 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
     tabNavItem(sim, 'Calendar', 'calendar', calendarChamps, false, true),
     // Register always shows. With open championships it's a dropdown of them;
     // with none open it's a plain link to /[sim]/register, which renders the
-    // "coming soon — watch Discord" state.
-    tabNavItem(sim, 'Register', 'register', registerChamps, false),
+    // "coming soon — watch Discord" state. alwaysDropdown keeps the dropdown
+    // affordance even with a single open championship (today, just LIAW) so
+    // it doesn't collapse to a plain link and then change shape on users the
+    // moment a second one opens — same reasoning as Standings below.
+    tabNavItem(sim, 'Register', 'register', registerChamps, false, false, true),
     leaderboardItem,
-    tabNavItem(sim, 'Standings', 'standings', standingsChamps),
+    tabNavItem(sim, 'Standings', 'standings', standingsChamps, true, false, true),
   ];
 }
 

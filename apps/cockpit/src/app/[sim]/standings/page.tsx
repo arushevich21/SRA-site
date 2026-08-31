@@ -23,11 +23,14 @@ export default async function SimStandingsPage({
   if (!sim) notFound();
 
   // Teased championships (e.g. Endurance) stay "coming soon" here even if a
-  // standings key exists — only surface real data for non-teased series.
+  // standings key OR an emperor_championship_id exists — !teaserOnly gates
+  // both. It used to gate only the standings-key branch, so a teaser
+  // championship with emperor_championship_id already wired up ahead of
+  // going live (e.g. GT3 Team Series S19) could out-rank the real active
+  // one by sort_order and get shown here instead — same bug as the nav's
+  // Standings dropdown (see NavBar.tsx's buildSimNav).
   const champ = (await getChampionships()).find(
-    (c) =>
-      c.game === sim.game &&
-      (c.emperorChampionshipId || (!c.teaserOnly && getStandingsKey(c))),
+    (c) => c.game === sim.game && !c.teaserOnly && (c.emperorChampionshipId || getStandingsKey(c)),
   );
 
   return (
