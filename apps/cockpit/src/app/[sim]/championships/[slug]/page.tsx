@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import { getChampionships } from '@/lib/championships-store';
 import { RealChampionshipBlock } from '@/app/championships/RealChampionshipBlock';
+import { matchAccRoundsToResultEvents } from '@/lib/acc/race-results-store';
 
 export default async function ChampionshipDetailPage({
   params,
@@ -15,6 +16,18 @@ export default async function ChampionshipDetailPage({
   const content = (await getChampionships()).find((c) => c.game === sim.game && c.slug === slug);
   if (!content) notFound();
 
+  // AC Evo rounds already know their own results link via emperorRawTrackName
+  // (set per round in content); ACC has no such field, so its rounds are
+  // matched to acc_race_sessions events here instead — see
+  // matchAccRoundsToResultEvents for why this needs both a championship_id
+  // pass and a track+date fallback.
+  const roundsWithResults =
+    content.game !== 'AC Evo'
+      ? new Set(
+          (await matchAccRoundsToResultEvents(content.schedule, content.emperorChampionshipId ?? null)).keys(),
+        )
+      : undefined;
+
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       <span
@@ -27,7 +40,7 @@ export default async function ChampionshipDetailPage({
         {content.title}
       </h1>
 
-      <RealChampionshipBlock content={content} />
+      <RealChampionshipBlock content={content} roundsWithResults={roundsWithResults} />
     </section>
   );
 }

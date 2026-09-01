@@ -27,9 +27,15 @@ const STATUS_TEXT_CLASS: Record<string, string> = {
 export function RealChampionshipBlock({
   content,
   href,
+  roundsWithResults,
 }: {
   content: ChampionshipContent;
   href?: string;
+  // Round numbers with a matched acc_race_sessions event (see
+  // matchAccRoundsToResultEvents) — the ACC equivalent of a round having
+  // emperorRawTrackName set for AC Evo. Omitted entirely by a caller that
+  // hasn't computed it (safe: just means no ACC round shows as a link).
+  roundsWithResults?: Set<number>;
 }) {
   const status = getChampionshipStatus(content);
   const isActive = status === 'active-open' || status === 'active-closed';
@@ -143,10 +149,12 @@ export function RealChampionshipBlock({
             <div className="mt-5 border border-line/60 bg-carbon-2/40">
               {content.schedule.map((round, i) => {
                 const { time: timeStr } = formatScheduleDateTime(round.date);
+                const hasResults =
+                  Boolean(round.emperorRawTrackName) || (roundsWithResults?.has(round.round) ?? false);
                 const rowClassName = [
                   'flex items-center gap-4 px-4 py-[9px]',
                   i < content.schedule.length - 1 ? 'border-b border-line/40' : '',
-                  round.emperorRawTrackName && sim ? 'hover:bg-panel-2 transition-colors' : '',
+                  hasResults && sim ? 'hover:bg-panel-2 transition-colors' : '',
                 ].join(' ');
                 const rowContent = (
                   <>
@@ -172,10 +180,12 @@ export function RealChampionshipBlock({
                   </>
                 );
 
-                // Only rounds with a known Emperor track key have a results
-                // page to link to — other rounds (or sims without a live
-                // results source yet) stay as plain, non-interactive rows.
-                if (round.emperorRawTrackName && sim) {
+                // Only rounds with a known Emperor track key (AC Evo) or a
+                // matched acc_race_sessions event (ACC — see
+                // roundsWithResults) have a results page to link to — other
+                // rounds (or sims without a live results source yet) stay as
+                // plain, non-interactive rows.
+                if (hasResults && sim) {
                   return (
                     <Link
                       key={round.round}

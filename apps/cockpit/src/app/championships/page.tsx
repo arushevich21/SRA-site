@@ -1,5 +1,7 @@
 import pastSeasonsData from '../../content/seasons_clean.json';
 import { getChampionships } from '@/lib/championships-store';
+import { getAccRaceEvents, matchAccRoundsToResultEventsFrom } from '@/lib/acc/race-results-store';
+import type { ChampionshipContent } from '@/content/championships';
 import { DivisionGroup } from './division-group';
 import { RealChampionshipBlock } from './RealChampionshipBlock';
 import { SectionLabel } from './shared';
@@ -36,6 +38,21 @@ const divisionGroups = Object.entries(
 
 export default async function ChampionshipsPage() {
   const championships = await getChampionships();
+
+  // One acc_race_sessions fetch shared across every ACC championship on this
+  // page (spans all sims/games) — see matchAccRoundsToResultEventsFrom.
+  const accChamps = championships.filter((c) => c.game === 'ACC');
+  const accEvents = accChamps.length > 0 ? await getAccRaceEvents() : [];
+  const roundsWithResultsByChamp = new Map<string, Set<number>>(
+    accChamps.map((c) => [
+      c.slug,
+      new Set(
+        matchAccRoundsToResultEventsFrom(accEvents, c.schedule, c.emperorChampionshipId ?? null).keys(),
+      ),
+    ]),
+  );
+  const roundsWithResultsFor = (content: ChampionshipContent) => roundsWithResultsByChamp.get(content.slug);
+
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       {/* Page header */}
@@ -52,7 +69,11 @@ export default async function ChampionshipsPage() {
           <SectionLabel>Active Championships</SectionLabel>
           <div className="flex flex-col gap-6">
             {championships.filter((c) => c.schedule.length > 0 && !c.teaserOnly).map((content) => (
-              <RealChampionshipBlock key={content.standingsKey ?? content.simgridId ?? content.title} content={content} />
+              <RealChampionshipBlock
+                key={content.standingsKey ?? content.simgridId ?? content.title}
+                content={content}
+                roundsWithResults={roundsWithResultsFor(content)}
+              />
             ))}
           </div>
         </div>
@@ -64,7 +85,11 @@ export default async function ChampionshipsPage() {
           <SectionLabel muted>Upcoming Championships</SectionLabel>
           <div className="flex flex-col gap-6">
             {championships.filter((c) => c.schedule.length === 0 || c.teaserOnly).map((content) => (
-              <RealChampionshipBlock key={content.standingsKey ?? content.simgridId ?? content.title} content={content} />
+              <RealChampionshipBlock
+                key={content.standingsKey ?? content.simgridId ?? content.title}
+                content={content}
+                roundsWithResults={roundsWithResultsFor(content)}
+              />
             ))}
           </div>
         </div>

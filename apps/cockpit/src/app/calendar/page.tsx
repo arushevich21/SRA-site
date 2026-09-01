@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { formatScheduleDateTime } from '@/lib/schedule-format';
 import { getChampionships } from '@/lib/championships-store';
 import { SIMS } from '@/content/sims';
@@ -7,6 +8,8 @@ import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid'
 import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
 import { getCalendarEvents } from '@/lib/calendar-events-store';
+import { getAccRaceEvents, matchAccRoundsToResultEventsFrom } from '@/lib/acc/race-results-store';
+import type { ChampionshipContent } from '@/content/championships';
 
 export default async function CalendarPage() {
   const [championships, calendarEvents] = await Promise.all([
@@ -16,6 +19,30 @@ export default async function CalendarPage() {
   const teasedChamps = championships.filter((c) => c.teaserOnly);
   const realChamps = championships.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
 
+  // One acc_race_sessions fetch shared across every real ACC championship on
+  // this page (spans all sims) — see matchAccRoundsToResultEventsFrom.
+  const accChamps = realChamps.filter((c) => c.game !== 'AC Evo');
+  const accEvents = accChamps.length > 0 ? await getAccRaceEvents() : [];
+  const roundsWithResultsByChamp = new Map<string, Set<number>>(
+    accChamps.map((c) => [
+      c.slug,
+      new Set(
+        matchAccRoundsToResultEventsFrom(accEvents, c.schedule, c.emperorChampionshipId ?? null).keys(),
+      ),
+    ]),
+  );
+  const hasResults = (champ: ChampionshipContent, round: ChampionshipContent['schedule'][number]) =>
+    Boolean(round.emperorRawTrackName) || (roundsWithResultsByChamp.get(champ.slug)?.has(round.round) ?? false);
+  const resultsHref = (
+    champ: ChampionshipContent,
+    round: ChampionshipContent['schedule'][number],
+    sim: (typeof SIMS)[number] | undefined,
+  ) => {
+    if (!sim) return '/calendar';
+    const champHref = `/${sim.slug}/championships/${champ.slug}`;
+    return hasResults(champ, round) ? `${champHref}/results/${round.round}` : champHref;
+  };
+
   const gridEvents: CalendarGridEvent[] = realChamps.flatMap((champ) => {
     const sim = SIMS.find((s) => s.game === champ.game);
     return champ.schedule
@@ -23,7 +50,7 @@ export default async function CalendarPage() {
       .map((round) => ({
         iso: round.date!,
         title: `${champ.game} · R${round.round} · ${round.track}`,
-        href: sim ? `/${sim.slug}/championships/${champ.slug}` : '/calendar',
+        href: resultsHref(champ, round, sim),
         color: sim?.accentColor,
       }));
   });
@@ -94,7 +121,9 @@ export default async function CalendarPage() {
         </div>
       )}
 
-      {realChamps.map((champ) => (
+      {realChamps.map((champ) => {
+        const sim = SIMS.find((s) => s.game === champ.game);
+        return (
         <div key={champ.standingsKey ?? champ.simgridId ?? champ.title} className="mb-14">
           <div className="flex items-center gap-4 mb-6">
             {champ.logo && (
@@ -135,16 +164,14 @@ export default async function CalendarPage() {
           <div className="border border-line bg-panel">
             {champ.schedule.map((round, i) => {
               const { time: timeStr } = formatScheduleDateTime(round.date);
-              return (
-                <div
-                  key={round.round}
-                  className={[
-                    'flex items-center gap-5 px-6 py-[11px]',
-                    i < champ.schedule.length - 1
-                      ? 'border-b border-line/50'
-                      : '',
-                  ].join(' ')}
-                >
+              const rowHasResults = hasResults(champ, round);
+              const rowClassName = [
+                'flex items-center gap-5 px-6 py-[11px]',
+                i < champ.schedule.length - 1 ? 'border-b border-line/50' : '',
+                rowHasResults ? 'hover:bg-panel-2 transition-colors' : '',
+              ].join(' ');
+              const rowContent = (
+                <>
                   <span className="font-mono text-[15px] tracking-[.2em] uppercase text-gold w-10 shrink-0">
                     R{round.round}
                   </span>
@@ -167,12 +194,23 @@ export default async function CalendarPage() {
                   <span className="font-mono text-[15px] tracking-[.1em] uppercase text-txt-3/70 shrink-0 w-24 text-right">
                     {round.raceLength}
                   </span>
+                </>
+              );
+
+              return rowHasResults ? (
+                <Link key={round.round} href={resultsHref(champ, round, sim)} className={rowClassName}>
+                  {rowContent}
+                </Link>
+              ) : (
+                <div key={round.round} className={rowClassName}>
+                  {rowContent}
                 </div>
               );
             })}
           </div>
         </div>
-      ))}
+        );
+      })}
     </section>
   );
 }

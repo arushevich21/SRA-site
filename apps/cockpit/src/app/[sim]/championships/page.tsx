@@ -4,6 +4,8 @@ import { getChampionships } from '@/lib/championships-store';
 import { RealChampionshipBlock } from '@/app/championships/RealChampionshipBlock';
 import { SectionLabel } from '@/app/championships/shared';
 import { GameLabel } from '@/components/GameLabel';
+import { getAccRaceEvents, matchAccRoundsToResultEventsFrom } from '@/lib/acc/race-results-store';
+import type { ChampionshipContent } from '@/content/championships';
 
 export default async function SimChampionshipsPage({
   params,
@@ -15,6 +17,21 @@ export default async function SimChampionshipsPage({
   if (!sim) notFound();
 
   const champs = (await getChampionships()).filter((c) => c.game === sim.game);
+
+  // One acc_race_sessions fetch shared across every championship on this
+  // page, not one per championship — see matchAccRoundsToResultEventsFrom.
+  const accEvents = sim.game !== 'AC Evo' ? await getAccRaceEvents() : [];
+  const roundsWithResultsByChamp = new Map<string, Set<number>>(
+    champs
+      .filter((c) => c.game !== 'AC Evo')
+      .map((c) => [
+        c.slug,
+        new Set(
+          matchAccRoundsToResultEventsFrom(accEvents, c.schedule, c.emperorChampionshipId ?? null).keys(),
+        ),
+      ]),
+  );
+  const roundsWithResultsFor = (content: ChampionshipContent) => roundsWithResultsByChamp.get(content.slug);
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -39,6 +56,7 @@ export default async function SimChampionshipsPage({
                     key={content.slug}
                     content={content}
                     href={`/${slug}/championships/${content.slug}`}
+                    roundsWithResults={roundsWithResultsFor(content)}
                   />
                 ))}
               </div>
@@ -54,6 +72,7 @@ export default async function SimChampionshipsPage({
                     key={content.slug}
                     content={content}
                     href={`/${slug}/championships/${content.slug}`}
+                    roundsWithResults={roundsWithResultsFor(content)}
                   />
                 ))}
               </div>
