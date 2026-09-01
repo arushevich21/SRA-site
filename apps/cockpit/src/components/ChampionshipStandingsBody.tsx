@@ -1,11 +1,18 @@
-import { accCarModelName } from '@sra/domain';
-import type { EmperorChampionshipStandings } from '@sra/shared-types';
+import { accCarModelName, accCarModelIdByName } from '@sra/domain';
+import type { EmperorDriverStanding } from '@sra/shared-types';
 import { getStandingsKey, type ChampionshipContent } from '@/content/championships';
 import { getAcEvoStandings, getAccStandings } from '@/lib/emperor-standings';
 import { getRoundPoints } from '@/lib/acevo-hotlaps';
 import { readStandings } from '@/lib/standings-store';
 import { supabase as adminClient } from '@/lib/supabase';
-import { EmperorStandingsTable } from './EmperorStandingsTable';
+import { resolveAccCarLogo } from '@/lib/acc/manufacturer-logo';
+import { getDriverInfoBySteamIds, driverInfoFor } from '@/lib/driver-lookup';
+import { stripSteamIdPrefix } from '@/lib/steam-id';
+import {
+  EmperorStandingsTable,
+  type EnrichedChampionshipStandings,
+  type EnrichedDriverStanding,
+} from './EmperorStandingsTable';
 import { ClassStandingsTabs } from './ClassStandingsTabs';
 import { AcEvoRaceResultsTabs } from './AcEvoRaceResultsTabs';
 
@@ -78,7 +85,7 @@ async function getEntryListAsZeroStandings(
   championshipKey: string,
   season: string,
   classTag: string,
-): Promise<EmperorChampionshipStandings | null> {
+): Promise<EnrichedChampionshipStandings | null> {
   const { data } = await adminClient
     .from('registrations')
     .select('car_model_id, registration_drivers(driver_id, drivers(display_name, steam_id))')
@@ -86,34 +93,81 @@ async function getEntryListAsZeroStandings(
     .eq('season', season)
     .eq('status', 'confirmed');
 
-  const entries = ((data ?? []) as unknown as RawEntryJoin[])
-    .flatMap((r) =>
-      (r.registration_drivers ?? []).map((rd) => ({
-        driverName: rd.drivers?.display_name ?? 'Unknown Driver',
-        // Falls back to the driver's uuid on an unlinked/unverified Steam
-        // account — this table only uses it as a React key and isn't
-        // matched against anything, unlike the public leaderboards.
-        steamId: rd.drivers?.steam_id ?? rd.driver_id,
-        carModel: r.car_model_id != null ? accCarModelName(r.car_model_id) : null,
-      })),
-    )
-    .sort((a, b) => a.driverName.localeCompare(b.driverName));
+  const rawEntries = ((data ?? []) as unknown as RawEntryJoin[]).flatMap((r) =>
+    (r.registration_drivers ?? []).map((rd) => ({
+      driverName: rd.drivers?.display_name ?? 'Unknown Driver',
+      // Falls back to the driver's uuid on an unlinked/unverified Steam
+      // account — used here only as a React key and a driver-info lookup
+      // key that will simply miss, not matched against anything external
+      // the way the public leaderboards match against Emperor/bot data.
+      steamId: rd.drivers?.steam_id ?? rd.driver_id,
+      carModelId: r.car_model_id,
+    })),
+  );
 
-  if (entries.length === 0) return null;
+  if (rawEntries.length === 0) return null;
 
-  return {
-    driverStandings: {
-      [classTag]: entries.map((e, i) => ({
-        position: i + 1,
+  // car_model_id is already numeric here (straight from registrations, not
+  // Emperor's reported name string), so this skips accCarModelIdByName
+  // entirely — same manufacturer resolution as the register page's entry
+  // list, division/tier badge same as HotLapBoard/TeamList.
+  const driverInfoMap = await getDriverInfoBySteamIds(rawEntries.map((e) => e.steamId));
+  const entries: EnrichedDriverStanding[] = rawEntries
+    .map((e) => {
+      const info = driverInfoFor(driverInfoMap, e.steamId);
+      return {
         driverName: e.driverName,
         steamId: e.steamId,
-        carModel: e.carModel,
+        carModel: e.carModelId != null ? accCarModelName(e.carModelId) : null,
         points: 0,
         pointsPenalty: 0,
-      })),
-    },
+        ...resolveAccCarLogo(e.carModelId),
+        isSralien: info.isSralien,
+        division: info.division,
+        tier: info.tier,
+      };
+    })
+    .sort((a, b) => a.driverName.localeCompare(b.driverName))
+    .map((e, i) => ({ ...e, position: i + 1 }));
+
+  return {
+    driverStandings: { [classTag]: entries },
     teamStandings: {},
   };
+}
+
+// Enriches Emperor's raw driverStandings (car names as plain strings, no
+// driver identity beyond steamId) with the same manufacturer icon/logo and
+// division/tier/SRAlien badge every other ACC board on the site shows —
+// resolved here (ACC standings only; AC Evo keeps its plain rendering, see
+// EmperorStandingsTable's `enriched` check) since Emperor itself carries
+// neither. Emperor's DriverGUID is 'S'-prefixed like every other ACC data
+// source (acc_hotlap_leaderboard.player_id, etc.) — stripped only for the
+// drivers-table lookup key, never for the steamId kept on the entry itself
+// (that stays whatever format rounds/getRoundPoints already key by).
+async function enrichAccDriverStandings(
+  driverStandings: Record<string, EmperorDriverStanding[]>,
+): Promise<Record<string, EnrichedDriverStanding[]>> {
+  const allBareSteamIds = Object.values(driverStandings).flatMap((s) =>
+    s.map((e) => stripSteamIdPrefix(e.steamId)),
+  );
+  const driverInfoMap = await getDriverInfoBySteamIds(allBareSteamIds);
+
+  const enriched: Record<string, EnrichedDriverStanding[]> = {};
+  for (const [className, standings] of Object.entries(driverStandings)) {
+    enriched[className] = standings.map((entry) => {
+      const carModelId = accCarModelIdByName(entry.carModel);
+      const info = driverInfoFor(driverInfoMap, stripSteamIdPrefix(entry.steamId));
+      return {
+        ...entry,
+        ...resolveAccCarLogo(carModelId),
+        isSralien: info.isSralien,
+        division: info.division,
+        tier: info.tier,
+      };
+    });
+  }
+  return enriched;
 }
 
 async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) {
@@ -168,17 +222,28 @@ async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) 
   }
 
   const roundsWithTrack = champ.schedule.filter((r) => r.emperorRawTrackName);
-  const rounds = await Promise.all(
-    roundsWithTrack.map(async (r) => ({
-      round: r.round,
-      track: r.track,
-      points: await getRoundPoints(r.emperorRawTrackName!, r.emperorTrack),
-    })),
-  );
+  const [rounds, enrichedDriverStandings] = await Promise.all([
+    Promise.all(
+      roundsWithTrack.map(async (r) => ({
+        round: r.round,
+        track: r.track,
+        points: await getRoundPoints(r.emperorRawTrackName!, r.emperorTrack),
+      })),
+    ),
+    // Enrichment (manufacturer icon, division/tier badge) is ACC-only —
+    // Emperor's AC Evo data keeps rendering exactly as before.
+    champ.game === 'AC Evo'
+      ? Promise.resolve(result.data.driverStandings as Record<string, EnrichedDriverStanding[]>)
+      : enrichAccDriverStandings(result.data.driverStandings),
+  ]);
+  const enrichedData: EnrichedChampionshipStandings = {
+    driverStandings: enrichedDriverStandings,
+    teamStandings: result.data.teamStandings,
+  };
 
   return (
     <div>
-      <EmperorStandingsTable data={result.data} rounds={rounds} />
+      <EmperorStandingsTable data={enrichedData} rounds={rounds} />
       {roundsWithTrack.length > 0 && (
         <AcEvoRaceResultsTabs
           rounds={roundsWithTrack.map((r) => ({

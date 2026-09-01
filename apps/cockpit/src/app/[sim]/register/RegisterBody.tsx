@@ -1,12 +1,12 @@
 import { type ReactNode } from 'react';
 import Link from 'next/link';
-import { accCarManufacturerIconName, accCarModelName } from '@sra/domain';
+import { accCarModelName } from '@sra/domain';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabase as adminClient } from '@/lib/supabase';
 import type { ChampionshipContent, ScheduleRound } from '@/content/championships';
 import type { SimConfig } from '@/content/sims';
 import { eventInstant, eventDateTimeParts, hasEventTime, EVENT_SOURCE_TIMEZONE } from '@/lib/event-time';
-import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
+import { resolveAccCarLogo } from '@/lib/acc/manufacturer-logo';
 import RegisterForm from './RegisterForm';
 import CurrentTeam, { type NextRoundInfo } from './CurrentTeam';
 import TeamList, { type Team } from './TeamList';
@@ -59,24 +59,6 @@ function toNextRoundInfo(round: ScheduleRound): NextRoundInfo {
   return { round: round.round, track: round.track, raceLength: round.raceLength, date, time };
 }
 
-// Manufacturer icon/logo for a car, same resolution every other car display
-// on the site uses (HotLapBoard, TrackHeader, jagoff's board): a
-// @cardog-icons/react icon name where one exists, else our own uploaded SVG
-// logo where the manufacturer has one, else neither — never a generic
-// placeholder glyph. Resolved once here (a server component) and passed
-// down as plain data, since Icon/FallbackLogoImage live in client
-// components (TeamList, CurrentTeam).
-function resolveCarLogo(carModelId: number | null): {
-  manufacturerIconName: string | null;
-  manufacturerLogoUrl: string | null;
-} {
-  if (carModelId == null) return { manufacturerIconName: null, manufacturerLogoUrl: null };
-  const manufacturerIconName = accCarManufacturerIconName(carModelId);
-  return {
-    manufacturerIconName,
-    manufacturerLogoUrl: !manufacturerIconName ? accCarManufacturerLogoUrl(carModelId) : null,
-  };
-}
 
 export async function RegisterBody({
   champ,
@@ -138,7 +120,7 @@ export async function RegisterBody({
       team_name: one(r.teams)?.name ?? 'Unnamed Team',
       car: (r.car_model_id != null ? accCarModelName(r.car_model_id) : null) ?? 'Unknown Car',
       carModelId: r.car_model_id,
-      ...resolveCarLogo(r.car_model_id),
+      ...resolveAccCarLogo(r.car_model_id),
       division_id: r.division_id,
       // NULL division => ungraded entry; no name to fall back to.
       division_name:

@@ -1,4 +1,4 @@
-import { ACC_CAR_MANUFACTURER_CDN_SLUGS } from '@sra/domain';
+import { ACC_CAR_MANUFACTURER_CDN_SLUGS, accCarManufacturerIconName } from '@sra/domain';
 
 // Public URL for a manufacturer's uploaded logo in the manufacturer-logos
 // Supabase Storage bucket — our own hosting, since the old site's CDN (where
@@ -18,4 +18,23 @@ export function accCarManufacturerLogoUrl(carModel: number): string | null {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!base) return null;
   return `${base}/storage/v1/object/public/manufacturer-logos/${slug}.svg`;
+}
+
+export type ResolvedCarLogo = {
+  manufacturerIconName: string | null;
+  manufacturerLogoUrl: string | null;
+};
+
+// Manufacturer icon/logo for a car — the icon where @cardog-icons/react has
+// one, else our own uploaded SVG logo, else neither (never a generic
+// placeholder). One resolution used everywhere a car appears with an icon
+// next to it: the register page's entry list/registered-team card
+// (RegisterBody.tsx) and the ACC standings table (ChampionshipStandingsBody.tsx).
+export function resolveAccCarLogo(carModelId: number | null): ResolvedCarLogo {
+  if (carModelId == null) return { manufacturerIconName: null, manufacturerLogoUrl: null };
+  const manufacturerIconName = accCarManufacturerIconName(carModelId);
+  return {
+    manufacturerIconName,
+    manufacturerLogoUrl: !manufacturerIconName ? accCarManufacturerLogoUrl(carModelId) : null,
+  };
 }

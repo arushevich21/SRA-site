@@ -53,6 +53,7 @@ export {
   ACC_CAR_MANUFACTURER_ICON_NAMES,
   ACC_CAR_MANUFACTURER_CDN_SLUGS,
   accCarModelName,
+  accCarModelIdByName,
   accCupCategoryName,
   accCarClassName,
   accCarManufacturerIconName,

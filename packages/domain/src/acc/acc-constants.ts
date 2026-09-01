@@ -212,6 +212,35 @@ export function accCarModelName(carModel: number): string | null {
   return ACC_CAR_MODEL_NAMES[carModel] ?? null;
 }
 
+// Reverse of ACC_CAR_MODEL_NAMES, keyed by a normalized form of the name
+// (lowercased, diacritics stripped, non-alphanumerics removed) — needed
+// because Emperor's championship-standings endpoint reports CarModel as a
+// plain string, not the numeric id every other ACC data source in this repo
+// carries (raw results, registrations.car_model_id). ACCSM's own car name
+// strings are expected to trace back to the same source (ACC's internal car
+// list) as this table, but haven't been confirmed byte-for-byte against a
+// populated standings response — normalizing absorbs the most likely drift
+// (accents, punctuation, casing) without guessing at a name that doesn't
+// match at all. Returns null on no match rather than a wrong guess; callers
+// should render the car name text with no icon in that case, same as an
+// unmapped numeric id.
+const NORMALIZED_NAME_TO_MODEL_ID: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.entries(ACC_CAR_MODEL_NAMES).map(([id, name]) => [normalizeCarName(name), Number(id)]),
+);
+
+function normalizeCarName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip diacritics (e.g. "Huracán" -> "Huracan")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+export function accCarModelIdByName(carModelName: string | null): number | null {
+  if (!carModelName) return null;
+  return NORMALIZED_NAME_TO_MODEL_ID[normalizeCarName(carModelName)] ?? null;
+}
+
 export function accCupCategoryName(cupCategory: number): string | null {
   return ACC_CUP_CATEGORY_NAMES[cupCategory] ?? null;
 }

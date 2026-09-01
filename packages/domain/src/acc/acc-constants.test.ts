@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   accCarModelName,
+  accCarModelIdByName,
   accCupCategoryName,
   accCarClassName,
   ACC_CAR_MODEL_NAMES,
@@ -24,6 +25,28 @@ describe('accCarModelName', () => {
     // (36 used to be this case until Ford Mustang GT3 was confirmed and added.)
     expect(accCarModelName(37)).toBeNull();
     expect(accCarModelName(9999)).toBeNull();
+  });
+});
+
+describe('accCarModelIdByName', () => {
+  it('round-trips every table entry through accCarModelName', () => {
+    for (const [id, name] of Object.entries(ACC_CAR_MODEL_NAMES)) {
+      expect(accCarModelIdByName(name)).toBe(Number(id));
+    }
+  });
+
+  it('normalizes case, diacritics, and punctuation the way Emperor is expected to vary them', () => {
+    // Real table entry is "Lamborghini Huracan Evo2" (id 33) — no accent — but
+    // Emperor (or any other reporter) echoing ACC's own display string is
+    // just as likely to carry the accented "Huracán".
+    expect(accCarModelIdByName('lamborghini huracán evo2')).toBe(33);
+    expect(accCarModelIdByName('BMW-M4-GT3')).toBe(30); // hyphens instead of spaces
+    expect(accCarModelIdByName('  Porsche 992 GT3 R  ')).toBe(34); // stray whitespace
+  });
+
+  it('returns null for null input and for a name not in the table', () => {
+    expect(accCarModelIdByName(null)).toBeNull();
+    expect(accCarModelIdByName('Some Car Nobody Has Heard Of')).toBeNull();
   });
 });
 
