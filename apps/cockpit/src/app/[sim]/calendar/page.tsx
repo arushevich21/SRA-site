@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import { formatScheduleDateTime } from '@/lib/schedule-format';
@@ -9,6 +10,8 @@ import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
 import { AccServerStatus } from '@/components/AccServerStatus';
 import { getCalendarEvents } from '@/lib/calendar-events-store';
+import { getAccRaceEvents, matchAccRoundsToResultEventsFrom } from '@/lib/acc/race-results-store';
+import type { ChampionshipContent } from '@/content/championships';
 
 export default async function SimCalendarPage({
   params,
@@ -30,13 +33,34 @@ export default async function SimCalendarPage({
     (c) => c.game === sim.game && c.schedule.length > 0 && !c.teaserOnly,
   );
 
+  // One acc_race_sessions fetch shared across every real championship on
+  // this page — see matchAccRoundsToResultEventsFrom. Same ACC-only
+  // matching as [slug]/page.tsx's roundsWithResults.
+  const accEvents = sim.game !== 'AC Evo' ? await getAccRaceEvents() : [];
+  const roundsWithResultsByChamp = new Map<string, Set<number>>(
+    realChamps
+      .filter((c) => c.game !== 'AC Evo')
+      .map((c) => [
+        c.slug,
+        new Set(
+          matchAccRoundsToResultEventsFrom(accEvents, c.schedule, c.emperorChampionshipId ?? null).keys(),
+        ),
+      ]),
+  );
+  const hasResults = (champ: ChampionshipContent, round: ChampionshipContent['schedule'][number]) =>
+    Boolean(round.emperorRawTrackName) || (roundsWithResultsByChamp.get(champ.slug)?.has(round.round) ?? false);
+  const resultsHref = (champ: ChampionshipContent, round: ChampionshipContent['schedule'][number]) => {
+    const champHref = `/${slug}/championships/${champ.slug}`;
+    return hasResults(champ, round) ? `${champHref}/results/${round.round}` : champHref;
+  };
+
   const gridEvents: CalendarGridEvent[] = realChamps.flatMap((champ) =>
     champ.schedule
       .filter((round) => round.date)
       .map((round) => ({
         iso: round.date!,
         title: `R${round.round} · ${round.track}`,
-        href: `/${slug}/championships/${champ.slug}`,
+        href: resultsHref(champ, round),
         color: sim.accentColor,
       })),
   );
@@ -138,16 +162,14 @@ export default async function SimCalendarPage({
             <div className="border border-line bg-panel">
               {champ.schedule.map((round, i) => {
                 const { time: timeStr } = formatScheduleDateTime(round.date);
-                return (
-                  <div
-                    key={round.round}
-                    className={[
-                      'flex items-center gap-5 px-6 py-[11px]',
-                      i < champ.schedule.length - 1
-                        ? 'border-b border-line/50'
-                        : '',
-                    ].join(' ')}
-                  >
+                const rowHasResults = hasResults(champ, round);
+                const rowClassName = [
+                  'flex items-center gap-5 px-6 py-[11px]',
+                  i < champ.schedule.length - 1 ? 'border-b border-line/50' : '',
+                  rowHasResults ? 'hover:bg-panel-2 transition-colors' : '',
+                ].join(' ');
+                const rowContent = (
+                  <>
                     <span className="font-mono text-[15px] tracking-[.2em] uppercase text-gold w-10 shrink-0">
                       R{round.round}
                     </span>
@@ -170,6 +192,16 @@ export default async function SimCalendarPage({
                     <span className="font-mono text-[15px] tracking-[.1em] uppercase text-txt-3/70 shrink-0 w-24 text-right">
                       {round.raceLength}
                     </span>
+                  </>
+                );
+
+                return rowHasResults ? (
+                  <Link key={round.round} href={resultsHref(champ, round)} className={rowClassName}>
+                    {rowContent}
+                  </Link>
+                ) : (
+                  <div key={round.round} className={rowClassName}>
+                    {rowContent}
                   </div>
                 );
               })}

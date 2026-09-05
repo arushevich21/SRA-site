@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import { getChampionships } from '@/lib/championships-store';
 import { AcEvoResultsTabs } from '@/components/AcEvoResultsTabs';
+import { ResultsTabs } from '@/components/ResultsTabs';
+import { getAccRaceEventSessions, matchAccRoundsToResultEvents } from '@/lib/acc/race-results-store';
 
 type PageProps = {
   params: Promise<{ sim: string; slug: string; round: string }>;
@@ -18,9 +20,24 @@ export default async function ChampionshipRoundResultsPage({ params }: PageProps
 
   const roundNumber = Number(roundParam);
   const round = content.schedule.find((r) => r.round === roundNumber);
-  // Only rounds with a known Emperor track key can be looked up on Emperor's
-  // results API — same gate the standings page's round tabs already use.
-  if (!round || !round.emperorRawTrackName) notFound();
+  if (!round) notFound();
+
+  // AC Evo looks up Emperor's results API directly by the round's own
+  // emperorRawTrackName field (content-authored). ACC has no such field —
+  // its round is matched to an acc_race_sessions event instead (see
+  // matchAccRoundsToResultEvents for why that needs both a championship_id
+  // pass and a track+date fallback, and RealChampionshipBlock's
+  // roundsWithResults for the same match used to decide whether this round's
+  // card was even shown as a link).
+  const accEventKey =
+    content.game !== 'AC Evo'
+      ? (await matchAccRoundsToResultEvents(content.schedule, content.emperorChampionshipId ?? null)).get(
+          round.round,
+        )
+      : undefined;
+  const accSessions = accEventKey ? await getAccRaceEventSessions(accEventKey) : null;
+
+  if (!round.emperorRawTrackName && !accSessions) notFound();
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -50,7 +67,7 @@ export default async function ChampionshipRoundResultsPage({ params }: PageProps
         </p>
       )}
 
-      <AcEvoResultsTabs trackKey={round.emperorRawTrackName} />
+      {accSessions ? <ResultsTabs sessions={accSessions} /> : <AcEvoResultsTabs trackKey={round.emperorRawTrackName!} />}
     </section>
   );
 }
