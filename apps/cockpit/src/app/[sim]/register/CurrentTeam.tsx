@@ -6,12 +6,15 @@ import { useActionState, useEffect, useState, useTransition } from 'react';
 import { Icon, type IconName } from '@cardog-icons/react';
 import { allowedCarNameForModelId } from '@/content/acc-car-model-map';
 import { FallbackLogoImage } from '@/components/FallbackLogoImage';
+import { DriverTierBadge } from '@/components/DriverTierBadge';
+import { getDriverTierBadge } from '@/lib/driver-tier-badge';
 import { leaveTeam, updateRegistration, type UpdateRegistrationState } from './actions';
 
 type Member = {
   driver_id: string;
   display_name: string | null;
   tier: 'gold' | 'silver' | null;
+  is_sralien: boolean;
 };
 
 export type NextRoundInfo = {
@@ -76,11 +79,8 @@ export default function CurrentTeam({
   // The signed-in driver's own division/tier crest — null on an ungraded
   // championship (divisionId null) or if their own member row somehow
   // carries no tier yet, same "no placeholder badge" rule TeamList follows.
-  const myTier = members.find((m) => m.driver_id === currentDriverId)?.tier ?? null;
-  const crestSrc =
-    divisionId != null && myTier != null
-      ? `/badges/Division ${divisionId} ${myTier === 'gold' ? 'Gold' : 'Silver'}.png`
-      : null;
+  const me = members.find((m) => m.driver_id === currentDriverId);
+  const myCrest = me ? getDriverTierBadge({ isSralien: me.is_sralien, division: divisionId, tier: me.tier }) : null;
 
   function handleLeave() {
     startTransition(async () => {
@@ -201,11 +201,11 @@ export default function CurrentTeam({
                   Change car / team name
                 </button>
               </div>
-              {crestSrc && (
+              {myCrest && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={crestSrc}
-                  alt={`${divisionName ?? `Division ${divisionId}`} ${myTier}`}
+                  src={myCrest.src}
+                  alt={myCrest.label}
                   className="w-[76px] h-[55px] shrink-0 object-contain"
                 />
               )}
@@ -223,16 +223,7 @@ export default function CurrentTeam({
               key={member.driver_id}
               className="flex items-center gap-3 px-5 py-3 border-b border-line/30 last:border-b-0"
             >
-              {/* Badge art is per-division ("Division 3 Gold.png"), so there
-                  is no badge to show on an ungraded championship. */}
-              {member.tier && divisionId != null && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`/badges/Division ${divisionId} ${member.tier === 'gold' ? 'Gold' : 'Silver'}.png`}
-                  alt={`Div ${divisionId} ${member.tier}`}
-                  className="h-6 w-auto"
-                />
-              )}
+              <DriverTierBadge isSralien={member.is_sralien} division={divisionId} tier={member.tier} />
               <span className="font-mono text-[13px] text-txt flex-1">
                 {member.display_name ?? '—'}
                 {member.driver_id === currentDriverId && (

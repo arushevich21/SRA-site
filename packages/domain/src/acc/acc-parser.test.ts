@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseAccSession, aggregateAccHotLapLeaderboard, computeAccEventKey } from './acc-parser.js';
+import { parseAccSession, aggregateAccHotLapLeaderboard, computeAccEventKey, mapSessionType } from './acc-parser.js';
 import type { AccSessionResult, AccDriverResult } from '@sra/shared-types';
 
 const FIXTURES = resolve(fileURLToPath(new URL('../../../../fixtures/acc-results', import.meta.url)));
@@ -403,5 +403,23 @@ describe('computeAccEventKey', () => {
     const q = parseAccSession(loadFixture('260617_213527_Q.json'));
     const differentDay = { ...q, date: '2026-07-01T21:35:27Z' };
     expect(computeAccEventKey(differentDay)).not.toBe(computeAccEventKey(q));
+  });
+});
+
+describe('mapSessionType', () => {
+  it('maps the standard FP/Q/R codes', () => {
+    expect(mapSessionType('FP')).toBe('Practice');
+    expect(mapSessionType('Q')).toBe('Qualify');
+    expect(mapSessionType('R')).toBe('Race');
+  });
+
+  it('collapses sprint-weekend R1/R2/... codes to Race (confirmed live: LIAW sprint format)', () => {
+    expect(mapSessionType('R1')).toBe('Race');
+    expect(mapSessionType('R2')).toBe('Race');
+    expect(mapSessionType('R10')).toBe('Race');
+  });
+
+  it('passes through an unrecognized code verbatim', () => {
+    expect(mapSessionType('Q1')).toBe('Q1');
   });
 });

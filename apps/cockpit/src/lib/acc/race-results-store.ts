@@ -1,4 +1,5 @@
-import { msToLaptime } from '@sra/domain';
+import { unstable_cache } from 'next/cache';
+import { msToLaptime, mapSessionType } from '@sra/domain';
 import type { AccSessionResult, AccSessionType } from '@sra/shared-types';
 import { supabase } from '../supabase';
 import { ingestAccRaceSessionInto } from './ingest-session';
@@ -42,7 +43,7 @@ type RaceSessionRow = {
 // table in sync, and fine at the data volumes a league's race archive
 // actually produces; revisit with a SQL view if this ever needs to paginate
 // server-side.
-export async function getAccRaceEvents(): Promise<AccRaceEventSummary[]> {
+async function fetchAccRaceEvents(): Promise<AccRaceEventSummary[]> {
   const { data, error } = await supabase
     .from('acc_race_sessions')
     .select('event_key, track_key, server_name, session_date, session_type, championship_id, season_id')
@@ -51,6 +52,10 @@ export async function getAccRaceEvents(): Promise<AccRaceEventSummary[]> {
 
   const byEvent = new Map<string, AccRaceEventSummary>();
   for (const row of (data ?? []) as RaceSessionRow[]) {
+    // Normalizes historical rows written before mapSessionType learned to
+    // collapse sprint-weekend R1/R2/... codes to 'Race' — those rows still
+    // have the raw code stored verbatim in session_type.
+    const sessionType = mapSessionType(row.session_type);
     const existing = byEvent.get(row.event_key);
     if (!existing) {
       byEvent.set(row.event_key, {
@@ -60,16 +65,30 @@ export async function getAccRaceEvents(): Promise<AccRaceEventSummary[]> {
         date: row.session_date,
         championshipId: row.championship_id,
         seasonId: row.season_id,
-        sessionTypes: [row.session_type],
+        sessionTypes: [sessionType],
       });
     } else {
       if (row.session_date < existing.date) existing.date = row.session_date;
-      if (!existing.sessionTypes.includes(row.session_type)) existing.sessionTypes.push(row.session_type);
+      if (!existing.sessionTypes.includes(sessionType)) existing.sessionTypes.push(sessionType);
     }
   }
   // Rows arrive newest-first, and a Map preserves first-insertion order, so
   // this is already newest-event-first.
   return [...byEvent.values()];
+}
+
+// Cached entry point — every round card on the calendar/championships pages
+// (see matchAccRoundsToResultEventsFrom) calls this per page render, and it
+// scans the full acc_race_sessions table with no filter. Uncached, that's one
+// full-table read per request on some of the most-hit pages on the site;
+// revalidate: 300 caps it to a Supabase read every 5 minutes regardless of
+// traffic. Staleness just means a just-ingested result takes up to 5 minutes
+// to link from a round card — the results page itself reads live.
+export function getAccRaceEvents(): Promise<AccRaceEventSummary[]> {
+  return unstable_cache(fetchAccRaceEvents, ['acc-race-events'], {
+    revalidate: 300,
+    tags: ['acc-race-events'],
+  })();
 }
 
 type FullRaceSessionRow = RaceSessionRow & {
@@ -90,7 +109,9 @@ export async function getAccRaceEventSessions(eventKey: string): Promise<AccSess
   if (error) throw error;
 
   const sessions: AccSessionResult[] = ((data ?? []) as FullRaceSessionRow[]).map((row) => ({
-    sessionType: row.session_type,
+    // See getAccRaceEvents's byEvent loop — same normalization for historical
+    // R1/R2 rows.
+    sessionType: mapSessionType(row.session_type),
     track: row.track_key,
     serverName: row.server_name,
     date: row.session_date,
@@ -105,7 +126,15 @@ export async function getAccRaceEventSessions(eventKey: string): Promise<AccSess
     results: row.results,
   }));
 
-  return sessions.sort((a, b) => SESSION_ORDER[a.sessionType] - SESSION_ORDER[b.sessionType]);
+  // Secondary sort by date: an event can have more than one session of the
+  // same type (e.g. LIAW's Race 1/Race 2 format), and Supabase doesn't
+  // guarantee row order without an explicit .order() — without this, which
+  // race renders as "Race 1" vs "Race 2" in ResultsTabs would be arbitrary.
+  return sessions.sort((a, b) => {
+    const byType = SESSION_ORDER[a.sessionType] - SESSION_ORDER[b.sessionType];
+    if (byType !== 0) return byType;
+    return (a.date ?? '').localeCompare(b.date ?? '');
+  });
 }
 
 // Loose comparison between a round's authored display name (round.track,

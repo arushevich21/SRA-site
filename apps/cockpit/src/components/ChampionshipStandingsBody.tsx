@@ -4,6 +4,7 @@ import { getStandingsKey, type ChampionshipContent } from '@/content/championshi
 import { getAcEvoStandings, getAccStandings } from '@/lib/emperor-standings';
 import { getRoundPoints } from '@/lib/acevo-hotlaps';
 import { readStandings } from '@/lib/standings-store';
+import { getDriverInfoBySteamIds, stripSteamIdPrefix, type DriverInfo } from '@/lib/driver-lookup';
 import { supabase as adminClient } from '@/lib/supabase';
 import { EmperorStandingsTable } from './EmperorStandingsTable';
 import { ClassStandingsTabs } from './ClassStandingsTabs';
@@ -116,6 +117,25 @@ async function getEntryListAsZeroStandings(
   };
 }
 
+// Division/tier badges (DriverTierBadge.tsx) need a batch driver lookup keyed
+// by every steamId appearing across all class groups on the table being
+// rendered — Emperor's standings payload itself carries no driver identity
+// beyond steamId/driverName.
+async function getDriverInfoForStandings(
+  data: EmperorChampionshipStandings,
+): Promise<Record<string, DriverInfo>> {
+  // Emperor's own standings payload carries steamId "S"-prefixed (ACC's
+  // native format, confirmed live) — drivers.steam_id is stored bare, so the
+  // lookup (and EmperorStandingsTable's read of the result) both need it
+  // stripped, unlike getEntryListAsZeroStandings's entries, which already
+  // come from drivers.steam_id directly and are bare already (stripping is a
+  // no-op there).
+  const steamIds = Object.values(data.driverStandings).flatMap((standings) =>
+    standings.map((s) => stripSteamIdPrefix(s.steamId)),
+  );
+  return Object.fromEntries(await getDriverInfoBySteamIds(steamIds));
+}
+
 async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) {
   // ACC's emperor_championship_id lives on one of 7 ACCSM instances (there's
   // no single well-known ACC Emperor host the way AC Evo has one) — see
@@ -153,7 +173,10 @@ async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) 
           <p className="font-mono text-[12px] tracking-[.1em] uppercase text-txt-3 italic mb-4">
             No races scored yet — showing the confirmed entry list at 0 points.
           </p>
-          <EmperorStandingsTable data={entryListStandings} />
+          <EmperorStandingsTable
+            data={entryListStandings}
+            driverInfo={await getDriverInfoForStandings(entryListStandings)}
+          />
         </div>
       );
     }
@@ -178,7 +201,11 @@ async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) 
 
   return (
     <div>
-      <EmperorStandingsTable data={result.data} rounds={rounds} />
+      <EmperorStandingsTable
+        data={result.data}
+        rounds={rounds}
+        driverInfo={await getDriverInfoForStandings(result.data)}
+      />
       {roundsWithTrack.length > 0 && (
         <AcEvoRaceResultsTabs
           rounds={roundsWithTrack.map((r) => ({

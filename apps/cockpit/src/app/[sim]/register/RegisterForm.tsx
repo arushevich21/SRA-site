@@ -1,12 +1,15 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { DriverTierBadge } from '@/components/DriverTierBadge';
 import { registerTeam, type RegisterState } from './actions';
 
 type AvailableDriver = {
   id: string;
   display_name: string | null;
   tier: 'gold' | 'silver' | null;
+  division_id: number | null;
+  is_sralien: boolean | null;
 };
 
 type Props = {
@@ -162,21 +165,14 @@ export default function RegisterForm({
                         onChange={() => toggle(driver.id)}
                         className="cursor-pointer"
                       />
+                      <DriverTierBadge
+                        isSralien={driver.is_sralien ?? false}
+                        division={driver.division_id}
+                        tier={driver.tier}
+                      />
                       <span className="font-mono text-[12px] text-txt flex-1">
                         {driver.display_name ?? '—'}
                       </span>
-                      {driver.tier && (
-                        <span
-                          className={[
-                            'font-mono text-[10px] tracking-[.15em] uppercase',
-                            driver.tier === 'gold'
-                              ? 'text-[#e6b53d]'
-                              : 'text-txt-3',
-                          ].join(' ')}
-                        >
-                          {driver.tier}
-                        </span>
-                      )}
                     </label>
                   );
                 })}

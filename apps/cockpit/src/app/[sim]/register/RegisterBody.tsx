@@ -14,7 +14,7 @@ import TeamList, { type Team } from './TeamList';
 // Supabase FK join inference — cast via as unknown as
 type RawMemberJoin = {
   driver_id: string;
-  drivers: { display_name: string | null; tier: string | null } | null;
+  drivers: { display_name: string | null; tier: string | null; is_sralien: boolean | null } | null;
 };
 type RawRegistrationJoin = {
   id: string;
@@ -125,7 +125,7 @@ export async function RegisterBody({
   const { data: rawRegistrations } = await adminClient
     .from('registrations')
     .select(
-      'id, team_id, car_model_id, division_id, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, tier))',
+      'id, team_id, car_model_id, division_id, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, tier, is_sralien))',
     )
     .eq('championship_key', champ.registrationKey)
     .eq('season', champ.registrationSeason)
@@ -149,6 +149,7 @@ export async function RegisterBody({
         driver_id: m.driver_id,
         display_name: m.drivers?.display_name ?? null,
         tier: (m.drivers?.tier ?? null) as 'gold' | 'silver' | null,
+        is_sralien: m.drivers?.is_sralien ?? false,
       })),
     }),
   );
@@ -309,7 +310,7 @@ export async function RegisterBody({
         // a teammate picker.
         let teammateQuery = adminClient
           .from('drivers')
-          .select('id, display_name, tier')
+          .select('id, display_name, tier, division_id, is_sralien')
           .neq('id', driver.id);
 
         if (requiresDivision) {
@@ -326,6 +327,8 @@ export async function RegisterBody({
             id: string;
             display_name: string | null;
             tier: 'gold' | 'silver' | null;
+            division_id: number | null;
+            is_sralien: boolean | null;
           }[]
         ).filter((d) => !takenSet.has(d.id));
 

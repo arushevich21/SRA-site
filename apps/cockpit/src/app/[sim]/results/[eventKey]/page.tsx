@@ -4,6 +4,7 @@ import { getSimBySlug } from '@/content/sims';
 import { getAccRaceEventSessions } from '@/lib/acc/race-results-store';
 import { getAccTrack } from '@/lib/acc/tracks';
 import { ResultsTabs } from '@/components/ResultsTabs';
+import { getDriverInfoBySteamIds } from '@/lib/driver-lookup';
 
 // Single event's sessions — bounded (one race's worth of results, not
 // unbounded per-track history). No documented reason for force-dynamic and
@@ -53,6 +54,14 @@ export default async function SimResultsEventPage({ params }: PageProps) {
   const track = await getAccTrack(header.track);
   const trackDisplayName = track?.displayName ?? header.track;
 
+  const driverInfo = Object.fromEntries(
+    await getDriverInfoBySteamIds(
+      sessions.flatMap((s) =>
+        s.results.map((r) => r.currentDriverSteamId ?? r.drivers[0]?.steamId).filter((id) => !!id),
+      ),
+    ),
+  );
+
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       <Link
@@ -86,7 +95,7 @@ export default async function SimResultsEventPage({ params }: PageProps) {
         </p>
       )}
 
-      <ResultsTabs sessions={sessions} />
+      <ResultsTabs sessions={sessions} driverInfo={driverInfo} />
     </section>
   );
 }

@@ -44,6 +44,7 @@ export {
   parseAccSession,
   aggregateAccHotLapLeaderboard,
   computeAccEventKey,
+  mapSessionType,
 } from './acc/acc-parser.js';
 
 export {
