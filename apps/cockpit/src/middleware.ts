@@ -49,13 +49,27 @@ export async function middleware(request: NextRequest) {
   if (user && !isGateExempt(request.nextUrl.pathname)) {
     const { data: driver } = await supabase
       .from('drivers')
-      .select('steam_verified')
+      .select('steam_verified, first_name, last_name, driver_number')
       .eq('user_id', user.id)
       .maybeSingle();
 
     if (!driver?.steam_verified) {
       const url = request.nextUrl.clone();
       url.pathname = '/auth/steam/link';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+
+    // ── Profile-completion gate ────────────────────────────────────────────
+    // Linking Discord + Steam alone left first_name/last_name/driver_number
+    // NULL (see auth/callback/route.ts's newcomer insert) — drivers were
+    // showing up nameless in results/standings/registration. /profile itself
+    // must stay reachable or a driver missing these could never fix it.
+    if ((!driver.first_name || !driver.last_name || driver.driver_number == null) &&
+      request.nextUrl.pathname !== '/profile'
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/profile';
       url.search = '';
       return NextResponse.redirect(url);
     }

@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { Icon, type IconName } from '@cardog-icons/react';
 import { FallbackLogoImage } from '@/components/FallbackLogoImage';
+import { DriverTierBadge } from '@/components/DriverTierBadge';
 
 export type Member = {
   driver_id: string;
   display_name: string | null;
   tier: 'gold' | 'silver' | null;
+  is_sralien: boolean;
 };
 
 export type Team = {
@@ -270,17 +272,7 @@ function TeamRow({
         <div className="flex flex-wrap gap-4">
           {team.members.map((m) => (
             <div key={m.driver_id} className="flex items-center gap-2">
-              {/* Badge art is per-division ("Division 3 Gold.png"), so there
-                  is no badge to show for an ungraded entry — division_id
-                  NULL would request /badges/Division null Gold.png. */}
-              {m.tier && team.division_id != null && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`/badges/Division ${team.division_id} ${m.tier === 'gold' ? 'Gold' : 'Silver'}.png`}
-                  alt={`Div ${team.division_id} ${m.tier}`}
-                  className="h-6 w-auto"
-                />
-              )}
+              <DriverTierBadge isSralien={m.is_sralien} division={team.division_id} tier={m.tier} />
               <span className="font-display font-bold text-[13px] uppercase text-txt">
                 {m.display_name ?? '—'}
               </span>

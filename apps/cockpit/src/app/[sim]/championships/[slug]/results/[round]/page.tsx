@@ -5,6 +5,7 @@ import { getChampionships } from '@/lib/championships-store';
 import { AcEvoResultsTabs } from '@/components/AcEvoResultsTabs';
 import { ResultsTabs } from '@/components/ResultsTabs';
 import { getAccRaceEventSessions, matchAccRoundsToResultEvents } from '@/lib/acc/race-results-store';
+import { getDriverInfoBySteamIds } from '@/lib/driver-lookup';
 
 type PageProps = {
   params: Promise<{ sim: string; slug: string; round: string }>;
@@ -39,6 +40,20 @@ export default async function ChampionshipRoundResultsPage({ params }: PageProps
 
   if (!round.emperorRawTrackName && !accSessions) notFound();
 
+  // Division/tier badges (DriverTierBadge.tsx) need each row's driver info —
+  // ResultsTabs is a client component, so the batch lookup happens here and
+  // rides along as a prop, same as AcEvoResultsTabs' driverInfo (see
+  // [sim]/standings/actions.ts).
+  const accDriverInfo = accSessions
+    ? Object.fromEntries(
+        await getDriverInfoBySteamIds(
+          accSessions.flatMap((s) =>
+            s.results.map((r) => r.currentDriverSteamId ?? r.drivers[0]?.steamId).filter((id) => !!id),
+          ),
+        ),
+      )
+    : {};
+
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       <Link
@@ -67,7 +82,11 @@ export default async function ChampionshipRoundResultsPage({ params }: PageProps
         </p>
       )}
 
-      {accSessions ? <ResultsTabs sessions={accSessions} /> : <AcEvoResultsTabs trackKey={round.emperorRawTrackName!} />}
+      {accSessions ? (
+        <ResultsTabs sessions={accSessions} driverInfo={accDriverInfo} />
+      ) : (
+        <AcEvoResultsTabs trackKey={round.emperorRawTrackName!} />
+      )}
     </section>
   );
 }
