@@ -11,6 +11,11 @@ describe('accCarModelName', () => {
   it.each([
     [0, 'Porsche 991 GT3 R'],
     [8, 'Bentley Continental GT3 2018'],
+    // The 2015 car and the 2020 Evo are two different car_model_ids that ACC
+    // itself (and the bot-written car_model columns downstream) both label
+    // plainly "Mercedes-AMG GT3" — pinned together here so a rename that
+    // re-collapses them into one indistinguishable string fails loudly.
+    [1, 'Mercedes-AMG GT3 (2015)'],
     [25, 'Mercedes-AMG GT3 2020'],
     [34, 'Porsche 992 GT3 R'],
     [61, 'Porsche 718 Cayman GT4'],
