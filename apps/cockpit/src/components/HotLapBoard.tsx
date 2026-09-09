@@ -287,9 +287,20 @@ export function HotLapBoard({
                 return (
                   // A driver can have multiple rows here (one per car
                   // they've set a lap in) — steamId alone is no longer
-                  // unique per row.
+                  // unique per row, and neither is steamId + carModel: ACC
+                  // ships several distinct car_model_ids under one display
+                  // name (e.g. the 2015 Mercedes-AMG GT3, id 1, and the Evo,
+                  // id 25, are both "Mercedes-AMG GT3"), so a driver with a
+                  // lap in each produced two rows with an identical key.
+                  // React then mis-reconciles on every filter toggle — the
+                  // duplicate row survives into views it was filtered out of
+                  // (it showed up alongside a signed-in driver's own laps
+                  // under "My Laps") and multiplies with each toggle. The row
+                  // index is unique by construction; the list is fully
+                  // re-derived and re-sorted on every filter change anyway,
+                  // so there's no positional identity to preserve here.
                   <tr
-                    key={`${entry.steamId}-${entry.carModel ?? ''}`}
+                    key={`${entry.steamId}-${entry.carModel ?? ''}-${i}`}
                     className="border-b border-line/30"
                     style={
                       isMine

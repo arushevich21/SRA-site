@@ -1,5 +1,6 @@
 import 'server-only';
 import { supabase } from '../supabase';
+import { accCarDisplayName } from './car-display-name';
 
 // Hot Stint Qualifying data is owned by an external bot, not this codebase
 // (see supabase/migrations/20260814_drop_hot_stint_ingest.sql for why the
@@ -198,7 +199,7 @@ export async function getPublicHotStintLeaderboard(
     driverName: [r.first_name, r.last_name].filter(Boolean).join(' ') || 'Unknown',
     hotstintMs: r.hotstint_ms,
     carModel: r.car_model_id,
-    carModelName: r.car_model,
+    carModelName: accCarDisplayName(r.car_model_id, r.car_model),
     sectorsMs: r.sectors_ms,
     carGroup: r.car_group,
     trackKey: r.track_key,

@@ -5,7 +5,7 @@
 
 export const ACC_CAR_MODEL_NAMES: Readonly<Record<number, string>> = {
   0: 'Porsche 991 GT3 R',
-  1: 'Mercedes-AMG GT3',
+  1: 'Mercedes-AMG GT3 (2015)',
   2: 'Ferrari 488 GT3',
   3: 'Audi R8 LMS',
   4: 'Lamborghini Huracan GT3',
