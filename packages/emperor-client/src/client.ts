@@ -29,13 +29,21 @@ type RawDriverStanding = {
   Points: number;
   PointsPenalty: number;
   Position: number;
+  // Keyed by team name; the value carries that team's per-event points, which
+  // we don't use. Absent for an unattached driver.
+  Teams?: Record<string, unknown> | null;
 };
 
+// NOTE: no Position. Unlike DriverStandings, Emperor's TeamStandings rows
+// carry only these four keys — verified against live data (LIAW, 55 team rows,
+// zero with a Position property). This type previously declared `Position:
+// number`, which TypeScript happily believed and which normalized to
+// `undefined` at runtime, so every team row rendered a blank rank.
 type RawTeamStanding = {
   TeamName: string;
   Points: number;
   PointsPenalty: number;
-  Position: number;
+  IgnoredEventIDs?: Record<string, unknown>;
 };
 
 type RawChampionshipStandingsResponse = {
@@ -195,13 +203,19 @@ function normalizeChampionshipStandings(
       carModel: d.CarModel ?? null,
       points: d.Points,
       pointsPenalty: d.PointsPenalty,
+      teamNames: Object.keys(d.Teams ?? {}),
     }));
   }
 
+  // Team positions are DERIVED from array order, because Emperor doesn't send
+  // them. It does return the array already ranked (verified: points descending
+  // across all 55 LIAW team rows), so index+1 is Emperor's own ranking rather
+  // than a re-ranking of our own — deliberately not re-sorting here, so that a
+  // tie Emperor has resolved one way isn't silently reordered another.
   const teamStandings: Record<string, EmperorTeamStanding[]> = {};
   for (const [className, entries] of Object.entries(raw.TeamStandings)) {
-    teamStandings[className] = (entries ?? []).map((t) => ({
-      position: t.Position,
+    teamStandings[className] = (entries ?? []).map((t, i) => ({
+      position: i + 1,
       teamName: t.TeamName,
       points: t.Points,
       pointsPenalty: t.PointsPenalty,

@@ -1,4 +1,4 @@
-import type { ChampionshipContent } from '@/content/championships';
+import { accsmChampionshipIds, type ChampionshipContent } from '@/content/championships';
 import { getHotLapBoard } from '@/lib/acevo-hotlaps';
 import { acEvoManufacturerIconName, acEvoManufacturerLogoUrl } from '@/lib/leaderboard-tracks';
 import { HotLapBoard } from './HotLapBoard';
@@ -11,7 +11,12 @@ export async function ChampionshipLeaderboardsBody({
   champ: ChampionshipContent;
   accentColor: string;
 }) {
-  if (!champ.emperorChampionshipId) {
+  // Gate only — the boards themselves are fetched per-round by track
+  // (emperorRawTrackName), not by championship id. Uses the resolver so a
+  // multi-division series, whose emperor_championship_id is NULL by design,
+  // isn't wrongly treated as having no Emperor data at all — the nav links
+  // here for exactly those championships.
+  if (accsmChampionshipIds(champ).length === 0) {
     return (
       <div className="border border-line/50 bg-carbon-2 px-8 py-12 text-center">
         <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3">

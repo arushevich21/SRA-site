@@ -1,5 +1,6 @@
 'use client';
 
+import { DivisionBadge } from '@/components/DivisionBadge';
 import { useState } from 'react';
 import { Icon, type IconName } from '@cardog-icons/react';
 import { FallbackLogoImage } from '@/components/FallbackLogoImage';
@@ -90,7 +91,7 @@ export default function TeamList({
           divStats.map((ds) => (
             <StatBox
               key={ds.div}
-              label={`Division ${ds.div}`}
+              label={<DivisionBadge division={ds.div} height={22} />}
               value={`${ds.teams} teams`}
               sub={`${ds.members} drivers`}
             />
@@ -141,12 +142,7 @@ export default function TeamList({
               {/* Tierless — this is a filter control, not a driver's own
                   standing, so it uses the plain Division N badge, not a
                   gold/silver variant. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/badges/Division ${d}.png`}
-                alt={`Division ${d}`}
-                className="w-full h-full object-contain"
-              />
+              <DivisionBadge division={d} height={22} />
             </button>
           ))}
       </div>
@@ -201,15 +197,17 @@ function StatBox({
   value,
   sub,
 }: {
-  label: string;
+  // ReactNode, not string: the per-division boxes label themselves with the
+  // division badge rather than the words "Division N".
+  label: React.ReactNode;
   value: string;
   sub?: string;
 }) {
   return (
     <div className="border border-line bg-panel px-4 py-3">
-      <p className="font-mono text-[9px] tracking-[.3em] uppercase text-txt-3 mb-1">
+      <div className="font-mono text-[9px] tracking-[.3em] uppercase text-txt-3 mb-1 min-h-[22px] flex items-center">
         {label}
-      </p>
+      </div>
       <p className="font-mono text-[17px] font-bold text-txt leading-tight">
         {value}
       </p>
@@ -264,7 +262,15 @@ function TeamRow({
           rendering an empty column. */}
       {showDivisions && (
         <td className="py-2.5 pr-3 align-middle font-mono text-[13px] text-txt-3/75">
-          {team.division_name ?? '—'}
+          {team.division_id != null ? (
+            <DivisionBadge
+              division={team.division_id}
+              label={team.division_name ?? undefined}
+              height={24}
+            />
+          ) : (
+            '—'
+          )}
         </td>
       )}
 

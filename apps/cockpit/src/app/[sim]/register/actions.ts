@@ -19,6 +19,10 @@ const REGISTRATION_ERROR_MESSAGES: Record<RegistrationErrorCode, string> = {
   REGISTRANT_NOT_IN_ROSTER: 'Registration error — contact an admin',
   DRIVER_ALREADY_CLAIMED:
     'One or more selected drivers are already registered for this championship',
+  SOLO_NOT_PERMITTED:
+    'This championship requires a teammate. If you cannot find one, ask an admin in ' +
+    '#admin-help to enable solo registration for you.',
+  TEAM_TOO_LARGE: 'Too many drivers for this championship',
   UNKNOWN: 'Registration failed — contact an admin if this persists',
 };
 

@@ -3,7 +3,6 @@ import { msToLaptime, mapSessionType } from '@sra/domain';
 import type { AccSessionResult, AccSessionType } from '@sra/shared-types';
 import { supabase } from '../supabase';
 import { ingestAccRaceSessionInto } from './ingest-session';
-import { eventInstant, hasEventTime } from '../event-time';
 
 const SESSION_ORDER: Record<AccSessionType, number> = { Practice: 0, Qualify: 1, Race: 2 };
 
@@ -18,15 +17,17 @@ export async function ingestAccRaceSession(session: AccSessionResult, sessionKey
   await ingestAccRaceSessionInto(supabase, 'acc_race_sessions', session, sessionKey);
 }
 
-export type AccRaceEventSummary = {
-  eventKey: string;
-  track: string;
-  serverName: string | null;
-  date: string; // earliest session date in the event
-  championshipId: string | null;
-  seasonId: string | null;
-  sessionTypes: AccSessionType[]; // which of FP/Q/R exist, unordered
-};
+// Matching logic lives in round-match.ts (pure, testable); re-exported here so
+// existing call sites keep importing from one place.
+export {
+  matchAccRoundsToResultEventsFrom,
+  SPLIT_NIGHT_MATCH_WINDOW_MS,
+  type AccRaceEventSummary,
+} from './round-match';
+import {
+  matchAccRoundsToResultEventsFrom,
+  type AccRaceEventSummary,
+} from './round-match';
 
 type RaceSessionRow = {
   event_key: string;
@@ -147,25 +148,7 @@ export async function getAccRaceEventSessions(eventKey: string): Promise<AccSess
 // name (Circuit of the Americas -> "cota"). TRACK_NAME_ALIASES is a
 // deliberately incomplete patch for those, extended as a round actually
 // needs it rather than front-loading ACC's full ~30-track list.
-function normalizeTrackName(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
-const TRACK_NAME_ALIASES: Readonly<Record<string, string>> = {
-  circuitoftheamericas: 'cota',
-};
-
-function trackNamesLooselyMatch(roundTrackDisplayName: string, sessionTrackKey: string): boolean {
-  const a = normalizeTrackName(roundTrackDisplayName);
-  const b = normalizeTrackName(sessionTrackKey);
-  if (a === b) return true;
-  return TRACK_NAME_ALIASES[a] === b;
-}
-
-// A round only has a scheduled instant to match against, not a track+date
-// pair Emperor is guaranteed to echo back exactly — races start late, admins
-// adjust servers, etc. — so this is a window, not an exact-timestamp lookup.
-const RESULT_MATCH_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 // Matches a championship's schedule rounds to their acc_race_sessions event,
 // for linking a round card straight to its results. Two passes, in order of
@@ -189,49 +172,14 @@ const RESULT_MATCH_WINDOW_MS = 48 * 60 * 60 * 1000;
 // wrong race.
 export async function matchAccRoundsToResultEvents(
   schedule: { round: number; track: string; date: string | null }[],
-  emperorChampionshipId: string | null,
+  emperorChampionshipId: string | string[] | null,
+  matchWindowMs?: number,
 ): Promise<Map<number, string>> {
-  return matchAccRoundsToResultEventsFrom(await getAccRaceEvents(), schedule, emperorChampionshipId);
+  return matchAccRoundsToResultEventsFrom(
+    await getAccRaceEvents(),
+    schedule,
+    emperorChampionshipId,
+    matchWindowMs,
+  );
 }
 
-// Same matching, taking an already-fetched event list — for a page matching
-// several championships' schedules at once (e.g. the championships listing),
-// so it fetches acc_race_sessions' full event set once rather than once per
-// championship.
-export function matchAccRoundsToResultEventsFrom(
-  events: AccRaceEventSummary[],
-  schedule: { round: number; track: string; date: string | null }[],
-  emperorChampionshipId: string | null,
-): Map<number, string> {
-  const matches = new Map<number, string>();
-
-  for (const round of schedule) {
-    if (!round.date) continue;
-    // round.date is a naked ISO string meaning Eastern wall-clock time (see
-    // event-time.ts) — plain new Date(round.date) would parse it as UTC and
-    // throw the match off by whatever the EST/EDT offset is that day. A
-    // date-only round (no time) has no real instant to compare against
-    // acc_race_sessions' precise timestamps; midnight UTC of that calendar
-    // day is a reasonable stand-in given RESULT_MATCH_WINDOW_MS's width.
-    const roundInstant = hasEventTime(round.date)
-      ? eventInstant(round.date)
-      : Date.parse(`${round.date}T00:00:00Z`);
-    if (Number.isNaN(roundInstant)) continue;
-
-    const primary = emperorChampionshipId
-      ? events.filter((e) => e.championshipId === emperorChampionshipId)
-      : [];
-    const candidates =
-      primary.length > 0 ? primary : events.filter((e) => trackNamesLooselyMatch(round.track, e.track));
-
-    let best: { eventKey: string; delta: number } | null = null;
-    for (const event of candidates) {
-      const delta = Math.abs(new Date(event.date).getTime() - roundInstant);
-      if (delta > RESULT_MATCH_WINDOW_MS) continue;
-      if (!best || delta < best.delta) best = { eventKey: event.eventKey, delta };
-    }
-    if (best) matches.set(round.round, best.eventKey);
-  }
-
-  return matches;
-}

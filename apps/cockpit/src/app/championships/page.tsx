@@ -1,7 +1,7 @@
 import pastSeasonsData from '../../content/seasons_clean.json';
 import { getChampionships } from '@/lib/championships-store';
 import { getAccRaceEvents, matchAccRoundsToResultEventsFrom } from '@/lib/acc/race-results-store';
-import type { ChampionshipContent } from '@/content/championships';
+import { accsmChampionshipIds, type ChampionshipContent } from '@/content/championships';
 import { DivisionGroup } from './division-group';
 import { RealChampionshipBlock } from './RealChampionshipBlock';
 import { SectionLabel } from './shared';
@@ -47,7 +47,7 @@ export default async function ChampionshipsPage() {
     accChamps.map((c) => [
       c.slug,
       new Set(
-        matchAccRoundsToResultEventsFrom(accEvents, c.schedule, c.emperorChampionshipId ?? null).keys(),
+        matchAccRoundsToResultEventsFrom(accEvents, c.schedule, accsmChampionshipIds(c)).keys(),
       ),
     ]),
   );

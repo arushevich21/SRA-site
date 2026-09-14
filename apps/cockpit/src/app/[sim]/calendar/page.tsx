@@ -11,7 +11,7 @@ import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalSchedule
 import { AccServerStatus } from '@/components/AccServerStatus';
 import { getCalendarEvents } from '@/lib/calendar-events-store';
 import { getAccRaceEvents, matchAccRoundsToResultEventsFrom } from '@/lib/acc/race-results-store';
-import type { ChampionshipContent } from '@/content/championships';
+import { accsmChampionshipIds, type ChampionshipContent } from '@/content/championships';
 
 export default async function SimCalendarPage({
   params,
@@ -43,7 +43,7 @@ export default async function SimCalendarPage({
       .map((c) => [
         c.slug,
         new Set(
-          matchAccRoundsToResultEventsFrom(accEvents, c.schedule, c.emperorChampionshipId ?? null).keys(),
+          matchAccRoundsToResultEventsFrom(accEvents, c.schedule, accsmChampionshipIds(c)).keys(),
         ),
       ]),
   );

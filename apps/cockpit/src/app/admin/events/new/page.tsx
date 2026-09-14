@@ -2,11 +2,13 @@ import Link from 'next/link';
 import { requireAdmin } from '@/lib/require-admin';
 import { EventForm } from '../EventForm';
 import { blankInput } from '../blank';
+import { getDivisions } from '@/lib/championships-store';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NewEventPage() {
   await requireAdmin();
+  const divisions = await getDivisions();
 
   return (
     <section className="max-w-[960px] mx-auto px-7 pt-14 pb-24">
@@ -19,7 +21,7 @@ export default async function NewEventPage() {
         New Event
       </h1>
 
-      <EventForm initial={blankInput()} isEdit={false} />
+      <EventForm initial={blankInput()} divisions={divisions} isEdit={false} />
     </section>
   );
 }

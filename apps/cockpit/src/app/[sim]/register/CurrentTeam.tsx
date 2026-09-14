@@ -1,5 +1,6 @@
 'use client';
 
+import { DivisionBadge } from '@/components/DivisionBadge';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState, useTransition } from 'react';
@@ -191,8 +192,10 @@ export default function CurrentTeam({
                   )}
                   {car}
                 </p>
-                {divisionName && (
-                  <p className="font-mono text-[11px] text-txt-3/60 mt-1">{divisionName}</p>
+                {divisionId != null && (
+                  <span className="block mt-1.5">
+                    <DivisionBadge division={divisionId} label={divisionName ?? undefined} height={24} />
+                  </span>
                 )}
                 <button
                   onClick={() => setEditing(true)}

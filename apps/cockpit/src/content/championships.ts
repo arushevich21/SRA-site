@@ -11,11 +11,48 @@ export type ScheduleRound = {
   // Admin-controlled: when true, this round's hot-lap board is published on the
   // Seasonal leaderboard (ACC / accsm1-7 championships). Default/absent = hidden.
   hotlapReleased?: boolean;
+  // Per-division start overrides for a split-night series (GT3 Team Series:
+  // D1/D3 Tuesday, D2/D4 Wednesday). Keyed by division id; a division absent
+  // here races at this round's own `date`. Same naked-Eastern convention.
+  // See championship_round_division_times (20260914b).
+  divisionStartsAt?: Record<number, string>;
+};
+
+/**
+ * When a given division actually races this round — its override if it has
+ * one, else the round's own date.
+ *
+ * Every date-aware path for a split-night series must go through this rather
+ * than reading `round.date` directly: `date` is only correct for the divisions
+ * with no override, and using it for the others is wrong by a full day.
+ */
+export function roundStartsAtForDivision(
+  round: ScheduleRound,
+  divisionId: number | null,
+): string | null {
+  if (divisionId == null) return round.date;
+  return round.divisionStartsAt?.[divisionId] ?? round.date;
+}
+
+// One division of a multi-division series, and the ACCSM championship that
+// hosts it. Mirrors a championship_accsm_targets row (20260825h/i), which is
+// the authoritative record — a series spans N ACCSM championships and nothing
+// on `championships` itself can hold more than one.
+export type AccsmTarget = {
+  divisionId: number;
+  emperorChampionshipId: string;
+  divisionName: string;
 };
 
 export type ChampionshipContent = {
   simgridId: number | null;
+  // The single Emperor championship this event IS. Mutually exclusive with
+  // accsmTargets: an event is either one championship or a series spanning
+  // several, never both. Read through accsmChampionshipIds(), not directly.
   emperorChampionshipId?: string;
+  // The ACCSM championships this series spans, one per division, division
+  // order. Absent/empty for a single-championship event.
+  accsmTargets?: AccsmTarget[];
   standingsKey?: string;
   // Stable per-sim URL slug, e.g. /acc/championships/gt3-team-series-s19
   slug: string;
@@ -41,18 +78,54 @@ export type ChampionshipContent = {
   registrationSeason?: string;   // DB season value, e.g. 's19'
   registrationOpen?: boolean;    // false/absent = form hidden
   maxTeamSize?: number;          // 2 for GT3 Sprint, 1-4 for Endurance
+  // Minimum drivers per entry. 1 (default) = solo entries fine (Endurance,
+  // LIAW). 2 on the GT3 Team Series, where a partner is required unless the
+  // registrant has been granted solo permission by SRA-Bot. Enforced in
+  // register_entry() — see 20260914d.
+  minTeamSize?: number;
   allowedCars?: string[];        // car picker options
   // Whether entries are graded into divisions. True for the GT3 Team Series;
   // false for single-grid events like League in a Week, where a driver needs
   // no division assigned to sign up. Defaults true — see migration
   // 20260826_optional_divisions.sql.
   requiresDivision?: boolean;
+  // Soft per-division DRIVER target shown as a count on the register page
+  // ("34 / 55 drivers"). Advisory only — nothing blocks or waitlists on it.
+  // Distinct from maxRegistrations, which is a HARD cap on confirmed ENTRIES
+  // enforced by register_entry(). See 20260914c_division_driver_cap.sql.
+  divisionDriverCap?: number;
   // Forces "coming soon" display everywhere (championship cards, sim overview)
   // even if a real schedule is populated — for series teased ahead of launch.
   teaserOnly?: boolean;
   // Season has finished racing — forces "Concluded" display instead of Active.
   concluded?: boolean;
 };
+
+// True when this event is graded into divisions that each run on their own
+// ACCSM championship — the GT3 Team Series today. Such an event has no single
+// emperor_championship_id; every GUID lives in accsmTargets.
+export function isMultiDivision(c: ChampionshipContent): boolean {
+  return (c.accsmTargets?.length ?? 0) > 0;
+}
+
+// Every ACCSM/Emperor championship this event spans, in division order. The
+// single read path for all three things a GUID drives — standings lookups,
+// race-result matching, and leaderboards — so no call site has to branch on
+// whether it got a one-championship event or a four-division series.
+export function accsmChampionshipIds(c: ChampionshipContent): string[] {
+  if (c.accsmTargets?.length) return c.accsmTargets.map((t) => t.emperorChampionshipId);
+  return c.emperorChampionshipId ? [c.emperorChampionshipId] : [];
+}
+
+// The target for one division, or null when this event doesn't run that
+// division (a series can legitimately skip one — a division with too few
+// entries simply has no ACCSM championship).
+export function accsmTargetForDivision(
+  c: ChampionshipContent,
+  divisionId: number,
+): AccsmTarget | null {
+  return c.accsmTargets?.find((t) => t.divisionId === divisionId) ?? null;
+}
 
 export function getStandingsKey(c: ChampionshipContent): string | undefined {
   return c.standingsKey ?? (c.simgridId != null ? String(c.simgridId) : undefined);

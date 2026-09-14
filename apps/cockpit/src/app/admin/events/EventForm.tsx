@@ -8,8 +8,9 @@ import {
   uploadChampionshipLogo,
   type ChampionshipInput,
   type ChampionshipRoundInput,
+  type DivisionTargetInput,
 } from './actions';
-import { blankRound } from './blank';
+import { blankRound, blankDivisionTarget } from './blank';
 import { SIMS } from '@/content/sims';
 import { getGameCatalog } from '@/content/sim-catalog';
 import {
@@ -102,7 +103,17 @@ function defaultDiscordLines(game: string, slug: string): string {
   return lines.join('\n');
 }
 
-export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isEdit: boolean }) {
+export type DivisionOption = { id: number; name: string };
+
+export function EventForm({
+  initial,
+  divisions,
+  isEdit,
+}: {
+  initial: ChampionshipInput;
+  divisions: DivisionOption[];
+  isEdit: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +142,40 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
   function addRound() {
     setF((prev) => ({ ...prev, rounds: [...prev.rounds, blankRound(prev.rounds.length + 1)] }));
   }
+
+  // ── Division championships (championship_accsm_targets) ──────────────────
+  const divisionTargets = f.divisionTargets;
+
+  function setDivisionTargets(next: DivisionTargetInput[]): void {
+    setF((prev) => ({ ...prev, divisionTargets: next }));
+  }
+
+  function addDivisionTarget(): void {
+    // Pre-select the lowest division not already used, so filling in four
+    // divisions in order is four clicks of "+ Add division" and four pastes
+    // rather than eight interactions.
+    const used = new Set(divisionTargets.map((t) => t.divisionId));
+    const nextDivision = divisions.find((d) => !used.has(String(d.id)));
+    setDivisionTargets([
+      ...divisionTargets,
+      { ...blankDivisionTarget(), divisionId: nextDivision ? String(nextDivision.id) : '' },
+    ]);
+  }
+
+  function updateDivisionTarget(i: number, patch: Partial<DivisionTargetInput>): void {
+    setDivisionTargets(divisionTargets.map((t, idx) => (idx === i ? { ...t, ...patch } : t)));
+  }
+
+  function removeDivisionTarget(i: number): void {
+    setDivisionTargets(divisionTargets.filter((_, idx) => idx !== i));
+  }
+
+  // An event is either ONE ACCSM championship or a series spanning several.
+  // The single-ID field is disabled while division rows exist (and vice versa)
+  // so the mutually-exclusive rule is visible in the form, not just enforced
+  // on save — see saveChampionship.
+  const hasDivisionTargets = divisionTargets.length > 0;
+  const hasSingleChampionshipId = f.emperorChampionshipId.trim() !== '';
   function removeRound(i: number) {
     setF((prev) => ({
       ...prev,
@@ -274,9 +319,91 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
           ACSM (the server manager) is still done by hand in its web UI — nothing here writes to it.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <Text label="ACSM championship ID" value={f.emperorChampionshipId}
-            onChange={(v) => set('emperorChampionshipId', v)} placeholder="3a2e4266-ff5f-…" />
+          <label className={labelCls}>
+            ACSM championship ID
+            <input
+              className={`${inputCls} disabled:opacity-40 disabled:cursor-not-allowed`}
+              value={f.emperorChampionshipId}
+              disabled={hasDivisionTargets}
+              placeholder={hasDivisionTargets ? 'Using per-division IDs below' : '3a2e4266-ff5f-…'}
+              onChange={(e) => set('emperorChampionshipId', e.target.value)}
+            />
+          </label>
           <Text label="SimGrid ID" value={f.simgridId} onChange={(v) => set('simgridId', v)} placeholder="22872" />
+        </div>
+        <p className="font-sans text-[12px] text-txt-3 -mt-3">
+          Paste the championship URL from ACSM
+          (<code>…/championship/‹id›</code>) or just the ID — both work.
+        </p>
+
+        <div className="border-t border-line/50 pt-5">
+          <span className={labelCls}>Division championships</span>
+          <p className="font-sans text-[13px] text-txt-3 mt-2 mb-4">
+            For a series that runs one ACSM championship <em>per division</em> — the GT3 Team
+            Series. Add a row per division and the site shows a single event card with division
+            tabs, instead of one card per division. Leave empty for a single-grid event and use
+            the one field above.
+          </p>
+
+          {divisionTargets.length > 0 && (
+            <div className="flex flex-col gap-3 mb-4">
+              {divisionTargets.map((t, i) => (
+                <div key={i} className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
+                  <label className={`${labelCls} shrink-0 w-full sm:w-[150px]`}>
+                    Division
+                    <select
+                      className={inputCls}
+                      value={t.divisionId}
+                      onChange={(e) => updateDivisionTarget(i, { divisionId: e.target.value })}
+                    >
+                      <option value="">— Select —</option>
+                      {divisions.map((d) => (
+                        <option key={d.id} value={String(d.id)}>{d.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={`${labelCls} flex-1 min-w-0`}>
+                    ACSM championship URL or ID
+                    <input
+                      className={inputCls}
+                      value={t.championshipId}
+                      placeholder="https://accsm1.simracingalliance.com/championship/66ec4e93-…"
+                      onChange={(e) => updateDivisionTarget(i, { championshipId: e.target.value })}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => removeDivisionTarget(i)}
+                    className="mt-[26px] shrink-0 font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 hover:text-gold-deep cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={addDivisionTarget}
+            disabled={hasSingleChampionshipId}
+            title={
+              hasSingleChampionshipId
+                ? 'Clear the single ACSM championship ID first — an event is either one championship or several.'
+                : undefined
+            }
+            className="font-mono text-[12px] tracking-[.2em] uppercase text-gold border border-gold/40 px-4 py-2 hover:bg-gold/5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            + Add division
+          </button>
+
+          {hasDivisionTargets && (
+            <p className="font-sans text-[12px] text-txt-3 mt-3">
+              Needs a <strong>Registration key</strong> set below — division championships are
+              stored against it, and it is what tells SRA-Bot which registrations belong on
+              which grid.
+            </p>
+          )}
         </div>
         <Text label="Standings key (manual-upload store)" value={f.standingsKey}
           onChange={(v) => set('standingsKey', v)} placeholder="endurance-s3" />
@@ -301,6 +428,21 @@ export function EventForm({ initial, isEdit }: { initial: ChampionshipInput; isE
           <div className="flex items-end"><Check label="Registration open" value={f.registrationOpen}
             onChange={(v) => set('registrationOpen', v)} /></div>
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <label className={labelCls}>
+            Min team size
+            <select className={inputCls} value={f.minTeamSize}
+              onChange={(e) => set('minTeamSize', e.target.value)}>
+              <option value="">1 — solo entries allowed</option>
+              {['2', '3', '4'].map((n) => <option key={n} value={n}>{n} — partner required</option>)}
+            </select>
+          </label>
+        </div>
+        <p className="font-sans text-[12px] text-txt-3 -mt-3">
+          2 on the GT3 Team Series: a driver cannot register alone unless an admin has granted
+          them solo registration (SRA-Bot command, stored per driver). Leave at 1 for events
+          where entering solo is normal — Endurance, League in a Week.
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div className="flex items-end"><Check label="Uses divisions" value={f.requiresDivision}
             onChange={(v) => set('requiresDivision', v)} /></div>
