@@ -1,4 +1,5 @@
 import type { DivisionCapacityRow } from '@/lib/division-capacity';
+import { DivisionBadge } from './DivisionBadge';
 
 // Per-division driver counts on the register page.
 //
@@ -24,9 +25,9 @@ export function DivisionCapacity({ rows }: { rows: DivisionCapacityRow[] }) {
 
           return (
             <div key={r.divisionId} className="border border-line bg-panel px-4 py-3">
-              <p className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 mb-2">
-                {r.divisionName}
-              </p>
+              <div className="mb-2 h-[26px] flex items-center">
+                <DivisionBadge division={r.divisionId} label={r.divisionName} height={26} />
+              </div>
               <p className="font-display font-bold text-[20px] text-txt leading-none">
                 {r.driverCount}
                 {r.cap != null && (

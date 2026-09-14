@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { AccsmTarget } from '@/content/championships';
+import { DivisionBadge } from './DivisionBadge';
 import {
   standingsViewHref,
   type StandingsTierFilter,
@@ -10,8 +11,7 @@ import {
 // why the view lives in the URL. Server components throughout; nothing here
 // needs client JS.
 
-const TAB_BASE =
-  'font-mono text-[15px] tracking-[.25em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors';
+const TAB_BASE = 'px-4 py-2 -mb-px border-b-2 transition-all';
 const PILL_BASE =
   'font-mono text-[11px] tracking-[.2em] uppercase px-3 py-1.5 border transition-colors';
 
@@ -38,11 +38,16 @@ export function DivisionTabs({
             aria-current={active ? 'page' : undefined}
             className={[
               TAB_BASE,
-              'whitespace-nowrap',
-              active ? 'text-gold border-gold' : 'text-txt-3 border-transparent hover:text-txt-2',
+              'whitespace-nowrap flex items-center',
+              // The badge carries the identity, so the active state is the
+              // underline plus full opacity — inactive tabs dim rather than
+              // change colour, which artwork can't do.
+              active
+                ? 'border-gold opacity-100'
+                : 'border-transparent opacity-45 hover:opacity-80',
             ].join(' ')}
           >
-            {t.divisionName}
+            <DivisionBadge division={t.divisionId} label={t.divisionName} height={30} />
           </Link>
         );
       })}
