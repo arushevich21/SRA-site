@@ -5,7 +5,7 @@ import { RealChampionshipBlock } from '@/app/championships/RealChampionshipBlock
 import { SectionLabel } from '@/app/championships/shared';
 import { GameLabel } from '@/components/GameLabel';
 import { getAccRaceEvents, matchAccRoundsToResultEventsFrom } from '@/lib/acc/race-results-store';
-import type { ChampionshipContent } from '@/content/championships';
+import { accsmChampionshipIds, type ChampionshipContent } from '@/content/championships';
 
 export default async function SimChampionshipsPage({
   params,
@@ -27,7 +27,7 @@ export default async function SimChampionshipsPage({
       .map((c) => [
         c.slug,
         new Set(
-          matchAccRoundsToResultEventsFrom(accEvents, c.schedule, c.emperorChampionshipId ?? null).keys(),
+          matchAccRoundsToResultEventsFrom(accEvents, c.schedule, accsmChampionshipIds(c)).keys(),
         ),
       ]),
   );

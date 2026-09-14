@@ -1,3 +1,4 @@
+import { accsmChampionshipIds } from '@/content/championships';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import { getChampionships } from '@/lib/championships-store';
@@ -22,7 +23,7 @@ export default async function ChampionshipCalendarPage({
   const roundsWithResults =
     content.game !== 'AC Evo'
       ? new Set(
-          (await matchAccRoundsToResultEvents(content.schedule, content.emperorChampionshipId ?? null)).keys(),
+          (await matchAccRoundsToResultEvents(content.schedule, accsmChampionshipIds(content))).keys(),
         )
       : undefined;
 
