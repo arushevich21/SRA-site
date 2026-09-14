@@ -10,6 +10,8 @@ import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
 import RegisterForm from './RegisterForm';
 import CurrentTeam, { type NextRoundInfo } from './CurrentTeam';
 import TeamList, { type Team } from './TeamList';
+import { DivisionCapacity } from '@/components/DivisionCapacity';
+import { buildDivisionCapacity } from '@/lib/division-capacity';
 
 // Supabase FK join inference — cast via as unknown as
 type RawMemberJoin = {
@@ -154,6 +156,28 @@ export async function RegisterBody({
     }),
   );
 
+  // ── Per-division driver counts ────────────────────────────────────────────
+  // Advisory only (see 20260914c): registration is never blocked at the cap.
+  // Counts DRIVERS, not entries — a team is up to two of them, and the pit-box
+  // ceiling this exists for is measured in cars on the grid.
+  //
+  // Only meaningful for a graded series; a single-grid event (LIAW) has no
+  // divisions to break down and renders nothing.
+  const divisionCapacity =
+    champ.requiresDivision !== false && champ.divisionDriverCap != null
+      ? await (async () => {
+          const { data: divisions } = await adminClient
+            .from('divisions')
+            .select('id, name')
+            .order('id');
+          return buildDivisionCapacity(
+            teams.map((t) => ({ divisionId: t.division_id, driverCount: t.members.length })),
+            (divisions ?? []) as { id: number; name: string }[],
+            champ.divisionDriverCap ?? null,
+          );
+        })()
+      : [];
+
   // Every driver already CLAIMED for this event, confirmed or waitlisted —
   // register_entry()'s unique constraint blocks a second claim regardless of
   // status, so a waitlisted driver must not appear as "available" here
@@ -197,7 +221,7 @@ export async function RegisterBody({
   } else {
     const { data: driver } = await adminClient
       .from('drivers')
-      .select('id, display_name, division_id')
+      .select('id, display_name, division_id, allow_gt3_team_series_solo_registration')
       .eq('user_id', user.id)
       .maybeSingle();
     currentDriverId = driver?.id;
@@ -352,6 +376,10 @@ export async function RegisterBody({
             <RegisterForm
               champKey={champ.registrationKey}
               maxTeamSize={champ.maxTeamSize}
+              minTeamSize={champ.minTeamSize ?? 1}
+              // The per-driver exception SRA-Bot grants. Advisory here —
+              // register_entry() is what actually enforces it.
+              canRegisterSolo={driver.allow_gt3_team_series_solo_registration === true}
               allowedCars={champ.allowedCars}
               simSlug={simSlug}
               availableDrivers={availableDrivers}
@@ -367,6 +395,7 @@ export async function RegisterBody({
     <>
       <div className="mb-16">{userSection}</div>
       <div className="border-t border-line pt-12">
+        <DivisionCapacity rows={divisionCapacity} />
         <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3 mb-8">
           Entry List
         </p>

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eg63ZvTdL66hdOKe19jJ39mheWp7zCpCztVSPkbWx7Sik941KuRt6rAi4xdi1vn
+\restrict KSDerZHDAfEGKUVTydUz2eIlVByPhmjdE1NzoXc6qyKcnD8UXKPp29WAfQpmDJN
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -41,6 +41,59 @@ CREATE TYPE public.driver_tier AS ENUM (
     'gold',
     'silver'
 );
+
+
+--
+-- Name: bump_registrations_on_driver_update(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.bump_registrations_on_driver_update() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if (new.steam_id, new.first_name, new.last_name, new.display_name, new.driver_number)
+     is distinct from
+     (old.steam_id, old.first_name, old.last_name, old.display_name, old.driver_number)
+  then
+    update registrations r
+       set updated_at = now()
+      from registration_drivers rd
+     where rd.driver_id = new.id
+       and rd.registration_id = r.id;
+  end if;
+  return new;
+end $$;
+
+
+--
+-- Name: enqueue_entrylist_push(text[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enqueue_entrylist_push(p_registration_keys text[]) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+BEGIN
+  IF p_registration_keys IS NULL OR cardinality(p_registration_keys) = 0 THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO public.bot_jobs (type, payload)
+  SELECT 'entrylist_push',
+         jsonb_build_object('championship_key', t.emperor_championship_id::text)
+    FROM public.championship_accsm_targets t
+   WHERE t.registration_key = ANY (p_registration_keys)
+  ON CONFLICT DO NOTHING;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION enqueue_entrylist_push(p_registration_keys text[]); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.enqueue_entrylist_push(p_registration_keys text[]) IS 'Queue an ACCSM entrylist rebuild for every enrolled target of these registration_keys. Called from the registration triggers; safe to call by hand to force a resync: SELECT enqueue_entrylist_push(ARRAY[''gt3-liaw'']).';
 
 
 --
@@ -100,7 +153,10 @@ CREATE FUNCTION public.register_entry(p_series text, p_season text, p_championsh
     AS $$
 DECLARE
   v_max               integer;
-  v_requires_division boolean;
+  v_min_team_size     integer;
+  v_max_team_size     integer;
+  v_roster_size       integer;
+  v_allow_solo        boolean;
   v_confirmed_count    integer;
   v_status             text;
   v_waitlist_position  integer;
@@ -109,15 +165,14 @@ DECLARE
   v_driver             jsonb;
   v_driver_id          uuid;
   v_driver_division    integer;
-  v_driver_exists      boolean;
   v_registrant_found   boolean := false;
 BEGIN
   IF p_drivers IS NULL OR jsonb_array_length(p_drivers) = 0 THEN
     RAISE EXCEPTION 'EMPTY_ROSTER: at least one driver is required';
   END IF;
 
-  SELECT max_registrations, requires_division
-    INTO v_max, v_requires_division
+  SELECT max_registrations, min_team_size, max_team_size
+    INTO v_max, v_min_team_size, v_max_team_size
   FROM championships
   WHERE registration_key = p_championship_key
   LIMIT 1;
@@ -134,30 +189,56 @@ BEGIN
       v_registrant_found := true;
     END IF;
 
-    SELECT division_id, true INTO v_driver_division, v_driver_exists
+    SELECT division_id INTO v_driver_division
     FROM drivers WHERE id = v_driver_id;
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'DRIVER_NOT_FOUND: %', v_driver_id;
     END IF;
 
-    -- Grading checks only apply to a championship that grades.
-    IF v_requires_division THEN
-      IF v_driver_division IS NULL THEN
-        RAISE EXCEPTION 'DIVISION_UNASSIGNED: %', v_driver_id;
-      END IF;
+    IF v_driver_division IS NULL THEN
+      RAISE EXCEPTION 'DIVISION_UNASSIGNED: %', v_driver_id;
+    END IF;
 
-      IF v_division_id IS NULL THEN
-        v_division_id := v_driver_division;
-      ELSIF v_division_id != v_driver_division THEN
-        RAISE EXCEPTION 'DIVISION_MISMATCH: driver % is division %, expected %',
-          v_driver_id, v_driver_division, v_division_id;
-      END IF;
+    IF v_division_id IS NULL THEN
+      v_division_id := v_driver_division;
+    ELSIF v_division_id != v_driver_division THEN
+      RAISE EXCEPTION 'DIVISION_MISMATCH: driver % is division %, expected %',
+        v_driver_id, v_driver_division, v_division_id;
     END IF;
   END LOOP;
 
   IF NOT v_registrant_found THEN
     RAISE EXCEPTION 'REGISTRANT_NOT_IN_ROSTER: %', p_registrant_driver_id;
+  END IF;
+
+  -- ── Roster size ────────────────────────────────────────────────────────
+  --
+  -- count(DISTINCT ...), NOT jsonb_array_length: a payload listing the same
+  -- driver twice would otherwise satisfy a minimum of 2 with one person. That
+  -- duplicate would ultimately fail on registration_drivers' unique claim —
+  -- but only AFTER this check had already passed it, so the size rule has to
+  -- count people, not array elements.
+  SELECT count(DISTINCT (d->>'driver_id'))
+    INTO v_roster_size
+  FROM jsonb_array_elements(p_drivers) d;
+
+  IF v_max_team_size IS NOT NULL AND v_roster_size > v_max_team_size THEN
+    RAISE EXCEPTION 'TEAM_TOO_LARGE: % drivers, maximum % for this championship',
+      v_roster_size, v_max_team_size;
+  END IF;
+
+  IF v_roster_size < v_min_team_size THEN
+    -- The per-driver exception, granted by SRA-Bot. coalesce because the
+    -- column is nullable and NULL means "not granted", not "unknown".
+    SELECT coalesce(allow_gt3_team_series_solo_registration, false)
+      INTO v_allow_solo
+    FROM drivers WHERE id = p_registrant_driver_id;
+
+    IF NOT coalesce(v_allow_solo, false) THEN
+      RAISE EXCEPTION 'SOLO_NOT_PERMITTED: % driver(s), minimum % for this championship',
+        v_roster_size, v_min_team_size;
+    END IF;
   END IF;
 
   PERFORM pg_advisory_xact_lock(hashtextextended(p_championship_key || ':' || p_season, 0));
@@ -232,6 +313,35 @@ $$;
 
 
 --
+-- Name: registrations_enqueue_entrylist_push(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.registrations_enqueue_entrylist_push() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+  v_keys text[];
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    SELECT array_agg(DISTINCT championship_key) INTO v_keys FROM new_rows;
+  ELSIF TG_OP = 'DELETE' THEN
+    SELECT array_agg(DISTINCT championship_key) INTO v_keys FROM old_rows;
+  ELSE
+    -- An entry moved between championships has to rebuild both grids.
+    SELECT array_agg(DISTINCT k) INTO v_keys
+      FROM (SELECT championship_key AS k FROM new_rows
+            UNION
+            SELECT championship_key      FROM old_rows) s;
+  END IF;
+
+  PERFORM public.enqueue_entrylist_push(v_keys);
+  RETURN NULL;
+END;
+$$;
+
+
+--
 -- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -242,6 +352,27 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END $$;
+
+
+--
+-- Name: teams_enqueue_entrylist_push(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.teams_enqueue_entrylist_push() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+  v_keys text[];
+BEGIN
+  SELECT array_agg(DISTINCT r.championship_key) INTO v_keys
+    FROM new_rows n
+    JOIN public.registrations r ON r.team_id = n.id;
+
+  PERFORM public.enqueue_entrylist_push(v_keys);
+  RETURN NULL;
+END;
+$$;
 
 
 --
@@ -590,6 +721,26 @@ COMMENT ON COLUMN public.championship_accsm_targets.division_id IS 'Which divisi
 
 
 --
+-- Name: championship_round_division_times; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.championship_round_division_times (
+    championship_round_id uuid NOT NULL,
+    division_id integer NOT NULL,
+    starts_at text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE championship_round_division_times; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.championship_round_division_times IS 'Per-division start time overrides for a round. A division with no row here races at championship_rounds.starts_at. Exists for split-night series like the GT3 Team Series (D1/D3 Tuesday, D2/D4 Wednesday).';
+
+
+--
 -- Name: championship_rounds; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -641,7 +792,12 @@ CREATE TABLE public.championships (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     max_registrations integer,
     requires_division boolean DEFAULT true NOT NULL,
-    CONSTRAINT championships_max_registrations_positive CHECK (((max_registrations IS NULL) OR (max_registrations > 0)))
+    division_driver_cap integer,
+    min_team_size integer DEFAULT 1 NOT NULL,
+    CONSTRAINT championships_division_driver_cap_positive CHECK (((division_driver_cap IS NULL) OR (division_driver_cap > 0))),
+    CONSTRAINT championships_max_registrations_positive CHECK (((max_registrations IS NULL) OR (max_registrations > 0))),
+    CONSTRAINT championships_min_team_size_positive CHECK ((min_team_size >= 1)),
+    CONSTRAINT championships_team_size_range CHECK (((max_team_size IS NULL) OR (min_team_size <= max_team_size)))
 );
 
 
@@ -650,6 +806,20 @@ CREATE TABLE public.championships (
 --
 
 COMMENT ON COLUMN public.championships.requires_division IS 'Whether entries are graded into divisions. TRUE for the GT3 Team Series; FALSE for single-grid events like League in a Week, whose registrants need no division assignment.';
+
+
+--
+-- Name: COLUMN championships.division_driver_cap; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.championships.division_driver_cap IS 'Soft per-division DRIVER target, shown as a count on the register page (e.g. "34 / 55 drivers"). Advisory only — nothing blocks or waitlists on it. Contrast max_registrations, which is a HARD cap on confirmed entries (teams/cars) enforced by register_entry(). NULL = no target shown.';
+
+
+--
+-- Name: COLUMN championships.min_team_size; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.championships.min_team_size IS 'Minimum drivers per entry. 1 (default) means solo entries are fine — Endurance, LIAW. 2 on the GT3 Team Series, where a partner is required unless the registrant has drivers.allow_gt3_team_series_solo_registration granted by SRA-Bot. Enforced in register_entry().';
 
 
 --
@@ -751,7 +921,7 @@ CREATE TABLE public.drivers (
 -- Name: classification_status; Type: VIEW; Schema: public; Owner: -
 --
 
-CREATE VIEW public.classification_status WITH (security_invoker='true') AS
+CREATE VIEW public.classification_status AS
  WITH best_quali AS (
          SELECT DISTINCT ON (acc_hotstint_leaderboard.season, acc_hotstint_leaderboard.steam_id) acc_hotstint_leaderboard.season,
             acc_hotstint_leaderboard.steam_id,
@@ -765,6 +935,13 @@ CREATE VIEW public.classification_status WITH (security_invoker='true') AS
            FROM public.acc_hotstint_leaderboard
           WHERE ((acc_hotstint_leaderboard.board_scope = 'seasonal'::text) AND (acc_hotstint_leaderboard.qualifying = true) AND (acc_hotstint_leaderboard.is_wet = false) AND (acc_hotstint_leaderboard.best_stint_ms IS NOT NULL))
           ORDER BY acc_hotstint_leaderboard.season, acc_hotstint_leaderboard.steam_id, acc_hotstint_leaderboard.best_stint_ms
+        ), quali_laps AS (
+         SELECT acc_hotstint_leaderboard.season,
+            acc_hotstint_leaderboard.steam_id,
+            sum(acc_hotstint_leaderboard.total_laps) AS laps_all_cars
+           FROM public.acc_hotstint_leaderboard
+          WHERE ((acc_hotstint_leaderboard.board_scope = 'seasonal'::text) AND (acc_hotstint_leaderboard.qualifying = true) AND (acc_hotstint_leaderboard.is_wet = false) AND (acc_hotstint_leaderboard.best_stint_ms IS NOT NULL))
+          GROUP BY acc_hotstint_leaderboard.season, acc_hotstint_leaderboard.steam_id
         )
  SELECT c.series,
     c.season,
@@ -787,10 +964,14 @@ CREATE VIEW public.classification_status WITH (security_invoker='true') AS
     bq.car_model,
     bq.sectors_ms,
     bq.car_group,
-    bq.track_key
-   FROM (((public.classification c
+    bq.track_key,
+    r.pace,
+    r.os_ordinal AS racecraft,
+    ql.laps_all_cars AS num_laps_all_cars
+   FROM ((((public.classification c
      LEFT JOIN public.drivers d ON ((d.discord_id = c.discord_id)))
      LEFT JOIN best_quali bq ON (((bq.season = ('S'::text || c.season)) AND (bq.steam_id = ('S'::text || d.steam_id)))))
+     LEFT JOIN quali_laps ql ON (((ql.season = ('S'::text || c.season)) AND (ql.steam_id = ('S'::text || d.steam_id)))))
      LEFT JOIN public.driver_ratings r ON (((r.player_id = ('S'::text || d.steam_id)) AND (r.engine = 'v2-openskill'::text))));
 
 
@@ -831,6 +1012,25 @@ COMMENT ON VIEW public.classification_status_public IS 'Public Hot Stint Qualify
 CREATE TABLE public.divisions (
     id integer NOT NULL,
     name text NOT NULL
+);
+
+
+--
+-- Name: host_metrics; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.host_metrics (
+    host text NOT NULL,
+    role text,
+    cpu_pct double precision,
+    mem_used_mb double precision,
+    mem_total_mb double precision,
+    disk_used_gb double precision,
+    disk_total_gb double precision,
+    load1 double precision,
+    uptime_s bigint,
+    extra jsonb DEFAULT '{}'::jsonb NOT NULL,
+    reported_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1230,6 +1430,14 @@ ALTER TABLE ONLY public.championship_accsm_targets
 
 
 --
+-- Name: championship_round_division_times championship_round_division_times_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_round_division_times
+    ADD CONSTRAINT championship_round_division_times_pkey PRIMARY KEY (championship_round_id, division_id);
+
+
+--
 -- Name: championship_rounds championship_rounds_championship_id_round_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1339,6 +1547,14 @@ ALTER TABLE ONLY public.drivers
 
 ALTER TABLE ONLY public.drivers
     ADD CONSTRAINT drivers_steam_id_key UNIQUE (steam_id);
+
+
+--
+-- Name: host_metrics host_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_metrics
+    ADD CONSTRAINT host_metrics_pkey PRIMARY KEY (host);
 
 
 --
@@ -1526,10 +1742,24 @@ CREATE INDEX acc_race_sessions_staging_session_date_idx ON public.acc_race_sessi
 
 
 --
+-- Name: bot_jobs_entrylist_push_pending_dedup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX bot_jobs_entrylist_push_pending_dedup ON public.bot_jobs USING btree (((payload ->> 'championship_key'::text))) WHERE ((type = 'entrylist_push'::text) AND (status = 'pending'::text));
+
+
+--
 -- Name: bot_jobs_pending; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX bot_jobs_pending ON public.bot_jobs USING btree (created_at) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: bot_jobs_profile_sync_pending_dedup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX bot_jobs_profile_sync_pending_dedup ON public.bot_jobs USING btree (((payload ->> 'discord_id'::text))) WHERE ((type = 'profile_sync'::text) AND (status = 'pending'::text));
 
 
 --
@@ -1694,6 +1924,13 @@ CREATE TRIGGER championship_accsm_targets_updated_at BEFORE UPDATE ON public.cha
 
 
 --
+-- Name: championship_round_division_times championship_round_division_times_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER championship_round_division_times_updated_at BEFORE UPDATE ON public.championship_round_division_times FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: championships championships_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -1708,10 +1945,52 @@ CREATE TRIGGER drivers_updated_at BEFORE UPDATE ON public.drivers FOR EACH ROW E
 
 
 --
+-- Name: registration_drivers registration_drivers_entrylist_push_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER registration_drivers_entrylist_push_delete AFTER DELETE ON public.registration_drivers REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public.registrations_enqueue_entrylist_push();
+
+
+--
+-- Name: registration_drivers registration_drivers_entrylist_push_insert; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER registration_drivers_entrylist_push_insert AFTER INSERT ON public.registration_drivers REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.registrations_enqueue_entrylist_push();
+
+
+--
+-- Name: registration_drivers registration_drivers_entrylist_push_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER registration_drivers_entrylist_push_update AFTER UPDATE ON public.registration_drivers REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.registrations_enqueue_entrylist_push();
+
+
+--
 -- Name: registration_drivers registration_drivers_set_event_key; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER registration_drivers_set_event_key BEFORE INSERT OR UPDATE OF registration_id ON public.registration_drivers FOR EACH ROW EXECUTE FUNCTION public.registration_drivers_set_event_key();
+
+
+--
+-- Name: registrations registrations_entrylist_push_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER registrations_entrylist_push_delete AFTER DELETE ON public.registrations REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION public.registrations_enqueue_entrylist_push();
+
+
+--
+-- Name: registrations registrations_entrylist_push_insert; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER registrations_entrylist_push_insert AFTER INSERT ON public.registrations REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.registrations_enqueue_entrylist_push();
+
+
+--
+-- Name: registrations registrations_entrylist_push_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER registrations_entrylist_push_update AFTER UPDATE ON public.registrations REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.registrations_enqueue_entrylist_push();
 
 
 --
@@ -1733,6 +2012,20 @@ CREATE TRIGGER settings_updated_at BEFORE UPDATE ON public.settings FOR EACH ROW
 --
 
 CREATE TRIGGER team_registrations_updated_at BEFORE UPDATE ON public.team_registrations FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: teams teams_entrylist_push_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER teams_entrylist_push_update AFTER UPDATE ON public.teams REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.teams_enqueue_entrylist_push();
+
+
+--
+-- Name: drivers trg_bump_registrations_on_driver_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_bump_registrations_on_driver_update AFTER UPDATE ON public.drivers FOR EACH ROW EXECUTE FUNCTION public.bump_registrations_on_driver_update();
 
 
 --
@@ -1821,6 +2114,22 @@ ALTER TABLE ONLY public.championship_accsm_targets
 
 ALTER TABLE ONLY public.championship_accsm_targets
     ADD CONSTRAINT championship_accsm_targets_registration_key_fkey FOREIGN KEY (registration_key) REFERENCES public.championships(registration_key) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+
+--
+-- Name: championship_round_division_times championship_round_division_times_championship_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_round_division_times
+    ADD CONSTRAINT championship_round_division_times_championship_round_id_fkey FOREIGN KEY (championship_round_id) REFERENCES public.championship_rounds(id) ON DELETE CASCADE;
+
+
+--
+-- Name: championship_round_division_times championship_round_division_times_division_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_round_division_times
+    ADD CONSTRAINT championship_round_division_times_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.divisions(id);
 
 
 --
@@ -2163,6 +2472,19 @@ CREATE POLICY calendar_events_select_all ON public.calendar_events FOR SELECT US
 ALTER TABLE public.championship_accsm_targets ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: championship_round_division_times; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.championship_round_division_times ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: championship_round_division_times championship_round_division_times_public_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY championship_round_division_times_public_read ON public.championship_round_division_times FOR SELECT TO authenticated, anon USING (true);
+
+
+--
 -- Name: championship_rounds; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2245,6 +2567,33 @@ CREATE POLICY drivers_select_own ON public.drivers FOR SELECT USING ((( SELECT a
 --
 
 CREATE POLICY drivers_update_own ON public.drivers FOR UPDATE USING ((( SELECT auth.uid() AS uid) = user_id));
+
+
+--
+-- Name: host_metrics; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.host_metrics ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: host_metrics host_metrics_anon_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY host_metrics_anon_insert ON public.host_metrics FOR INSERT TO anon WITH CHECK (true);
+
+
+--
+-- Name: host_metrics host_metrics_anon_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY host_metrics_anon_select ON public.host_metrics FOR SELECT TO anon USING (true);
+
+
+--
+-- Name: host_metrics host_metrics_anon_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY host_metrics_anon_update ON public.host_metrics FOR UPDATE TO anon USING (true) WITH CHECK (true);
 
 
 --
@@ -2370,5 +2719,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eg63ZvTdL66hdOKe19jJ39mheWp7zCpCztVSPkbWx7Sik941KuRt6rAi4xdi1vn
+\unrestrict KSDerZHDAfEGKUVTydUz2eIlVByPhmjdE1NzoXc6qyKcnD8UXKPp29WAfQpmDJN
 

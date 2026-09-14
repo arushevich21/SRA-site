@@ -3,6 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/require-admin';
 import { supabase } from '@/lib/supabase';
+import {
+  notifyDiscordProfileUpdatedMany,
+  type DiscordNudgeOutcome,
+} from '@/lib/discord-notify';
 
 // drivers.division_id/drivers.tier feed the tier badge (getDriverTierBadge,
 // lib/driver-tier-badge.ts) wherever a driver's registered classification is
@@ -37,12 +41,48 @@ function revalidateDriverTierBadgePages(): void {
   revalidatePath('/[sim]/championships/[slug]/leaderboards', 'page');
 }
 
+export type AssignResult = {
+  updated: number;
+  discord: DiscordNudgeOutcome;
+};
+
+// Pushes a division/tier change back out to Discord.
+//
+// drivers.division_id and drivers.tier are what the bot's member_role_sync
+// reads to decide a member's division ROLE — but the bot only ever runs that
+// sync from its on_member_update listener; it does not poll. So a write here
+// that isn't followed by a nudge leaves the driver graded on the site with no
+// matching Discord role, indefinitely.
+//
+// This is the same loop /profile already closes on a self-service profile save
+// (see app/profile/actions.ts). It was simply never wired to the admin grading
+// path, which is where divisions are actually assigned.
+//
+// Looks discord_id up from the ids just written rather than taking it from the
+// caller: the client sends driver row ids, and a stale client-side discord_id
+// would nudge the wrong member.
+async function nudgeDiscordFor(driverIds: string[]): Promise<DiscordNudgeOutcome> {
+  const { data, error } = await supabase
+    .from('drivers')
+    .select('discord_id')
+    .in('id', driverIds);
+
+  // A failed lookup must not fail the grading write, which has already
+  // committed — report it as "nothing nudged" and let the admin resync.
+  if (error) {
+    console.error('[divisions] discord_id lookup failed, skipping nudge:', error.message);
+    return { kind: 'none' };
+  }
+
+  return notifyDiscordProfileUpdatedMany((data ?? []).map((d) => d.discord_id as string | null));
+}
+
 export async function assignDivision(
   driverIds: string[],
   divisionId: number | null,
-): Promise<void> {
+): Promise<AssignResult> {
   await requireAdmin();
-  if (driverIds.length === 0) return;
+  if (driverIds.length === 0) return { updated: 0, discord: { kind: 'none' } };
 
   const { error } = await supabase
     .from('drivers')
@@ -51,14 +91,15 @@ export async function assignDivision(
 
   if (error) throw new Error(error.message);
   revalidateDriverTierBadgePages();
+  return { updated: driverIds.length, discord: await nudgeDiscordFor(driverIds) };
 }
 
 export async function assignTier(
   driverIds: string[],
   tier: 'gold' | 'silver' | null,
-): Promise<void> {
+): Promise<AssignResult> {
   await requireAdmin();
-  if (driverIds.length === 0) return;
+  if (driverIds.length === 0) return { updated: 0, discord: { kind: 'none' } };
 
   const { error } = await supabase
     .from('drivers')
@@ -67,6 +108,7 @@ export async function assignTier(
 
   if (error) throw new Error(error.message);
   revalidateDriverTierBadgePages();
+  return { updated: driverIds.length, discord: await nudgeDiscordFor(driverIds) };
 }
 
 /**
@@ -77,14 +119,14 @@ export async function assignBulk(
   driverIds: string[],
   divisionId: number | null | undefined,
   tier: 'gold' | 'silver' | null | undefined,
-): Promise<void> {
+): Promise<AssignResult> {
   await requireAdmin();
-  if (driverIds.length === 0) return;
+  if (driverIds.length === 0) return { updated: 0, discord: { kind: 'none' } };
 
   const patch: Record<string, unknown> = {};
   if (divisionId !== undefined) patch.division_id = divisionId;
   if (tier !== undefined) patch.tier = tier;
-  if (Object.keys(patch).length === 0) return;
+  if (Object.keys(patch).length === 0) return { updated: 0, discord: { kind: 'none' } };
 
   const { error } = await supabase
     .from('drivers')
@@ -93,6 +135,10 @@ export async function assignBulk(
 
   if (error) throw new Error(error.message);
   revalidateDriverTierBadgePages();
+  // A grading run over the whole cohort exceeds DISCORD_NUDGE_LIMIT and comes
+  // back 'deferred-to-bulk' — the UI then tells the admin to run SRA-Bot's
+  // bulk resync, which is far quicker than hundreds of throttled webhooks.
+  return { updated: driverIds.length, discord: await nudgeDiscordFor(driverIds) };
 }
 
 export type ResolveDiscordIdsResult = {

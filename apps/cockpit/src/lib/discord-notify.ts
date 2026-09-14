@@ -119,3 +119,60 @@ export async function notifyDiscordProfileUpdated(
     );
   }
 }
+
+/**
+ * How many drivers a single admin action will nudge individually before it
+ * stops and defers to the bot's bulk resync command.
+ *
+ * Discord rate-limits a webhook to roughly 5 requests per 2 seconds (and ~30
+ * messages/minute per channel), so nudging the whole 221-driver classification
+ * cohort one at a time would take minutes and blow the server action's
+ * execution budget long before it finished. A small edit — regrading a handful
+ * of drivers — is worth nudging inline; a bulk run is the bot's job.
+ */
+export const DISCORD_NUDGE_LIMIT = 10;
+
+// Spacing between nudges. Comfortably under Discord's ~5-per-2s webhook bucket
+// while keeping a full batch (10 × 250ms = 2.5s) inside a server action's
+// budget alongside the DB write it follows.
+const NUDGE_SPACING_MS = 250;
+
+export type DiscordNudgeOutcome =
+  /** Every affected driver was nudged individually. */
+  | { kind: 'nudged'; count: number }
+  /** Too many to nudge inline — SRA-Bot's bulk resync should be run instead. */
+  | { kind: 'deferred-to-bulk'; count: number }
+  /** Nothing to do: no affected driver had a usable discord_id. */
+  | { kind: 'none' };
+
+/**
+ * Nudges a set of drivers, throttled, or defers when the set is too large.
+ *
+ * Same trigger-not-transfer semantics as {@link notifyDiscordProfileUpdated}:
+ * each nudge makes the bot re-read that driver's row out of Supabase, so the
+ * division/tier written immediately before this call is what the bot picks up.
+ * Never throws — a Discord problem must not fail a grading write that already
+ * committed.
+ */
+export async function notifyDiscordProfileUpdatedMany(
+  discordIds: (string | null | undefined)[],
+  // Overridable so tests don't spend real seconds asleep. Production callers
+  // pass nothing and get the throttle.
+  { spacingMs = NUDGE_SPACING_MS }: { spacingMs?: number } = {},
+): Promise<DiscordNudgeOutcome> {
+  const ids = [...new Set(discordIds.filter((id): id is string => !!id && id.trim() !== ''))];
+
+  if (ids.length === 0) return { kind: 'none' };
+  if (ids.length > DISCORD_NUDGE_LIMIT) return { kind: 'deferred-to-bulk', count: ids.length };
+
+  for (const [i, id] of ids.entries()) {
+    // Sequential, not Promise.all: the whole point is to stay under the rate
+    // limit, and firing them in parallel would defeat that.
+    await notifyDiscordProfileUpdated(id);
+    if (spacingMs > 0 && i < ids.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, spacingMs));
+    }
+  }
+
+  return { kind: 'nudged', count: ids.length };
+}
