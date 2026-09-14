@@ -11,6 +11,7 @@ import type { ChampionshipInput } from './actions';
 export function rowToInput(
   row: ChampionshipRow & { id: string },
   divisionTargets: { divisionId: number; emperorChampionshipId: string }[] = [],
+  raceNights: { divisionId: number; dayOffset: number }[] = [],
 ): ChampionshipInput {
   return {
     id: row.id,
@@ -42,6 +43,10 @@ export function rowToInput(
     teaserOnly: row.teaser_only,
     concluded: row.concluded,
     sortOrder: row.sort_order,
+    raceNights: raceNights.map((n) => ({
+      divisionId: String(n.divisionId),
+      dayOffset: String(n.dayOffset),
+    })),
     divisionTargets: divisionTargets.map((t) => ({
       divisionId: String(t.divisionId),
       championshipId: t.emperorChampionshipId,

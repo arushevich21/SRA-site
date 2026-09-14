@@ -9,6 +9,7 @@ import {
   type ChampionshipInput,
   type ChampionshipRoundInput,
   type DivisionTargetInput,
+  type RaceNightInput,
 } from './actions';
 import { blankRound, blankDivisionTarget } from './blank';
 import { SIMS } from '@/content/sims';
@@ -169,6 +170,30 @@ export function EventForm({
   function removeDivisionTarget(i: number): void {
     setDivisionTargets(divisionTargets.filter((_, idx) => idx !== i));
   }
+
+  // ── Race nights ─────────────────────────────────────────────────────────
+  //
+  // The rule is per division and does not vary round to round, so it is
+  // entered once here rather than as a second date on all 8 rounds. Saving
+  // regenerates each round's per-division time from it.
+  function raceNightOffset(divisionId: number): string {
+    return f.raceNights.find((n) => n.divisionId === String(divisionId))?.dayOffset ?? '0';
+  }
+
+  function setRaceNightOffset(divisionId: number, dayOffset: string): void {
+    setF((prev) => {
+      const others = prev.raceNights.filter((n) => n.divisionId !== String(divisionId));
+      // Offset 0 is the default and needs no row — dropping it keeps the
+      // stored rule to only the divisions that actually race later.
+      const next: RaceNightInput[] =
+        dayOffset === '0'
+          ? others
+          : [...others, { divisionId: String(divisionId), dayOffset }];
+      return { ...prev, raceNights: next };
+    });
+  }
+
+  const hasSplitNights = f.raceNights.some((n) => n.dayOffset !== '0');
 
   // An event is either ONE ACCSM championship or a series spanning several.
   // The single-ID field is disabled while division rows exist (and vice versa)
@@ -470,6 +495,42 @@ export function EventForm({
       </Section>
 
       <Section title="Rounds">
+        {f.requiresDivision && divisions.length > 0 && (
+          <div className="border border-line bg-carbon-2 p-4 mb-2">
+            <span className={labelCls}>Race nights</span>
+            <p className="font-sans text-[13px] text-txt-3 mt-2 mb-4">
+              For a series that races the same round across two nights — the GT3 Team Series runs
+              divisions 1 &amp; 3 on the round&apos;s own date and divisions 2 &amp; 4 the next
+              day. Set it once here and every round below gets both nights automatically; you
+              still only enter one date per round.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {divisions.map((d) => (
+                <label key={d.id} className={labelCls}>
+                  {d.name}
+                  <select
+                    className={inputCls}
+                    value={raceNightOffset(d.id)}
+                    onChange={(e) => setRaceNightOffset(d.id, e.target.value)}
+                  >
+                    <option value="0">Round date</option>
+                    {[1, 2, 3, 4, 5, 6].map((n) => (
+                      <option key={n} value={String(n)}>
+                        +{n} day{n > 1 ? 's' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+            {hasSplitNights && (
+              <p className="font-sans text-[12px] text-txt-3 mt-3">
+                Same start time on both nights — only the date shifts, so 9:00 PM stays 9:00 PM
+                even across a daylight-saving change.
+              </p>
+            )}
+          </div>
+        )}
         <div className="flex flex-col gap-4">
           {f.rounds.map((r, i) => (
             <div key={i} className="border border-line bg-carbon-2 p-4">

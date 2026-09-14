@@ -135,6 +135,24 @@ export async function getAccsmTargetsForKey(
     }));
 }
 
+// The series-level race-night rule, for pre-filling the admin form. Only
+// divisions that race LATER than the round date have a row; the form renders
+// every division and treats a missing one as offset 0.
+export async function getRaceNightsForChampionship(
+  championshipId: string,
+): Promise<{ divisionId: number; dayOffset: number }[]> {
+  const { data, error } = await supabase
+    .from('championship_division_nights')
+    .select('division_id, day_offset')
+    .eq('championship_id', championshipId)
+    .order('division_id', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    divisionId: r.division_id as number,
+    dayOffset: r.day_offset as number,
+  }));
+}
+
 // Division list for the admin form's division picker.
 export async function getDivisions(): Promise<{ id: number; name: string }[]> {
   const { data, error } = await supabase.from('divisions').select('id, name').order('id');

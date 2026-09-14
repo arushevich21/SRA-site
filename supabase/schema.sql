@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KSDerZHDAfEGKUVTydUz2eIlVByPhmjdE1NzoXc6qyKcnD8UXKPp29WAfQpmDJN
+\restrict a6T1VjneDgxSPcHj34Xaw7nnyTTGvCY93MvIZF4c3TbHGEfRLXwyQbPPJEbQ1c9
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -721,6 +721,27 @@ COMMENT ON COLUMN public.championship_accsm_targets.division_id IS 'Which divisi
 
 
 --
+-- Name: championship_division_nights; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.championship_division_nights (
+    championship_id uuid NOT NULL,
+    division_id integer NOT NULL,
+    day_offset integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT championship_division_nights_offset_range CHECK (((day_offset >= 0) AND (day_offset <= 6)))
+);
+
+
+--
+-- Name: TABLE championship_division_nights; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.championship_division_nights IS 'Series-level race-night rule: days after a round''s own date that each division races. Authoring input for championship_round_division_times, which is regenerated from this on save and is what the site actually reads. A division with no row races on the round date.';
+
+
+--
 -- Name: championship_round_division_times; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1430,6 +1451,14 @@ ALTER TABLE ONLY public.championship_accsm_targets
 
 
 --
+-- Name: championship_division_nights championship_division_nights_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_division_nights
+    ADD CONSTRAINT championship_division_nights_pkey PRIMARY KEY (championship_id, division_id);
+
+
+--
 -- Name: championship_round_division_times championship_round_division_times_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1924,6 +1953,13 @@ CREATE TRIGGER championship_accsm_targets_updated_at BEFORE UPDATE ON public.cha
 
 
 --
+-- Name: championship_division_nights championship_division_nights_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER championship_division_nights_updated_at BEFORE UPDATE ON public.championship_division_nights FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: championship_round_division_times championship_round_division_times_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2114,6 +2150,22 @@ ALTER TABLE ONLY public.championship_accsm_targets
 
 ALTER TABLE ONLY public.championship_accsm_targets
     ADD CONSTRAINT championship_accsm_targets_registration_key_fkey FOREIGN KEY (registration_key) REFERENCES public.championships(registration_key) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+
+--
+-- Name: championship_division_nights championship_division_nights_championship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_division_nights
+    ADD CONSTRAINT championship_division_nights_championship_id_fkey FOREIGN KEY (championship_id) REFERENCES public.championships(id) ON DELETE CASCADE;
+
+
+--
+-- Name: championship_division_nights championship_division_nights_division_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.championship_division_nights
+    ADD CONSTRAINT championship_division_nights_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.divisions(id);
 
 
 --
@@ -2472,6 +2524,12 @@ CREATE POLICY calendar_events_select_all ON public.calendar_events FOR SELECT US
 ALTER TABLE public.championship_accsm_targets ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: championship_division_nights; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.championship_division_nights ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: championship_round_division_times; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2719,5 +2777,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KSDerZHDAfEGKUVTydUz2eIlVByPhmjdE1NzoXc6qyKcnD8UXKPp29WAfQpmDJN
+\unrestrict a6T1VjneDgxSPcHj34Xaw7nnyTTGvCY93MvIZF4c3TbHGEfRLXwyQbPPJEbQ1c9
 
