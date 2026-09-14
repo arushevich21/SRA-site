@@ -127,6 +127,52 @@ export function accsmTargetForDivision(
   return c.accsmTargets?.find((t) => t.divisionId === divisionId) ?? null;
 }
 
+/** One night a round is raced on, and which divisions race it. */
+export type RoundNight = {
+  startsAt: string | null;
+  /**
+   * Divisions racing this night. EMPTY means "everyone" — either the series
+   * isn't graded, or every division races the same night — and the caller
+   * should then show no division labels at all rather than listing all four.
+   */
+  divisionIds: number[];
+};
+
+/**
+ * Splits a round into the nights it is actually raced on.
+ *
+ * A split-night series runs one round across two evenings (GT3 S19: D1/D3
+ * Tuesday, D2/D4 Wednesday), so anything presenting a round to a driver — the
+ * schedule list, the calendar grid — has to show both, and show which
+ * divisions belong to each. Rendering only `round.date` tells half the grid
+ * the wrong night.
+ *
+ * Returns a single unlabelled night whenever there is nothing to distinguish:
+ * an ungraded series, or one where every division happens to race together.
+ * Labelling that case with all four badges would be noise.
+ */
+export function roundNights(round: ScheduleRound, divisionIds: number[]): RoundNight[] {
+  if (divisionIds.length === 0) return [{ startsAt: round.date, divisionIds: [] }];
+
+  const byStart = new Map<string, number[]>();
+  for (const divisionId of [...divisionIds].sort((a, b) => a - b)) {
+    // '' stands in for a fully-TBA round so it groups like any other value;
+    // converted back to null on the way out.
+    const key = roundStartsAtForDivision(round, divisionId) ?? '';
+    const existing = byStart.get(key);
+    if (existing) existing.push(divisionId);
+    else byStart.set(key, [divisionId]);
+  }
+
+  if (byStart.size <= 1) return [{ startsAt: round.date, divisionIds: [] }];
+
+  return [...byStart.entries()]
+    .map(([startsAt, ids]) => ({ startsAt: startsAt === '' ? null : startsAt, divisionIds: ids }))
+    // Chronological, so the first night listed is the first one raced. A TBA
+    // night sorts last — it has no date to place it by.
+    .sort((a, b) => (a.startsAt ?? '￿').localeCompare(b.startsAt ?? '￿'));
+}
+
 export function getStandingsKey(c: ChampionshipContent): string | undefined {
   return c.standingsKey ?? (c.simgridId != null ? String(c.simgridId) : undefined);
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { DivisionBadge } from './DivisionBadge';
 import { useEffect, useMemo, useState } from 'react';
 import { eventDateTimeParts, eventInstant, hasEventTime } from '@/lib/event-time';
 
@@ -12,6 +13,9 @@ export type CalendarGridEvent = {
   title: string;
   href: string;
   color?: string;
+  // Divisions racing this particular night, for a split-night series where one
+  // round appears on the grid twice. Empty/absent = everyone, so no badges.
+  divisionIds?: number[];
 };
 
 const WEEKDAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -194,6 +198,13 @@ export function CalendarGrid({ events }: { events: CalendarGridEvent[] }) {
                 >
                   <span className="block truncate font-mono text-[10px] tracking-[.05em] uppercase text-txt-2 hover:text-gold">
                     {event.title}
+                    {event.divisionIds && event.divisionIds.length > 0 && (
+                      <span className="flex items-center gap-0.5 mt-0.5">
+                        {event.divisionIds.map((d) => (
+                          <DivisionBadge key={d} division={d} height={14} />
+                        ))}
+                      </span>
+                    )}
                   </span>
                   {at.time && (
                     <span className="block truncate font-mono text-[9px] tracking-[.05em] text-txt-3">

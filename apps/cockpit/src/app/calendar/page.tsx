@@ -9,7 +9,7 @@ import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
 import { getCalendarEvents } from '@/lib/calendar-events-store';
 import { getAccRaceEvents, matchAccRoundsToResultEventsFrom } from '@/lib/acc/race-results-store';
-import { accsmChampionshipIds, type ChampionshipContent } from '@/content/championships';
+import { accsmChampionshipIds, type ChampionshipContent, roundNights } from '@/content/championships';
 
 export default async function CalendarPage() {
   const [championships, calendarEvents] = await Promise.all([
@@ -43,16 +43,23 @@ export default async function CalendarPage() {
     return hasResults(champ, round) ? `${champHref}/results/${round.round}` : champHref;
   };
 
+  // One entry PER NIGHT, not per round: a split-night series races the same
+  // round across two evenings, and placing it only on the first told half the
+  // grid the wrong day. Each entry badges the divisions racing that night.
   const gridEvents: CalendarGridEvent[] = realChamps.flatMap((champ) => {
     const sim = SIMS.find((s) => s.game === champ.game);
-    return champ.schedule
-      .filter((round) => round.date)
-      .map((round) => ({
-        iso: round.date!,
-        title: `${champ.game} · R${round.round} · ${round.track}`,
-        href: resultsHref(champ, round, sim),
-        color: sim?.accentColor,
-      }));
+    const divisionIds = champ.accsmTargets?.map((t) => t.divisionId) ?? [];
+    return champ.schedule.flatMap((round) =>
+      roundNights(round, divisionIds)
+        .filter((night) => night.startsAt)
+        .map((night) => ({
+          iso: night.startsAt!,
+          title: `${champ.game} · R${round.round} · ${round.track}`,
+          href: resultsHref(champ, round, sim),
+          color: sim?.accentColor,
+          divisionIds: night.divisionIds,
+        })),
+    );
   });
 
   // Admin-managed, non-race entries (deadlines, streams, announcements) —
