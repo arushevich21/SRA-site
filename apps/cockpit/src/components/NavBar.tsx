@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { getSimBySlug, SIMS, type SimConfig } from '@/content/sims';
-import { getStandingsKey, type ChampionshipContent } from '@/content/championships';
+import {
+  accsmChampionshipIds,
+  getStandingsKey,
+  type ChampionshipContent,
+} from '@/content/championships';
 import { GameLabel } from '@/components/GameLabel';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
@@ -101,10 +105,16 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
   // emperor_championship_id already set (e.g. GT3 Team Series S19, wired up
   // ahead of actually going live) slipped into the dropdown as a second,
   // stale entry alongside the one real active championship.
+  //
+  // accsmChampionshipIds covers BOTH shapes — a single-championship event and
+  // a multi-division series, whose emperor_championship_id is NULL by design
+  // (its per-division ids live in championship_accsm_targets). Testing the
+  // single column alone dropped the GT3 Team Series out of this dropdown
+  // entirely.
   const standingsChamps = champsForSim.filter(
-    (c) => !c.teaserOnly && (c.emperorChampionshipId || getStandingsKey(c)),
+    (c) => !c.teaserOnly && (accsmChampionshipIds(c).length > 0 || getStandingsKey(c)),
   );
-  const leaderboardChamps = champsForSim.filter((c) => c.emperorChampionshipId);
+  const leaderboardChamps = champsForSim.filter((c) => accsmChampionshipIds(c).length > 0);
   // Only championships with registration currently OPEN belong in the Register
   // menu — a closed/disabled one drops out (and the whole Register item goes
   // away once none are open).

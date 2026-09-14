@@ -1,4 +1,4 @@
-import type { ChampionshipInput, ChampionshipRoundInput } from './actions';
+import type { ChampionshipInput, ChampionshipRoundInput, DivisionTargetInput } from './actions';
 
 // Blank-form factories. Kept in a plain (non-'use client') module so server
 // components (e.g. the New Event page) can call blankInput() directly — a
@@ -8,6 +8,10 @@ export function blankRound(round: number): ChampionshipRoundInput {
   return { round, track: '', raceLength: '', startsAt: '', emperorTrack: '', emperorRawTrackName: '', hotlapReleased: false };
 }
 
+export function blankDivisionTarget(): DivisionTargetInput {
+  return { divisionId: '', championshipId: '' };
+}
+
 export function blankInput(): ChampionshipInput {
   return {
     slug: '', game: 'ACC', title: '', classTag: '', formatTag: '',
@@ -15,7 +19,7 @@ export function blankInput(): ChampionshipInput {
     rulesBullets: [], discordLinks: [], resultsUrl: '', resultsLabel: '',
     emperorChampionshipId: '', simgridId: '', standingsKey: '',
     registrationKey: '', registrationSeason: '', registrationOpen: false,
-    maxTeamSize: '', maxRegistrations: '', allowedCars: [], requiresDivision: true, teaserOnly: false, concluded: false,
-    sortOrder: 0, rounds: [],
+    maxTeamSize: '', minTeamSize: '', maxRegistrations: '', allowedCars: [], requiresDivision: true, teaserOnly: false, concluded: false,
+    sortOrder: 0, rounds: [], divisionTargets: [],
   };
 }

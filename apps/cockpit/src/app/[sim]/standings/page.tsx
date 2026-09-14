@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { getStandingsKey } from '@/content/championships';
+import { accsmChampionshipIds, getStandingsKey } from '@/content/championships';
 import { getChampionships } from '@/lib/championships-store';
 import { ChampionshipStandingsBody } from '@/components/ChampionshipStandingsBody';
 import { GameLabel } from '@/components/GameLabel';
@@ -15,10 +15,13 @@ export const revalidate = 300;
 
 export default async function SimStandingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sim: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { sim: slug } = await params;
+  const query = await searchParams;
   const sim = getSimBySlug(slug);
   if (!sim) notFound();
 
@@ -29,8 +32,15 @@ export default async function SimStandingsPage({
   // going live (e.g. GT3 Team Series S19) could out-rank the real active
   // one by sort_order and get shown here instead — same bug as the nav's
   // Standings dropdown (see NavBar.tsx's buildSimNav).
+  // accsmChampionshipIds, not emperorChampionshipId: a multi-division series
+  // has no single Emperor id (it is NULL on the row by design — see
+  // 20260914_gt3_team_series_one_brand.sql), so testing that column alone
+  // would drop the GT3 Team Series out of Standings entirely.
   const champ = (await getChampionships()).find(
-    (c) => c.game === sim.game && !c.teaserOnly && (c.emperorChampionshipId || getStandingsKey(c)),
+    (c) =>
+      c.game === sim.game &&
+      !c.teaserOnly &&
+      (accsmChampionshipIds(c).length > 0 || getStandingsKey(c)),
   );
 
   return (
@@ -46,7 +56,11 @@ export default async function SimStandingsPage({
       </h1>
 
       {champ ? (
-        <ChampionshipStandingsBody champ={champ} />
+        <ChampionshipStandingsBody
+          champ={champ}
+          basePath={`/${slug}/standings`}
+          searchParams={query}
+        />
       ) : (
         <div className="border border-line/50 bg-carbon-2 px-8 py-12 text-center">
           <p className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3">

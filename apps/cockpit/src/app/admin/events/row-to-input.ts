@@ -3,7 +3,15 @@ import type { ChampionshipInput } from './actions';
 
 // DB row -> the form's working shape. NULLs become '' (empty inputs); the
 // rounds array is sorted and its NULLs likewise blanked.
-export function rowToInput(row: ChampionshipRow & { id: string }): ChampionshipInput {
+//
+// Division targets live in championship_accsm_targets, keyed by
+// registration_key rather than championships.id (see 20260825i), so they
+// can't ride along on the championships row — the caller reads them with
+// getAccsmTargetsForKey and passes them in.
+export function rowToInput(
+  row: ChampionshipRow & { id: string },
+  divisionTargets: { divisionId: number; emperorChampionshipId: string }[] = [],
+): ChampionshipInput {
   return {
     id: row.id,
     slug: row.slug,
@@ -27,12 +35,17 @@ export function rowToInput(row: ChampionshipRow & { id: string }): ChampionshipI
     registrationSeason: row.registration_season ?? '',
     registrationOpen: row.registration_open,
     maxTeamSize: row.max_team_size != null ? String(row.max_team_size) : '',
+    minTeamSize: row.min_team_size != null ? String(row.min_team_size) : '',
     maxRegistrations: row.max_registrations != null ? String(row.max_registrations) : '',
     allowedCars: row.allowed_cars ?? [],
     requiresDivision: row.requires_division ?? true,
     teaserOnly: row.teaser_only,
     concluded: row.concluded,
     sortOrder: row.sort_order,
+    divisionTargets: divisionTargets.map((t) => ({
+      divisionId: String(t.divisionId),
+      championshipId: t.emperorChampionshipId,
+    })),
     rounds: (row.championship_rounds ?? [])
       .slice()
       .sort((a, b) => a.round - b.round)
