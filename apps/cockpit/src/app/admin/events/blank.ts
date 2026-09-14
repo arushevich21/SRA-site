@@ -20,6 +20,6 @@ export function blankInput(): ChampionshipInput {
     emperorChampionshipId: '', simgridId: '', standingsKey: '',
     registrationKey: '', registrationSeason: '', registrationOpen: false,
     maxTeamSize: '', minTeamSize: '', maxRegistrations: '', allowedCars: [], requiresDivision: true, teaserOnly: false, concluded: false,
-    sortOrder: 0, rounds: [], divisionTargets: [],
+    sortOrder: 0, rounds: [], divisionTargets: [], raceNights: [],
   };
 }

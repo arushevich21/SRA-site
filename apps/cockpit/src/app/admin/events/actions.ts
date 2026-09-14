@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/require-admin';
 import { supabase } from '@/lib/supabase';
 import { parseAccsmChampionshipId } from '@/lib/accsm-championship-id';
+import { addDaysToEventDate } from '@/lib/event-time';
 
 // Structured payload the EventForm sends. Empty strings mean "unset" and are
 // converted to NULL; numeric-ish strings are parsed. Kept as a plain object
@@ -25,6 +26,13 @@ export type ChampionshipRoundInput = {
 export type DivisionTargetInput = {
   divisionId: string;
   championshipId: string;
+};
+
+// One division's race-night rule: how many days after a round's own date it
+// races. Strings because they come off select inputs.
+export type RaceNightInput = {
+  divisionId: string;
+  dayOffset: string;
 };
 
 export type ChampionshipInput = {
@@ -61,6 +69,8 @@ export type ChampionshipInput = {
   // Multi-division series only — written to championship_accsm_targets, not
   // to the championships row. Empty for a single-championship event.
   divisionTargets: DivisionTargetInput[];
+  // Split-night series only. Divisions absent here race on the round date.
+  raceNights: RaceNightInput[];
 };
 
 export type SaveResult = { ok: true; id: string } | { ok: false; error: string };
@@ -232,6 +242,100 @@ async function saveDivisionTargets(
   return delErr ? delErr.message : null;
 }
 
+// Persists the series-level race-night rule, then REGENERATES
+// championship_round_division_times from it.
+//
+// The rule is the authoring input; those per-round rows are what the site
+// actually reads (roundStartsAtForDivision). Deriving them on every save means
+// the two can never disagree, and that adding or moving a round automatically
+// gets the right second night rather than needing 16 rows retyped.
+//
+// Only offsets > 0 produce rows: offset 0 means "races on the round date",
+// which is exactly what an ABSENT row already means. Writing a row for it
+// would be a redundant duplicate of championship_rounds.starts_at that could
+// later drift from it.
+async function saveRaceNights(
+  championshipId: string,
+  raceNights: RaceNightInput[],
+): Promise<string | null> {
+  const parsed = raceNights
+    .map((n) => ({ divisionId: intOrNull(n.divisionId), dayOffset: intOrNull(n.dayOffset) ?? 0 }))
+    .filter((n): n is { divisionId: number; dayOffset: number } => n.divisionId != null);
+
+  const shifted = parsed.filter((n) => n.dayOffset > 0);
+
+  // ── the rule itself ────────────────────────────────────────────────────
+  if (shifted.length > 0) {
+    const { error } = await supabase
+      .from('championship_division_nights')
+      .upsert(
+        shifted.map((n) => ({
+          championship_id: championshipId,
+          division_id: n.divisionId,
+          day_offset: n.dayOffset,
+        })),
+        { onConflict: 'championship_id,division_id' },
+      );
+    if (error) return error.message;
+  }
+
+  let delRule = supabase
+    .from('championship_division_nights')
+    .delete()
+    .eq('championship_id', championshipId);
+  if (shifted.length > 0) {
+    delRule = delRule.not('division_id', 'in', `(${shifted.map((n) => n.divisionId).join(',')})`);
+  }
+  const { error: delRuleErr } = await delRule;
+  if (delRuleErr) return delRuleErr.message;
+
+  // ── regenerate the per-round times ─────────────────────────────────────
+  const { data: roundRowsForChamp, error: readErr } = await supabase
+    .from('championship_rounds')
+    .select('id, starts_at')
+    .eq('championship_id', championshipId);
+  if (readErr) return readErr.message;
+
+  const generated: { championship_round_id: string; division_id: number; starts_at: string }[] = [];
+  for (const round of roundRowsForChamp ?? []) {
+    const startsAt = round.starts_at as string | null;
+    // A fully-TBA round has no date to offset from. Skipped rather than
+    // guessed — an invented second night would read as a scheduled race.
+    if (!startsAt) continue;
+    for (const { divisionId, dayOffset } of shifted) {
+      generated.push({
+        championship_round_id: round.id as string,
+        division_id: divisionId,
+        starts_at: addDaysToEventDate(startsAt, dayOffset),
+      });
+    }
+  }
+
+  if (generated.length > 0) {
+    const { error } = await supabase
+      .from('championship_round_division_times')
+      .upsert(generated, { onConflict: 'championship_round_id,division_id' });
+    if (error) return error.message;
+  }
+
+  // Clear rows for divisions no longer shifted. Scoped through this
+  // championship's rounds only — this table is shared across championships.
+  const roundIds = (roundRowsForChamp ?? []).map((r) => r.id as string);
+  if (roundIds.length > 0) {
+    let delTimes = supabase
+      .from('championship_round_division_times')
+      .delete()
+      .in('championship_round_id', roundIds);
+    if (shifted.length > 0) {
+      delTimes = delTimes.not('division_id', 'in', `(${shifted.map((n) => n.divisionId).join(',')})`);
+    }
+    const { error } = await delTimes;
+    if (error) return error.message;
+  }
+
+  return null;
+}
+
 export async function saveChampionship(input: ChampionshipInput): Promise<SaveResult> {
   await requireAdmin();
 
@@ -290,18 +394,39 @@ export async function saveChampionship(input: ChampionshipInput): Promise<SaveRe
     championshipId = data.id as string;
   }
 
-  // Replace rounds wholesale (matches the seed script's approach).
-  const { error: delErr } = await supabase
+  // Upsert rounds on (championship_id, round) — NOT the delete-and-reinsert
+  // this used to do.
+  //
+  // That pattern gave every round a NEW id on every save, and
+  // championship_round_division_times references championship_rounds(id) ON
+  // DELETE CASCADE. So one innocuous save of an event silently destroyed every
+  // per-division race night it had — confirmed live: all 16 of S19's rows
+  // vanished the first time the event was opened and saved, leaving D2/D4
+  // shown as racing the Tuesday.
+  //
+  // Upserting preserves ids, so anything hanging off a round survives an edit.
+  const rows = roundRows(championshipId, input.rounds);
+  if (rows.length > 0) {
+    const { error: upErr } = await supabase
+      .from('championship_rounds')
+      .upsert(rows, { onConflict: 'championship_id,round' });
+    if (upErr) return { ok: false, error: upErr.message };
+  }
+
+  // Then drop only the rounds the admin actually removed. Expressed as "not in
+  // the submitted set" so clearing every round still clears them.
+  let delRounds = supabase
     .from('championship_rounds')
     .delete()
     .eq('championship_id', championshipId);
+  if (rows.length > 0) {
+    delRounds = delRounds.not('round', 'in', `(${rows.map((r) => r.round).join(',')})`);
+  }
+  const { error: delErr } = await delRounds;
   if (delErr) return { ok: false, error: delErr.message };
 
-  const rows = roundRows(championshipId, input.rounds);
-  if (rows.length > 0) {
-    const { error: insErr } = await supabase.from('championship_rounds').insert(rows);
-    if (insErr) return { ok: false, error: insErr.message };
-  }
+  const raceNightErr = await saveRaceNights(championshipId, input.raceNights);
+  if (raceNightErr) return { ok: false, error: raceNightErr };
 
   // After the championships write, so a registration_key set or renamed in
   // this same save exists (and has cascaded to any existing targets) before

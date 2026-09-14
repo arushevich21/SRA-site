@@ -5,6 +5,7 @@ import {
   getAccsmTargetsForKey,
   getChampionshipRowById,
   getDivisions,
+  getRaceNightsForChampionship,
 } from '@/lib/championships-store';
 import { getEventRegistrationSummary } from '@/lib/registrations';
 import { EventForm } from '../EventForm';
@@ -30,9 +31,10 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   // Division targets hang off registration_key, so an event without one has
   // none by construction — skip the query rather than asking for rows keyed by
   // null.
-  const [divisionTargets, divisions] = await Promise.all([
+  const [divisionTargets, divisions, raceNights] = await Promise.all([
     row.registration_key ? getAccsmTargetsForKey(row.registration_key) : Promise.resolve([]),
     getDivisions(),
+    getRaceNightsForChampionship(id),
   ]);
 
   return (
@@ -46,7 +48,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
         Edit Event
       </h1>
 
-      <EventForm initial={rowToInput(row, divisionTargets)} divisions={divisions} isEdit />
+      <EventForm initial={rowToInput(row, divisionTargets, raceNights)} divisions={divisions} isEdit />
 
       {summary && (
         <div className="mt-14 border-t border-line pt-8">
