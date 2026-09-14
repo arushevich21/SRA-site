@@ -54,6 +54,12 @@ export type EmperorDriverStanding = {
   carModel: string | null;
   points: number;
   pointsPenalty: number;
+  // Teams this driver has been entered under, from Emperor's per-driver
+  // `Teams` map. This is the ONLY driver<->team linkage in the standings
+  // payload — team rows themselves carry a name and points and nothing else.
+  // Usually one; more than one means the driver changed team mid-season
+  // (confirmed live on LIAW), and empty means they raced unattached.
+  teamNames: string[];
 };
 
 export type EmperorTeamStanding = {
