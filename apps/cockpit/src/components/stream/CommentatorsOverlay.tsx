@@ -1,26 +1,23 @@
-import { OverlayPanel } from './OverlayPrimitives';
-import { MOCK_COMMENTATORS } from './commentator-data';
+import type { Commentator } from './commentators';
 
-export function CommentatorsOverlay() {
+// Transparent lower-third over the race feed. Renders nothing when the
+// operator hasn't set a booth — a blank source beats a placeholder on air.
+export function CommentatorsOverlay({ commentators }: { commentators: Commentator[] }) {
+  if (commentators.length === 0) return null;
   return (
-    <div className="stream-commentator-booth" aria-label="Commentator booth">
-      <div className="stream-commentator-kicker">LIVE FROM THE BOOTH</div>
-      <OverlayPanel className="stream-commentator-panel">
-        <div className="stream-commentator-heading">
-          <span>COMMENTATORS</span>
-          <span className="stream-commentator-live-dot" aria-hidden="true" />
-        </div>
-        <div className="stream-commentator-list">
-          {MOCK_COMMENTATORS.map((commentator) => (
-            <div className="stream-commentator" key={commentator.name}>
-              <span className="stream-commentator-copy">
-                <strong>{commentator.name}</strong>
-                <small>{commentator.role}</small>
-              </span>
-            </div>
-          ))}
-        </div>
-      </OverlayPanel>
+    <div className="ov-lower-third" aria-label="Commentators">
+      <div className="ov-lower-third-kicker">
+        <span className="ov-live-dot" aria-hidden="true" />
+        Live from the booth
+      </div>
+      <div className="ov-lower-third-body">
+        {commentators.map((c) => (
+          <div key={c.name}>
+            <b>{c.name}</b>
+            <span>{c.role ?? 'Commentator'}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

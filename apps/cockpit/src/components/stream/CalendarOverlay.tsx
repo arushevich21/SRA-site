@@ -1,13 +1,70 @@
-import type { ChampionshipContent, ScheduleRound } from '@/content/championships';
-import Image from 'next/image';
-import { OverlayHeader, OverlayPanel } from './OverlayPrimitives';
-import { trackMapUrl } from './TrackOverlay';
+import type { ChampionshipContent } from '@/content/championships';
+import { eventDateTimeParts } from '@/lib/event-time';
+import type { StreamRound } from '@/lib/stream/overlay-data';
+import { seasonLabel } from '@/lib/stream/labels';
+import { OverlayFoot, OverlayFrame, OverlayLockup } from './OverlayPrimitives';
+import { isTbaTrack, trackMapUrl } from './track-maps';
 
-export function CalendarOverlay({ championship, division, rounds }: { championship: ChampionshipContent; division: string; rounds: ScheduleRound[] }) {
-  return <>
-    <OverlayHeader title={`${championship.title} Calendar`} subtitle={`Division ${division} · 8-week season`} />
-    <Image className="stream-calendar-series-logo" src="/badges/GT3TS_Logo.png" alt="GT3 Team Series" width={400} height={200} sizes="12vw" unoptimized />
-    <div className="stream-calendar-grid">{rounds.slice(0, 8).map((round) => { const mapSrc = trackMapUrl(round.track); return <OverlayPanel key={round.round} className="stream-round-card"><div className="stream-round-heading"><b>R{round.round}: {round.track}</b><strong>{round.date?.slice(5, 10).replace('-', '/') ?? 'TBA'}</strong></div><div className="stream-round-map">{mapSrc ? <Image className="stream-round-map-image" src={mapSrc} alt={`${round.track} circuit map`} width={1200} height={800} unoptimized /> : 'TRACK MAP'}</div><span>{round.raceLength} · Race night</span></OverlayPanel>; })}</div>
-    <p className="stream-footer-note">All events begin at 9:00 PM Eastern · Visit simracingalliance.com/calendar for more information.</p>
-  </>;
+export function CalendarOverlay({
+  championship,
+  division,
+  rounds,
+}: {
+  championship: ChampionshipContent;
+  division: number | null;
+  rounds: StreamRound[];
+}) {
+  const current = rounds.find((r) => r.isCurrent) ?? null;
+  const currentIndex = current ? rounds.indexOf(current) : -1;
+
+  return (
+    <OverlayFrame ticker>
+      <OverlayLockup
+        championship={championship}
+        title={`${seasonLabel(championship)} Calendar`}
+        subtitle={`${rounds.length}-round season · ${championship.raceDays ?? championship.raceFormat}`}
+        division={division}
+        round={current}
+      />
+
+      <div className="ov-calendar">
+        {rounds.slice(0, 8).map((r, i) => {
+          const tba = isTbaTrack(r.round.track);
+          const map = tba ? null : trackMapUrl(r.round.track);
+          const when = eventDateTimeParts(r.startsAt, 'America/New_York');
+          const state = r.isCurrent ? 'is-current' : i < currentIndex ? 'is-past' : '';
+          return (
+            <article className={`ov-round ${state}`} key={r.round.round}>
+              {r.isCurrent && <span className="ov-round-tag">This week</span>}
+              <div className="ov-round-head">
+                <b>R{r.round.round}</b>
+                <strong className={tba ? 'is-tba' : ''}>{tba ? 'Track TBA' : r.round.track}</strong>
+              </div>
+              <div className="ov-round-map">
+                {map ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- static map art
+                  <img src={map} alt={`${r.round.track} circuit map`} />
+                ) : (
+                  <span>{tba ? 'TBA' : 'NO MAP'}</span>
+                )}
+              </div>
+              <div className="ov-round-date">
+                <strong>{when.date}</strong>
+                <span>{when.time ?? r.round.raceLength}</span>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <OverlayFoot
+        left={
+          <>
+            All times Eastern{championship.raceDays ? ` · ${championship.raceDays}` : ''}
+          </>
+        }
+        right="simracingalliance.com/acc/calendar"
+      />
+    </OverlayFrame>
+  );
 }
