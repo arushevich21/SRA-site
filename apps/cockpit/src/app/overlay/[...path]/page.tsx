@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import {
+  getBoothRoster,
   getDivisionStandings,
   getStreamChampionship,
   resolveStreamRound,
@@ -26,7 +27,7 @@ import { parseCommentators } from '@/components/stream/commentators';
 //   /overlay/season_calendar/1
 //   /overlay/track_maps/current            (or /track_maps/silverstone)
 //   /overlay/race_information/1            transparent — label only
-//   /overlay/intermission/1?names=A|Lead,B|Analyst
+//   /overlay/intermission/1?names=A|Lead,B|Analyst   (names resolve to drivers -> Discord avatar)
 //   /overlay/commentators/1?names=...      transparent lower-third
 //   /overlay/sponsors?footer_message=STREAM%20STARTING%20SOON|...&opacity=.5
 //   /overlay/sponsors?mode=horizontal_marquee   transparent ticker strip
@@ -59,7 +60,7 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
 
   const roundOverride = query.round ? Number.parseInt(query.round, 10) : undefined;
   const round = resolveStreamRound(championship, division, Date.now(), roundOverride);
-  const commentators = parseCommentators(query.names);
+  const booth = await getBoothRoster(parseCommentators(query.names));
 
   if (scene === 'standings' && (subtype === 'driver' || subtype === 'team')) {
     const page = Math.max(1, Number.parseInt(query.page ?? '1', 10) || 1);
@@ -111,16 +112,9 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
   }
 
   if (scene === 'intermission') {
-    const standings = await getDivisionStandings(championship, division);
     return (
       <OverlayCanvas>
-        <IntermissionOverlay
-          championship={championship}
-          division={division}
-          round={round}
-          commentators={commentators}
-          standings={standings}
-        />
+        <IntermissionOverlay championship={championship} division={division} round={round} booth={booth} />
       </OverlayCanvas>
     );
   }
@@ -128,7 +122,7 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
   if (scene === 'commentators') {
     return (
       <OverlayCanvas transparent>
-        <CommentatorsOverlay commentators={commentators} />
+        <CommentatorsOverlay commentators={booth} />
       </OverlayCanvas>
     );
   }

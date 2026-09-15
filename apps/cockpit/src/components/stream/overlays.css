@@ -511,61 +511,84 @@ body:has(.ov-transparent)::after { display: none; }
 .ov-race-label .is-track { color: var(--ov-txt); }
 .ov-race-label .is-round { color: var(--ov-gold); }
 
-/* ── Intermission ────────────────────────────────────────────────────────── */
-.ov-intermission {
+/* ── Intermission: the booth ─────────────────────────────────────────────── */
+.ov-booth-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-columns: repeat(var(--booth-count, 2), minmax(0, 1fr));
   gap: calc(1.6 * var(--u));
   min-height: 0;
+  align-items: stretch;
 }
-.ov-next {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: calc(0.8 * var(--u));
-  min-height: 0;
-  padding: calc(1.2 * var(--u)) calc(1.4 * var(--u));
-  background: var(--ov-panel);
-  border: calc(0.12 * var(--u)) solid var(--ov-line);
-}
-.ov-next-map { display: grid; place-items: center; min-height: 0; }
-.ov-next-map img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.ov-next-when { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--ov-mono); font-size: calc(0.8 * var(--u)); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ov-txt-2); }
-.ov-next-when b { color: var(--ov-gold); }
-.ov-booth { display: flex; flex-direction: column; gap: calc(0.8 * var(--u)); min-height: 0; }
+.ov-booth-grid[data-count="1"] { --booth-count: 1; padding: 0 calc(30 * var(--u)); }
+.ov-booth-grid[data-count="2"] { --booth-count: 2; padding: 0 calc(16 * var(--u)); }
+.ov-booth-grid[data-count="3"] { --booth-count: 3; padding: 0 calc(5 * var(--u)); }
+.ov-booth-grid[data-count="4"] { --booth-count: 4; padding: 0; }
 .ov-booth-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: calc(1 * var(--u));
-  padding: calc(1 * var(--u)) calc(1.2 * var(--u));
-  background: var(--ov-panel);
-  border-left: calc(0.2 * var(--u)) solid var(--ov-gold);
-}
-.ov-booth-card b { display: block; font-family: var(--ov-display); font-weight: 700; font-size: calc(1.7 * var(--u)); line-height: 1; text-transform: uppercase; }
-.ov-booth-card span { display: block; margin-top: calc(0.3 * var(--u)); font-family: var(--ov-mono); font-size: calc(0.68 * var(--u)); letter-spacing: 0.2em; text-transform: uppercase; color: var(--ov-txt-3); }
-.ov-live-dot { width: calc(0.7 * var(--u)); height: calc(0.7 * var(--u)); border-radius: 50%; background: var(--ov-acc); box-shadow: 0 0 calc(0.6 * var(--u)) var(--ov-acc); animation: ov-pulse 1.6s ease-in-out infinite; }
-@keyframes ov-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-
-/* Standings snapshot under the booth */
-.ov-snapshot {
-  margin-top: auto;
-  display: grid;
-  gap: calc(0.6 * var(--u));
-  padding: calc(1 * var(--u)) calc(1.2 * var(--u));
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
   background: var(--ov-panel);
   border: calc(0.12 * var(--u)) solid var(--ov-line);
+  border-top: calc(0.25 * var(--u)) solid var(--ov-gold);
 }
-.ov-snapshot h2 { margin: 0; font-family: var(--ov-mono); font-size: calc(0.72 * var(--u)); letter-spacing: 0.32em; text-transform: uppercase; color: var(--ov-gold); }
-.ov-snapshot h2 span { color: var(--ov-txt-3); letter-spacing: 0.14em; }
-.ov-snapshot ol { margin: 0; padding: 0; list-style: none; display: grid; gap: calc(0.3 * var(--u)); }
-.ov-snapshot li { display: grid; grid-template-columns: calc(1.8 * var(--u)) minmax(0, 1fr) auto calc(3 * var(--u)); align-items: baseline; gap: calc(0.7 * var(--u)); }
-.ov-snapshot-pos { font-family: var(--ov-display); font-weight: 800; font-size: calc(1.2 * var(--u)); color: var(--ov-gold); }
-.ov-snapshot-name { font-size: calc(1.05 * var(--u)); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ov-snapshot-team { font-family: var(--ov-mono); font-size: calc(0.62 * var(--u)); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ov-txt-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(12 * var(--u)); }
-.ov-snapshot li b { font-family: var(--ov-display); font-weight: 800; font-size: calc(1.3 * var(--u)); text-align: right; }
-.ov-snapshot-big { margin: 0; font-size: calc(1.1 * var(--u)); color: var(--ov-txt-2); }
-.ov-snapshot-big b { font-family: var(--ov-display); font-weight: 800; font-size: calc(2.4 * var(--u)); color: var(--ov-txt); margin-right: calc(0.2 * var(--u)); }
-.ov-snapshot-big i { font-style: normal; color: var(--ov-gold); padding: 0 calc(0.5 * var(--u)); }
+.ov-booth-avatar {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: calc(1.6 * var(--u));
+  container-type: size;
+}
+/* A true circle: the square is the smaller of the box's two sides. */
+.ov-booth-avatar img,
+.ov-booth-avatar span {
+  grid-area: 1 / 1;
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 calc(0.2 * var(--u)) var(--ov-line-2), 0 calc(0.6 * var(--u)) calc(2 * var(--u)) rgba(0,0,0,0.5);
+}
+/* Initials sit underneath the picture, so a stale Discord avatar URL (the
+   hash changes when someone updates their picture) falls back to them. */
+.ov-booth-avatar span {
+  display: grid;
+  place-items: center;
+  background: var(--ov-panel-2);
+  font-family: var(--ov-display);
+  font-weight: 800;
+  font-size: calc(5 * var(--u));
+  color: var(--ov-txt-3);
+}
+.ov-booth-name {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: calc(0.7 * var(--u));
+  align-items: center;
+  padding: calc(0.9 * var(--u)) calc(1.4 * var(--u)) calc(1.1 * var(--u));
+  border-top: calc(0.12 * var(--u)) solid var(--ov-line);
+}
+.ov-booth-name .ov-live-dot { grid-row: 1 / span 2; }
+.ov-booth-name b {
+  font-family: var(--ov-display);
+  font-weight: 800;
+  font-size: calc(2.1 * var(--u));
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ov-booth-name span:not(.ov-live-dot) {
+  margin-top: calc(0.3 * var(--u));
+  font-family: var(--ov-mono);
+  font-size: calc(0.72 * var(--u));
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ov-txt-3);
+}
+.ov-live-dot { width: calc(0.7 * var(--u)); height: calc(0.7 * var(--u)); border-radius: 50%; background: var(--ov-acc); box-shadow: 0 0 calc(0.6 * var(--u)) var(--ov-acc); animation: ov-pulse 1.6s ease-in-out infinite; }
+@keyframes ov-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 /* ── Commentator lower-third (transparent) ───────────────────────────────── */
 .ov-lower-third {

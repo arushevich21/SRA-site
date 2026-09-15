@@ -13,6 +13,8 @@ import { getDriverInfoForStandings, getEntryListAsZeroStandings } from '@/lib/en
 import { eventInstant, hasEventTime } from '@/lib/event-time';
 import { buildTeamRosters, type TeamMember } from '@/lib/team-rosters';
 import type { DriverInfo } from '@/lib/driver-lookup';
+import { supabase } from '@/lib/supabase';
+import { bareDriverName } from '@/lib/driver-display-name';
 
 // Data behind the OBS browser-source overlays (/overlay/...). Everything here
 // reads the same sources the public site renders from — Emperor standings,
@@ -183,4 +185,50 @@ export async function getDivisionStandings(
 // values for the /overlay/<scene>/division_N segment.
 export function streamDivisionIds(champ: ChampionshipContent): number[] {
   return (champ.accsmTargets ?? []).map((t) => t.divisionId);
+}
+
+// ── The booth ─────────────────────────────────────────────────────────────
+
+export type BoothMember = {
+  name: string;
+  role: string | null;
+  // Discord avatar captured on the driver row (drivers.avatar_url) — null
+  // when the name matched nobody or they have no avatar.
+  avatarUrl: string | null;
+};
+
+// Resolves the operator's ?names= list against the drivers table so each
+// commentator gets their real display name and Discord avatar. Matching is
+// by display name prefix, case-insensitive, so "Anton Rushevich" finds
+// "Anton Rushevich┊1". An unmatched name is still shown, just without a
+// picture — a typo shouldn't blank a card on air.
+export async function getBoothRoster(
+  requested: { name: string; role: string | null }[],
+): Promise<BoothMember[]> {
+  if (requested.length === 0) return [];
+
+  const pattern = requested.map((r) => `display_name.ilike.${escapeLike(r.name)}%`).join(',');
+  const { data, error } = await supabase
+    .from('drivers')
+    .select('display_name, avatar_url')
+    .or(pattern);
+  if (error) console.error('booth roster lookup failed:', error.message);
+
+  const rows = (data ?? []) as { display_name: string; avatar_url: string | null }[];
+  return requested.map((r) => {
+    const match = rows.find((row) =>
+      bareDriverName(row.display_name).toLowerCase().startsWith(r.name.toLowerCase()),
+    );
+    return {
+      name: match ? bareDriverName(match.display_name) : r.name,
+      role: r.role,
+      avatarUrl: match?.avatar_url ?? null,
+    };
+  });
+}
+
+// PostgREST's or() filter splits on commas and parens; a name containing
+// either would break the whole query, so strip them rather than escape.
+function escapeLike(value: string): string {
+  return value.replace(/[,()%_]/g, '').trim();
 }

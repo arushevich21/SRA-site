@@ -1,8 +1,8 @@
-import type { Commentator } from './commentators';
+import type { BoothMember } from '@/lib/stream/overlay-data';
 
 // Transparent lower-third over the race feed. Renders nothing when the
 // operator hasn't set a booth — a blank source beats a placeholder on air.
-export function CommentatorsOverlay({ commentators }: { commentators: Commentator[] }) {
+export function CommentatorsOverlay({ commentators }: { commentators: BoothMember[] }) {
   if (commentators.length === 0) return null;
   return (
     <div className="ov-lower-third" aria-label="Commentators">

@@ -1,122 +1,68 @@
 import type { ChampionshipContent } from '@/content/championships';
-import { eventDateTimeParts } from '@/lib/event-time';
-import type { DivisionStandings, StreamRound } from '@/lib/stream/overlay-data';
-import { bareDriverName } from '@/lib/driver-display-name';
-import { stripSteamIdPrefix } from '@/lib/driver-lookup';
-import type { Commentator } from './commentators';
-import { OverlayFoot, OverlayFrame, OverlayLockup, TrackFlag } from './OverlayPrimitives';
-import { isTbaTrack, trackFacts, trackMapUrl } from './track-maps';
+import type { BoothMember, StreamRound } from '@/lib/stream/overlay-data';
+import { OverlayFoot, OverlayFrame, OverlayLockup } from './OverlayPrimitives';
 
-// Between sessions: tonight's round on the left, the booth on the right.
+// Between sessions: whoever is in the booth, and nothing else. One card per
+// commentator, sized to however many there are.
 export function IntermissionOverlay({
   championship,
   division,
   round,
-  commentators,
-  standings,
+  booth,
 }: {
   championship: ChampionshipContent;
   division: number | null;
   round: StreamRound | null;
-  commentators: Commentator[];
-  standings: DivisionStandings | null;
+  booth: BoothMember[];
 }) {
-  const track = round?.round.track ?? '';
-  const map = round && !isTbaTrack(track) ? trackMapUrl(track) : null;
-  const facts = round ? trackFacts(track) : null;
-  const when = round ? eventDateTimeParts(round.startsAt, 'America/New_York') : null;
-
   return (
     <OverlayFrame ticker>
       <OverlayLockup
         championship={championship}
         title="We'll be right back"
-        subtitle={facts?.location}
+        subtitle={booth.length ? 'Live from the booth' : undefined}
         division={division}
         round={round}
       />
 
-      <div className="ov-intermission">
-        <section className="ov-next">
-          <h2 className="ov-track-name">
-            <small>{round ? `Tonight · Round ${round.round.round}` : 'Tonight'}</small>
-            {round && !isTbaTrack(track) && <TrackFlag track={track} large />}
-            {round ? (isTbaTrack(track) ? 'Track TBA' : track) : 'Race night'}
-          </h2>
-          <div className="ov-next-map">
-            {map && (
-              // eslint-disable-next-line @next/next/no-img-element -- static map art
-              <img src={map} alt={`${track} circuit map`} />
-            )}
-          </div>
-          <div className="ov-next-when">
-            <span>
-              <b>{when?.date ?? 'TBA'}</b>
-              {when?.time && ` · ${when.time}`}
-            </span>
-            <span>{round?.round.raceLength ?? championship.raceFormat}</span>
-          </div>
-        </section>
-
-        <section className="ov-booth">
-          {commentators.length === 0 ? (
-            <div className="ov-empty">Booth</div>
-          ) : (
-            commentators.map((c) => (
-              <div className="ov-booth-card" key={c.name}>
-                <span className="ov-live-dot" aria-hidden="true" />
-                <div>
-                  <b>{c.name}</b>
-                  <span>{c.role ?? 'Commentator'}</span>
-                </div>
+      {booth.length === 0 ? (
+        <div className="ov-empty">Back shortly</div>
+      ) : (
+        <div className="ov-booth-grid" data-count={Math.min(booth.length, 4)}>
+          {booth.map((member) => (
+            <div className="ov-booth-card" key={member.name}>
+              <div className="ov-booth-avatar">
+                <span>{initials(member.name)}</span>
+                {member.avatarUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- Discord CDN avatar
+                  <img src={avatarAt(member.avatarUrl, 512)} alt="" />
+                )}
               </div>
-            ))
-          )}
-          {standings && <StandingsSnapshot standings={standings} totalRounds={championship.schedule.length} />}
-        </section>
-      </div>
+              <div className="ov-booth-name">
+                <span className="ov-live-dot" aria-hidden="true" />
+                <b>{member.name}</b>
+                {member.role && <span>{member.role}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <OverlayFoot left={<>{championship.raceFormat}</>} right="discord.gg/SimRacingAlliance" />
     </OverlayFrame>
   );
 }
 
-// What the booth is talking over: the top five once racing has started, the
-// size of the grid before it has.
-function StandingsSnapshot({
-  standings,
-  totalRounds,
-}: {
-  standings: DivisionStandings;
-  totalRounds: number;
-}) {
-  if (standings.source !== 'live') {
-    return (
-      <div className="ov-snapshot">
-        <h2>{standings.divisionName} grid</h2>
-        <p className="ov-snapshot-big">
-          <b>{standings.drivers.length}</b> drivers <i>·</i> <b>{standings.teams.length}</b> teams
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="ov-snapshot">
-      <h2>
-        Championship top 5 <span>after {standings.roundsScored} of {totalRounds}</span>
-      </h2>
-      <ol>
-        {standings.drivers.slice(0, 5).map((d) => (
-          <li key={d.steamId}>
-            <span className="ov-snapshot-pos">{d.position}</span>
-            <span className="ov-snapshot-name">
-              {bareDriverName(standings.driverInfo[stripSteamIdPrefix(d.steamId)]?.displayName ?? d.driverName)}
-            </span>
-            <span className="ov-snapshot-team">{d.teamNames[0] ?? ''}</span>
-            <b>{d.points}</b>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
+// Discord's CDN serves avatars at any power-of-two ?size=; the stored URL
+// has none, which defaults to 128px — soft at broadcast size.
+function avatarAt(url: string, size: number): string {
+  return url.includes('cdn.discordapp.com') ? `${url}?size=${size}` : url;
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
 }
