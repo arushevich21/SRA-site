@@ -72,8 +72,8 @@ export function OverlayLockup({
         <div className="ov-context">
           {division != null && (
             <div className="ov-context-division">
-              {/* eslint-disable-next-line @next/next/no-img-element -- static badge art */}
-              <img src={`/badges/Division ${division}.png`} alt={`Division ${division}`} />
+              <small>DIV</small>
+              {division}
             </div>
           )}
           {round && (
