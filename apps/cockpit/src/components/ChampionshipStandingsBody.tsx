@@ -2,6 +2,7 @@ import { accCarModelName } from '@sra/domain';
 import type {
   EmperorChampionshipStandings,
   EmperorDriverStanding,
+  EmperorTeamStanding,
 } from '@sra/shared-types';
 import {
   accsmTargetForDivision,
@@ -412,6 +413,49 @@ async function MultiDivisionStandingsSection({
     }
 
     const driverInfo = await getDriverInfoForStandings(entryListStandings);
+
+    const preRaceNote = (
+      <p className="font-mono text-[12px] tracking-[.1em] uppercase text-txt-3 italic mb-4">
+        No races scored yet — showing {target.divisionName}&apos;s confirmed entry list at 0
+        points.
+      </p>
+    );
+
+    // Teams view before any race: the same entry list grouped by team, every
+    // team at 0. Emperor has no team rows yet, but the registrations DO know
+    // the teams (teamNames on each driver row, via getEntryListAsZeroStandings),
+    // so the toggle is offered here too — it's the only way to see rosters
+    // before R1, which is exactly when people are checking who's paired with
+    // whom. Alphabetical, since there's nothing to rank on.
+    if (view.entrant === 'teams') {
+      const rosters = buildTeamRosters(entryListStandings.driverStandings);
+      const teamGroups: [string, EmperorTeamStanding[]][] = Object.entries(
+        entryListStandings.driverStandings,
+      ).map(([className, standings]) => {
+        const names = [...new Set(standings.flatMap((d) => d.teamNames))].sort((a, b) =>
+          a.localeCompare(b),
+        );
+        return [
+          className,
+          names.map((teamName, i) => ({
+            position: i + 1,
+            teamName,
+            points: 0,
+            pointsPenalty: 0,
+          })),
+        ];
+      });
+
+      return (
+        <div>
+          {tabs}
+          <StandingsViewControls basePath={basePath} view={resolvedView} hasTeamStandings />
+          {preRaceNote}
+          <TeamStandingsTable groups={teamGroups} rosters={rosters} driverInfo={driverInfo} />
+        </div>
+      );
+    }
+
     const groups = Object.entries(entryListStandings.driverStandings).map(
       ([className, standings]) =>
         [className, filterAndRankByTier(standings, driverInfo, view.tier)] as const,
@@ -420,14 +464,9 @@ async function MultiDivisionStandingsSection({
     return (
       <div>
         {tabs}
-        {/* No entrant toggle here: there are no team standings to switch to
-            before a race has been scored, and the entry list is per-driver. */}
-        <StandingsViewControls basePath={basePath} view={resolvedView} hasTeamStandings={false} />
+        <StandingsViewControls basePath={basePath} view={resolvedView} hasTeamStandings />
         <SubChampionshipNote tier={view.tier} />
-        <p className="font-mono text-[12px] tracking-[.1em] uppercase text-txt-3 italic mb-4">
-          No races scored yet — showing {target.divisionName}&apos;s confirmed entry list at 0
-          points.
-        </p>
+        {preRaceNote}
         <EmperorStandingsTable
           data={{
             driverStandings: Object.fromEntries(groups),
