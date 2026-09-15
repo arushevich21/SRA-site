@@ -4,14 +4,15 @@ import type { ChampionshipContent } from '@/content/championships';
 import { resolveCarLogo } from '@/lib/acc/manufacturer-logo';
 import { bareDriverName } from '@/lib/driver-display-name';
 import { stripSteamIdPrefix, type DriverInfo } from '@/lib/driver-lookup';
+import { getDriverTierBadge } from '@/lib/driver-tier-badge';
 import type { DivisionStandings, StreamRound } from '@/lib/stream/overlay-data';
 import type { TeamMember } from '@/lib/team-rosters';
 import { CarLogo } from '@/components/CarLogo';
 import { OverlayFoot, OverlayFrame, OverlayLockup } from './OverlayPrimitives';
 
-// 13 rows a column, two columns a page — the density the old stream graphics
-// used and the most that stays legible at stream bitrates.
-export const ROWS_PER_COLUMN = 13;
+// 12 rows a column, two columns a page — the most that stays legible at
+// stream bitrates with names, teams and points at a readable size.
+export const ROWS_PER_COLUMN = 12;
 export const ROWS_PER_PAGE = ROWS_PER_COLUMN * 2;
 
 export function StandingsOverlay({
@@ -80,7 +81,7 @@ export function StandingsOverlay({
   );
 }
 
-// A full page is 13 + 13; a shorter one is balanced across both columns so
+// A full page is 12 + 12; a shorter one is balanced across both columns so
 // a 12-car division doesn't leave half the screen empty.
 function splitColumns<T>(rows: T[]): T[][] {
   const first = Math.min(ROWS_PER_COLUMN, Math.ceil(rows.length / 2));
@@ -106,19 +107,19 @@ function DriverColumns({
           {column.map((row) => {
             const info = driverInfo[stripSteamIdPrefix(row.steamId)];
             const logo = resolveCarLogo(accCarModelIdFromName(row.carModel));
+            const badge = info ? getDriverTierBadge(info) : null;
             return (
               <article className={`ov-row ${podiumClass(row.position, live)}`} key={row.steamId}>
                 <span className="ov-pos">{row.position}</span>
                 <span className="ov-num">{info?.driverNumber ?? ''}</span>
+                <span className="ov-badge">
+                  {badge && (
+                    // eslint-disable-next-line @next/next/no-img-element -- static badge art
+                    <img src={badge.src} alt={badge.label} title={badge.label} />
+                  )}
+                </span>
                 <div className="ov-driver">
-                  <b>
-                    {bareDriverName(info?.displayName ?? row.driverName)}
-                    {info?.tier && (
-                      <span className={`ov-tier ${info.tier === 'gold' ? 'is-gold' : ''}`}>
-                        {info.tier}
-                      </span>
-                    )}
-                  </b>
+                  <b>{bareDriverName(info?.displayName ?? row.driverName)}</b>
                   <span>{row.teamNames[0] ?? row.carModel ?? ''}</span>
                 </div>
                 <span className="ov-car">
