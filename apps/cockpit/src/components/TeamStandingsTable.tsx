@@ -1,4 +1,8 @@
+import { accCarModelIdFromName } from '@sra/domain';
 import type { EmperorTeamStanding } from '@sra/shared-types';
+import { bareDriverName } from '@/lib/driver-display-name';
+import { resolveCarLogo } from '@/lib/acc/manufacturer-logo';
+import { CarLogo } from './CarLogo';
 import { DriverTierBadge } from './DriverTierBadge';
 import { stripSteamIdPrefix, type DriverInfo } from '@/lib/driver-lookup';
 import type { TeamMember } from '@/lib/team-rosters';
@@ -121,7 +125,16 @@ function Roster({
                 tier={info.tier}
               />
             )}
-            <span className="font-sans text-[15px] text-txt-2 truncate">{m.driverName}</span>
+            <span className="font-sans text-[15px] text-txt-2 truncate">
+              {bareDriverName(m.driverName)}
+            </span>
+            {/* Each driver's own car — on the Team Series every driver runs
+                their own, so it belongs on the roster line, not the team. */}
+            <CarLogo
+              {...resolveCarLogo(accCarModelIdFromName(m.carModel))}
+              alt={m.carModel ?? ''}
+              size={18}
+            />
           </span>
         );
       })}

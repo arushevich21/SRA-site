@@ -1,17 +1,18 @@
 import { type ReactNode } from 'react';
 import Link from 'next/link';
-import { accCarManufacturerIconName, accCarModelName } from '@sra/domain';
+import { accCarModelName } from '@sra/domain';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabase as adminClient } from '@/lib/supabase';
 import type { ChampionshipContent, ScheduleRound } from '@/content/championships';
 import type { SimConfig } from '@/content/sims';
 import { eventInstant, eventDateTimeParts, hasEventTime, EVENT_SOURCE_TIMEZONE } from '@/lib/event-time';
-import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
+import { resolveCarLogo } from '@/lib/acc/manufacturer-logo';
 import RegisterForm from './RegisterForm';
 import CurrentTeam, { type NextRoundInfo } from './CurrentTeam';
 import TeamList, { type Team } from './TeamList';
 import { DivisionCapacity } from '@/components/DivisionCapacity';
 import { buildDivisionCapacity } from '@/lib/division-capacity';
+import { bareDriverName } from '@/lib/driver-display-name';
 
 // Supabase FK join inference — cast via as unknown as
 type RawMemberJoin = {
@@ -59,25 +60,6 @@ function findNextRound(schedule: ScheduleRound[]): ScheduleRound | null {
 function toNextRoundInfo(round: ScheduleRound): NextRoundInfo {
   const { date, time } = eventDateTimeParts(round.date, EVENT_SOURCE_TIMEZONE);
   return { round: round.round, track: round.track, raceLength: round.raceLength, date, time };
-}
-
-// Manufacturer icon/logo for a car, same resolution every other car display
-// on the site uses (HotLapBoard, TrackHeader, jagoff's board): a
-// @cardog-icons/react icon name where one exists, else our own uploaded SVG
-// logo where the manufacturer has one, else neither — never a generic
-// placeholder glyph. Resolved once here (a server component) and passed
-// down as plain data, since Icon/FallbackLogoImage live in client
-// components (TeamList, CurrentTeam).
-function resolveCarLogo(carModelId: number | null): {
-  manufacturerIconName: string | null;
-  manufacturerLogoUrl: string | null;
-} {
-  if (carModelId == null) return { manufacturerIconName: null, manufacturerLogoUrl: null };
-  const manufacturerIconName = accCarManufacturerIconName(carModelId);
-  return {
-    manufacturerIconName,
-    manufacturerLogoUrl: !manufacturerIconName ? accCarManufacturerLogoUrl(carModelId) : null,
-  };
 }
 
 export async function RegisterBody({
@@ -147,7 +129,10 @@ export async function RegisterBody({
     const key = r.team_id ?? r.id;
     const members = (r.registration_drivers ?? []).map((m) => ({
       driver_id: m.driver_id,
-      display_name: m.drivers?.display_name ?? null,
+      // Name only — the ┊number suffix is dropped for the entry list and
+      // CurrentTeam; the number is on the driver's own tier badge context
+      // and the ACCSM grid, not needed here.
+      display_name: m.drivers?.display_name ? bareDriverName(m.drivers.display_name) : null,
       tier: (m.drivers?.tier ?? null) as 'gold' | 'silver' | null,
       is_sralien: m.drivers?.is_sralien ?? false,
     }));

@@ -212,6 +212,34 @@ export function accCarModelName(carModel: number): string | null {
   return ACC_CAR_MODEL_NAMES[carModel] ?? null;
 }
 
+// Reverse of accCarModelName for the car strings Emperor's championship
+// standings carry (CarModel is a NAME there, never an id). Emperor's spelling
+// drifts from the handbook table in small ways — "(2018)" vs "2018", "GT R"
+// vs "GT-R" — so matching is on a normalized key (lowercase, alphanumerics
+// only). Where the two disagree on more than punctuation, an explicit alias
+// maps Emperor's key to ours. Returns null for a string neither resolves,
+// so callers fall back to "no logo" rather than guessing.
+function normalizeCarName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const ACC_CAR_MODEL_ID_BY_NORMALIZED_NAME: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.entries(ACC_CAR_MODEL_NAMES).map(([id, name]) => [normalizeCarName(name), Number(id)]),
+);
+
+// Emperor's key -> our key, for the names that differ beyond punctuation.
+// Confirmed against live LIAW standings (2026-09); extend as new ones appear.
+const EMPEROR_CAR_NAME_ALIASES: Readonly<Record<string, string>> = {
+  // Emperor calls the 2019 991.2 a "911"; the handbook keeps the chassis code.
+  porsche911iigt3r2019: 'porsche991iigt3r2019',
+};
+
+export function accCarModelIdFromName(name: string | null | undefined): number | null {
+  if (!name) return null;
+  const key = normalizeCarName(name);
+  return ACC_CAR_MODEL_ID_BY_NORMALIZED_NAME[EMPEROR_CAR_NAME_ALIASES[key] ?? key] ?? null;
+}
+
 export function accCupCategoryName(cupCategory: number): string | null {
   return ACC_CUP_CATEGORY_NAMES[cupCategory] ?? null;
 }

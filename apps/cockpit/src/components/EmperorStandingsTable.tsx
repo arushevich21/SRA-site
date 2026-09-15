@@ -1,4 +1,7 @@
-import { sortStandingsWithTiebreak } from '@sra/domain';
+import { accCarModelIdFromName, sortStandingsWithTiebreak } from '@sra/domain';
+import { bareDriverName } from '@/lib/driver-display-name';
+import { resolveCarLogo } from '@/lib/acc/manufacturer-logo';
+import { CarLogo } from './CarLogo';
 import type { EmperorChampionshipStandings, EmperorDriverStanding } from '@sra/shared-types';
 import { DriverTierBadge } from './DriverTierBadge';
 import { stripSteamIdPrefix, type DriverInfo } from '@/lib/driver-lookup';
@@ -94,13 +97,28 @@ export function EmperorStandingsTable({
                             {info && (
                               <DriverTierBadge isSralien={info.isSralien} division={info.division} tier={info.tier} />
                             )}
-                            {entry.driverName}
+                            {/* Emperor's own names carry no ┊number, but the
+                                pre-race entry list (getEntryListAsZeroStandings)
+                                feeds drivers.display_name through here, which
+                                does — strip it either way. */}
+                            {bareDriverName(entry.driverName)}
                           </span>
                         );
                       })()}
                     </td>
-                    <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 truncate max-w-[200px] hidden lg:table-cell">
-                      {entry.carModel ?? '—'}
+                    <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 max-w-[240px] hidden lg:table-cell">
+                      {/* Emperor gives the car as a NAME; accCarModelIdFromName
+                          gets the id back so the logo resolves the same way
+                          the register page's entry list does. Unknown name =>
+                          no logo, name still shown. */}
+                      <span className="flex items-center gap-3 min-w-0">
+                        <CarLogo
+                          {...resolveCarLogo(accCarModelIdFromName(entry.carModel))}
+                          alt={entry.carModel ?? ''}
+                          size={22}
+                        />
+                        <span className="truncate">{entry.carModel ?? '—'}</span>
+                      </span>
                     </td>
                     <td
                       className="font-mono text-[15px] py-2 pl-5 text-right"

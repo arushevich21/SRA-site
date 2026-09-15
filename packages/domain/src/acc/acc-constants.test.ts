@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   accCarModelName,
+  accCarModelIdFromName,
   accCupCategoryName,
   accCarClassName,
   ACC_CAR_MODEL_NAMES,
@@ -29,6 +30,37 @@ describe('accCarModelName', () => {
     // (36 used to be this case until Ford Mustang GT3 was confirmed and added.)
     expect(accCarModelName(37)).toBeNull();
     expect(accCarModelName(9999)).toBeNull();
+  });
+});
+
+describe('accCarModelIdFromName', () => {
+  it.each([
+    // Exact handbook spellings round-trip.
+    ['Ferrari 296 GT3', 32],
+    ['Porsche 992 GT3 R', 34],
+    // Emperor's spellings, as seen live in LIAW standings: parenthesised
+    // years, spaced hyphens.
+    ['Bentley Continental GT3 (2018)', 8],
+    ['Nissan GT R Nismo GT3 (2018)', 6],
+    // Explicit alias: Emperor's "911" vs the handbook's "991" chassis code.
+    ['Porsche 911 II GT3 R (2019)', 23],
+    // Case/punctuation never matter.
+    ['  mercedes-amg gt3 (2015) ', 1],
+  ])('resolves %s to id %i', (name, id) => {
+    expect(accCarModelIdFromName(name)).toBe(id);
+  });
+
+  it('returns null for an unknown, empty, or missing name', () => {
+    expect(accCarModelIdFromName('Reliant Robin GT3')).toBeNull();
+    expect(accCarModelIdFromName('')).toBeNull();
+    expect(accCarModelIdFromName(null)).toBeNull();
+    expect(accCarModelIdFromName(undefined)).toBeNull();
+  });
+
+  it('is a true inverse of accCarModelName for every handbook entry', () => {
+    for (const [id, name] of Object.entries(ACC_CAR_MODEL_NAMES)) {
+      expect(accCarModelIdFromName(name)).toBe(Number(id));
+    }
   });
 });
 
