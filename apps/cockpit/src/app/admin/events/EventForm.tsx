@@ -479,6 +479,16 @@ export function EventForm({
           the entry list drops its division tabs and badges.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="flex items-end"><Check label="Shared car (Endurance)" value={f.sharedCar}
+            onChange={(v) => set('sharedCar', v)} /></div>
+        </div>
+        <p className="font-sans text-[12px] text-txt-3 -mt-3">
+          On for Endurance: the whole team drives ONE car, so an entry is one grid slot with
+          every driver on it. Leave OFF for the GT3 Team Series and League in a Week, where
+          each driver has their own car — a two-driver team then takes two grid slots (and
+          two of the max registrations), both under the same team name.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <label className={labelCls}>
             Max registrations
             <input type="number" min={1} step={1} className={inputCls} value={f.maxRegistrations}

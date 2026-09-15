@@ -30,6 +30,7 @@ type RawMemberJoin = {
 };
 type RawTeamJoin = {
   id: string;
+  team_id: string | null;
   car_model_id: number | null;
   division_id: number | null;
   entry_class: string | null;
@@ -68,16 +69,53 @@ export default async function AdminRegistrationsPage() {
     const { data: rawTeams } = await supabase
       .from('registrations')
       .select(
-        'id, car_model_id, division_id, entry_class, status, waitlist_position, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, steam_id, discord_id, tier, division_id, divisions(name)))',
+        'id, team_id, car_model_id, division_id, entry_class, status, waitlist_position, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, steam_id, discord_id, tier, division_id, divisions(name)))',
       )
       .eq('championship_key', champ.registrationKey!)
       .eq('season', champ.registrationSeason!)
       .order('status')
       .order('waitlist_position', { nullsFirst: true });
 
-    const teams: AdminTeam[] = ((rawTeams ?? []) as unknown as RawTeamJoin[]).map(
-      (r) => ({
-        id: r.id,
+    // One registrations row is one CAR. A car-per-driver championship (GT3
+    // Team Series, championships.shared_car = false — see 20260915) holds a
+    // team as N rows sharing team_id, one driver each; a shared-car one as a
+    // single row. Admins think in teams, so fold rows by team_id. Status is
+    // per row (a promote-from-waitlist acts on one car), so a team whose cars
+    // disagree is split into a confirmed team and a waitlisted one rather
+    // than hidden behind a single label.
+    const teamsByKey = new Map<string, AdminTeam>();
+    for (const r of (rawTeams ?? []) as unknown as RawTeamJoin[]) {
+      const status = r.status === 'waitlisted' ? 'waitlisted' : 'confirmed';
+      const key = `${r.team_id ?? r.id}:${status}`;
+      const members = (r.registration_drivers ?? []).map((m) => ({
+        registration_id: r.id,
+        driver_id: m.driver_id,
+        display_name: m.drivers?.display_name ?? null,
+        steam_id: m.drivers?.steam_id ?? null,
+        discord_id: m.drivers?.discord_id ?? null,
+        tier: (m.drivers?.tier ?? null) as 'gold' | 'silver' | null,
+        divisionName:
+          one(m.drivers?.divisions ?? null)?.name ??
+          (m.drivers?.division_id != null
+            ? `Division ${m.drivers.division_id}`
+            : null),
+      }));
+      const existing = teamsByKey.get(key);
+      if (existing) {
+        existing.registrationIds.push(r.id);
+        existing.members.push(...members);
+        // Lowest position wins — that's where the team as a whole sits.
+        if (
+          r.waitlist_position != null &&
+          (existing.waitlistPosition == null || r.waitlist_position < existing.waitlistPosition)
+        ) {
+          existing.waitlistPosition = r.waitlist_position;
+        }
+        continue;
+      }
+      teamsByKey.set(key, {
+        id: key,
+        registrationIds: [r.id],
         team_name: one(r.teams)?.name ?? 'Unnamed Team',
         car:
           (r.car_model_id != null ? accCarModelName(r.car_model_id) : null) ??
@@ -87,22 +125,12 @@ export default async function AdminRegistrationsPage() {
           one(r.divisions)?.name ??
           (r.division_id != null ? `Division ${r.division_id}` : null),
         entryClass: r.entry_class,
-        status: r.status === 'waitlisted' ? 'waitlisted' : 'confirmed',
+        status,
         waitlistPosition: r.waitlist_position,
-        members: (r.registration_drivers ?? []).map((m) => ({
-          driver_id: m.driver_id,
-          display_name: m.drivers?.display_name ?? null,
-          steam_id: m.drivers?.steam_id ?? null,
-          discord_id: m.drivers?.discord_id ?? null,
-          tier: (m.drivers?.tier ?? null) as 'gold' | 'silver' | null,
-          divisionName:
-            one(m.drivers?.divisions ?? null)?.name ??
-            (m.drivers?.division_id != null
-              ? `Division ${m.drivers.division_id}`
-              : null),
-        })),
-      }),
-    );
+        members,
+      });
+    }
+    const teams: AdminTeam[] = [...teamsByKey.values()];
 
     championships.push({
       key: champ.registrationKey!,

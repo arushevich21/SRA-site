@@ -20,7 +20,7 @@ type RawMemberJoin = {
 };
 type RawRegistrationJoin = {
   id: string;
-  team_id: string;
+  team_id: string | null;
   car_model_id: number | null;
   division_id: number | null;
   teams: { name: string } | { name: string }[] | null;
@@ -134,9 +134,30 @@ export async function RegisterBody({
     .eq('status', 'confirmed')
     .order('id');
 
-  const teams: Team[] = ((rawRegistrations ?? []) as unknown as RawRegistrationJoin[]).map(
-    (r) => ({
-      id: r.team_id,
+  // One registrations row is one CAR. On a car-per-driver championship (GT3
+  // Team Series — championships.shared_car = false, see 20260915) a team is
+  // N rows sharing a team_id with one driver each; on a shared-car one
+  // (Endurance) it is a single row with N drivers. TeamList/CurrentTeam think
+  // in teams, so fold rows by team_id here — a shared-car row folds to
+  // itself, so both shapes come out the same.
+  const teamsById = new Map<string, Team>();
+  for (const r of (rawRegistrations ?? []) as unknown as RawRegistrationJoin[]) {
+    // team_id is nullable in the schema; register_entry() always sets it, but
+    // a stray null must not collapse every such row into one "team".
+    const key = r.team_id ?? r.id;
+    const members = (r.registration_drivers ?? []).map((m) => ({
+      driver_id: m.driver_id,
+      display_name: m.drivers?.display_name ?? null,
+      tier: (m.drivers?.tier ?? null) as 'gold' | 'silver' | null,
+      is_sralien: m.drivers?.is_sralien ?? false,
+    }));
+    const existing = teamsById.get(key);
+    if (existing) {
+      existing.members.push(...members);
+      continue;
+    }
+    teamsById.set(key, {
+      id: key,
       team_name: one(r.teams)?.name ?? 'Unnamed Team',
       car: (r.car_model_id != null ? accCarModelName(r.car_model_id) : null) ?? 'Unknown Car',
       carModelId: r.car_model_id,
@@ -147,14 +168,10 @@ export async function RegisterBody({
         r.division_id == null
           ? null
           : (one(r.divisions)?.name ?? `Division ${r.division_id}`),
-      members: (r.registration_drivers ?? []).map((m) => ({
-        driver_id: m.driver_id,
-        display_name: m.drivers?.display_name ?? null,
-        tier: (m.drivers?.tier ?? null) as 'gold' | 'silver' | null,
-        is_sralien: m.drivers?.is_sralien ?? false,
-      })),
-    }),
-  );
+      members,
+    });
+  }
+  const teams: Team[] = [...teamsById.values()];
 
   // ── Per-division driver counts ────────────────────────────────────────────
   // Advisory only (see 20260914c): registration is never blocked at the cap.

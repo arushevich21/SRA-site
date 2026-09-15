@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict a6T1VjneDgxSPcHj34Xaw7nnyTTGvCY93MvIZF4c3TbHGEfRLXwyQbPPJEbQ1c9
+\restrict 6QuJumKoS79S8G78jMu1VLGZjht4sp0NbgolwuuQhPfVtDHFoP81a8MIeoiHAJv
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -155,12 +155,15 @@ DECLARE
   v_max               integer;
   v_min_team_size     integer;
   v_max_team_size     integer;
+  v_shared_car        boolean;
   v_roster_size       integer;
+  v_row_count         integer;
   v_allow_solo        boolean;
   v_confirmed_count    integer;
   v_status             text;
   v_waitlist_position  integer;
   v_row                registrations;
+  v_registrant_row     registrations;
   v_division_id        integer;
   v_driver             jsonb;
   v_driver_id          uuid;
@@ -171,8 +174,8 @@ BEGIN
     RAISE EXCEPTION 'EMPTY_ROSTER: at least one driver is required';
   END IF;
 
-  SELECT max_registrations, min_team_size, max_team_size
-    INTO v_max, v_min_team_size, v_max_team_size
+  SELECT max_registrations, min_team_size, max_team_size, shared_car
+    INTO v_max, v_min_team_size, v_max_team_size, v_shared_car
   FROM championships
   WHERE registration_key = p_championship_key
   LIMIT 1;
@@ -241,6 +244,10 @@ BEGIN
     END IF;
   END IF;
 
+  -- How many registrations rows this entry occupies: one car for the whole
+  -- roster, or one car per driver.
+  v_row_count := CASE WHEN v_shared_car THEN 1 ELSE v_roster_size END;
+
   PERFORM pg_advisory_xact_lock(hashtextextended(p_championship_key || ':' || p_season, 0));
 
   SELECT count(*) INTO v_confirmed_count
@@ -249,7 +256,8 @@ BEGIN
     AND season = p_season
     AND status = 'confirmed';
 
-  IF v_max IS NOT NULL AND v_confirmed_count >= v_max THEN
+  -- The whole entry is confirmed or waitlisted together.
+  IF v_max IS NOT NULL AND v_confirmed_count + v_row_count > v_max THEN
     v_status := 'waitlisted';
     SELECT coalesce(max(waitlist_position), 0) + 1 INTO v_waitlist_position
     FROM registrations
@@ -261,31 +269,78 @@ BEGIN
     v_waitlist_position := NULL;
   END IF;
 
-  INSERT INTO registrations (
-    series, season, championship_key, division_id, team_id,
-    car_model_id, race_number, entry_class, status, waitlist_position
-  ) VALUES (
-    p_series, p_season, p_championship_key, v_division_id, p_team_id,
-    p_car_model_id, p_race_number, p_entry_class, v_status, v_waitlist_position
-  )
-  RETURNING * INTO v_row;
+  IF v_shared_car THEN
+    -- ── Shared car: one row, every driver on it ────────────────────────
+    INSERT INTO registrations (
+      series, season, championship_key, division_id, team_id,
+      car_model_id, race_number, entry_class, status, waitlist_position
+    ) VALUES (
+      p_series, p_season, p_championship_key, v_division_id, p_team_id,
+      p_car_model_id, p_race_number, p_entry_class, v_status, v_waitlist_position
+    )
+    RETURNING * INTO v_row;
+    v_registrant_row := v_row;
 
-  FOR v_driver IN SELECT * FROM jsonb_array_elements(p_drivers)
-  LOOP
-    BEGIN
-      INSERT INTO registration_drivers (registration_id, driver_id, driver_category, slot)
-      VALUES (
-        v_row.id,
-        (v_driver->>'driver_id')::uuid,
-        coalesce((v_driver->>'driver_category')::integer, 1),
-        coalesce((v_driver->>'slot')::integer, 0)
-      );
-    EXCEPTION WHEN unique_violation THEN
-      RAISE EXCEPTION 'DRIVER_ALREADY_CLAIMED: %', (v_driver->>'driver_id')::uuid;
-    END;
-  END LOOP;
+    FOR v_driver IN SELECT * FROM jsonb_array_elements(p_drivers)
+    LOOP
+      BEGIN
+        INSERT INTO registration_drivers (registration_id, driver_id, driver_category, slot)
+        VALUES (
+          v_row.id,
+          (v_driver->>'driver_id')::uuid,
+          coalesce((v_driver->>'driver_category')::integer, 1),
+          coalesce((v_driver->>'slot')::integer, 0)
+        );
+      EXCEPTION WHEN unique_violation THEN
+        RAISE EXCEPTION 'DRIVER_ALREADY_CLAIMED: %', (v_driver->>'driver_id')::uuid;
+      END;
+    END LOOP;
+  ELSE
+    -- ── Car per driver: one row per DISTINCT driver, one driver each ───
+    --
+    -- race_number is passed through as given (null from the site): the
+    -- number derives from drivers.driver_number at entrylist-push time, and
+    -- an explicit team number only makes sense for a shared car. slot is
+    -- always 0 — each car has a single seat.
+    FOR v_driver IN
+      SELECT DISTINCT ON (d->>'driver_id') d
+      FROM jsonb_array_elements(p_drivers) d
+      ORDER BY d->>'driver_id'
+    LOOP
+      v_driver_id := (v_driver->>'driver_id')::uuid;
 
-  RETURN v_row;
+      INSERT INTO registrations (
+        series, season, championship_key, division_id, team_id,
+        car_model_id, race_number, entry_class, status, waitlist_position
+      ) VALUES (
+        p_series, p_season, p_championship_key, v_division_id, p_team_id,
+        p_car_model_id, p_race_number, p_entry_class, v_status, v_waitlist_position
+      )
+      RETURNING * INTO v_row;
+
+      BEGIN
+        INSERT INTO registration_drivers (registration_id, driver_id, driver_category, slot)
+        VALUES (
+          v_row.id,
+          v_driver_id,
+          coalesce((v_driver->>'driver_category')::integer, 1),
+          0
+        );
+      EXCEPTION WHEN unique_violation THEN
+        RAISE EXCEPTION 'DRIVER_ALREADY_CLAIMED: %', v_driver_id;
+      END;
+
+      IF v_driver_id = p_registrant_driver_id THEN
+        v_registrant_row := v_row;
+      END IF;
+
+      IF v_waitlist_position IS NOT NULL THEN
+        v_waitlist_position := v_waitlist_position + 1;
+      END IF;
+    END LOOP;
+  END IF;
+
+  RETURN v_registrant_row;
 END;
 $$;
 
@@ -815,6 +870,7 @@ CREATE TABLE public.championships (
     requires_division boolean DEFAULT true NOT NULL,
     division_driver_cap integer,
     min_team_size integer DEFAULT 1 NOT NULL,
+    shared_car boolean DEFAULT false NOT NULL,
     CONSTRAINT championships_division_driver_cap_positive CHECK (((division_driver_cap IS NULL) OR (division_driver_cap > 0))),
     CONSTRAINT championships_max_registrations_positive CHECK (((max_registrations IS NULL) OR (max_registrations > 0))),
     CONSTRAINT championships_min_team_size_positive CHECK ((min_team_size >= 1)),
@@ -841,6 +897,13 @@ COMMENT ON COLUMN public.championships.division_driver_cap IS 'Soft per-division
 --
 
 COMMENT ON COLUMN public.championships.min_team_size IS 'Minimum drivers per entry. 1 (default) means solo entries are fine — Endurance, LIAW. 2 on the GT3 Team Series, where a partner is required unless the registrant has drivers.allow_gt3_team_series_solo_registration granted by SRA-Bot. Enforced in register_entry().';
+
+
+--
+-- Name: COLUMN championships.shared_car; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.championships.shared_car IS 'TRUE when every driver on an entry shares ONE car (Endurance): register_entry() writes one registrations row with N registration_drivers. FALSE (default) when each driver has their own car (GT3 Team Series, LIAW): one registrations row per driver, all sharing team_id. The row shape is what readers (entrylist push, entry lists) key off — this flag only decides which shape gets written.';
 
 
 --
@@ -1034,6 +1097,19 @@ CREATE TABLE public.divisions (
     id integer NOT NULL,
     name text NOT NULL
 );
+
+
+--
+-- Name: gt3_roster; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.gt3_roster AS
+ SELECT COALESCE(NULLIF(TRIM(BOTH FROM ((COALESCE(first_name, ''::text) || ' '::text) || COALESCE(last_name, ''::text))), ''::text), display_name) AS name,
+    driver_number AS number,
+    division_id AS division,
+    initcap((tier)::text) AS split
+   FROM public.drivers d
+  WHERE ((division_id IS NOT NULL) AND (COALESCE(NULLIF(TRIM(BOTH FROM ((COALESCE(first_name, ''::text) || ' '::text) || COALESCE(last_name, ''::text))), ''::text), display_name) IS NOT NULL));
 
 
 --
@@ -2777,5 +2853,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict a6T1VjneDgxSPcHj34Xaw7nnyTTGvCY93MvIZF4c3TbHGEfRLXwyQbPPJEbQ1c9
+\unrestrict 6QuJumKoS79S8G78jMu1VLGZjht4sp0NbgolwuuQhPfVtDHFoP81a8MIeoiHAJv
 
