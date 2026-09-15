@@ -194,12 +194,11 @@ function Points({
   position: number;
   live: boolean;
 }) {
-  // Only the podium shows its gap — every row carrying "−611" was noise.
   const gap = leaderPoints - points;
   return (
     <span className="ov-points">
       <b>{points}</b>
-      {live && position > 1 && position <= 3 && <small>−{gap}</small>}
+      {live && position > 1 && <small>−{gap}</small>}
     </span>
   );
 }
