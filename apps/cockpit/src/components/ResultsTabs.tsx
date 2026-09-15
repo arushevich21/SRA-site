@@ -6,6 +6,8 @@ import { accCarManufacturerIconName } from '@sra/domain';
 import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
 import type { AccDriverResult, AccSessionResult, AccSessionType } from '@sra/shared-types';
 import { FallbackLogoImage } from './FallbackLogoImage';
+import { DriverTierBadge } from './DriverTierBadge';
+import type { DriverInfo } from '@/lib/driver-lookup';
 
 const TAB_ORDER: AccSessionType[] = ['Race', 'Qualify', 'Practice'];
 const TAB_LABEL: Record<AccSessionType, string> = {
@@ -31,12 +33,56 @@ function driverDisplayName(result: AccDriverResult): string {
   return fullName || driver.shortName || 'Unknown';
 }
 
-export function ResultsTabs({ sessions }: { sessions: AccSessionResult[] }) {
-  const bySessionType = new Map(sessions.map((s) => [s.sessionType, s]));
-  const availableTabs = TAB_ORDER.filter((t) => bySessionType.has(t));
-  const [active, setActive] = useState<AccSessionType | null>(availableTabs[0] ?? null);
+function currentDriverSteamId(result: AccDriverResult): string | null {
+  return result.currentDriverSteamId ?? result.drivers[0]?.steamId ?? null;
+}
 
-  if (availableTabs.length === 0 || active == null) {
+type ResultsTab = {
+  key: string; // sessionFile/date-derived — sessionType alone isn't unique (e.g. LIAW's Race 1/Race 2)
+  label: string;
+  session: AccSessionResult;
+};
+
+// A championship can run more than one session of the same type per event
+// (LIAW's Race 1/Race 2 format is the motivating case) — sessions arrive
+// already ordered per type (see getAccRaceEventSessions), so the Nth session
+// of a type becomes "<Type> N" only when there's more than one.
+function buildTabs(sessions: AccSessionResult[]): ResultsTab[] {
+  const byType = new Map<AccSessionType, AccSessionResult[]>();
+  for (const s of sessions) {
+    const group = byType.get(s.sessionType);
+    if (group) group.push(s);
+    else byType.set(s.sessionType, [s]);
+  }
+
+  const tabs: ResultsTab[] = [];
+  for (const type of TAB_ORDER) {
+    const group = byType.get(type);
+    if (!group) continue;
+    group.forEach((session, i) => {
+      tabs.push({
+        key: session.sessionFile ?? `${type}-${i}`,
+        label: group.length > 1 ? `${TAB_LABEL[type]} ${i + 1}` : TAB_LABEL[type],
+        session,
+      });
+    });
+  }
+  return tabs;
+}
+
+export function ResultsTabs({
+  sessions,
+  driverInfo,
+}: {
+  sessions: AccSessionResult[];
+  driverInfo: Record<string, DriverInfo>;
+}) {
+  const tabs = buildTabs(sessions);
+  const [activeKey, setActiveKey] = useState<string | null>(tabs[0]?.key ?? null);
+
+  const active = tabs.find((t) => t.key === activeKey) ?? tabs[0];
+
+  if (!active) {
     return (
       <p className="font-mono text-[12px] text-txt-3 py-6 text-center">
         No session data for this event.
@@ -44,33 +90,37 @@ export function ResultsTabs({ sessions }: { sessions: AccSessionResult[] }) {
     );
   }
 
-  const session = bySessionType.get(active)!;
-
   return (
     <div>
       <div className="flex gap-1 border-b border-line mb-4 flex-wrap">
-        {availableTabs.map((tab) => (
+        {tabs.map((tab) => (
           <button
-            key={tab}
+            key={tab.key}
             type="button"
-            onClick={() => setActive(tab)}
+            onClick={() => setActiveKey(tab.key)}
             className={[
               'font-mono text-[13px] tracking-[.2em] uppercase px-4 py-2 -mb-px border-b-2 transition-colors cursor-pointer',
-              active === tab ? 'text-gold border-gold' : 'text-txt-3 border-transparent hover:text-txt-2',
+              active.key === tab.key ? 'text-gold border-gold' : 'text-txt-3 border-transparent hover:text-txt-2',
             ].join(' ')}
           >
-            {TAB_LABEL[tab]}
+            {tab.label}
           </button>
         ))}
       </div>
-      <ResultsTable session={session} />
+      <ResultsTable session={active.session} driverInfo={driverInfo} />
     </div>
   );
 }
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
-function ResultsTable({ session }: { session: AccSessionResult }) {
+function ResultsTable({
+  session,
+  driverInfo,
+}: {
+  session: AccSessionResult;
+  driverInfo: Record<string, DriverInfo>;
+}) {
   const isRace = session.sessionType === 'Race';
 
   return (
@@ -101,6 +151,8 @@ function ResultsTable({ session }: { session: AccSessionResult }) {
           {session.results.map((r) => {
             const { iconName, logoUrl } = carIcon(r.carModel);
             const isFastestRaceLap = isRace && r.bestLapMs != null && r.bestLapMs === session.bestLapMs;
+            const steamId = currentDriverSteamId(r);
+            const info = steamId ? driverInfo[steamId] : undefined;
             return (
               <tr key={`${r.carId}-${r.position}`} className="border-b border-line/30">
                 <td
@@ -115,7 +167,12 @@ function ResultsTable({ session }: { session: AccSessionResult }) {
                   </span>
                 </td>
                 <td className="font-display font-bold text-[15px] uppercase text-txt py-2 pr-3 truncate max-w-[220px]">
-                  {driverDisplayName(r)}
+                  <span className="inline-flex items-center gap-2">
+                    {info && (
+                      <DriverTierBadge isSralien={info.isSralien} division={info.division} tier={info.tier} />
+                    )}
+                    {driverDisplayName(r)}
+                  </span>
                 </td>
                 <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 truncate max-w-[200px] hidden lg:table-cell">
                   <div className="flex items-center gap-2">

@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { getSimBySlug, SIMS, type SimConfig } from '@/content/sims';
-import { getStandingsKey, type ChampionshipContent } from '@/content/championships';
+import {
+  accsmChampionshipIds,
+  getStandingsKey,
+  type ChampionshipContent,
+} from '@/content/championships';
 import { GameLabel } from '@/components/GameLabel';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
@@ -59,10 +63,16 @@ function tabNavItem(
   // Whether the parent label links to the tab index (see NavItem.clickParent).
   // The tab index then replaces the "All" head as the way to reach it.
   clickableParent = false,
+  // Keep rendering a dropdown even with exactly one championship, instead of
+  // collapsing to a plain link straight to it. Standings/Register want this
+  // so the affordance stays consistent (and already wired) as soon as a
+  // second championship opens, rather than the nav shape changing shape
+  // underneath users the moment that happens.
+  alwaysDropdown = false,
 ): NavItem {
   const href = `/${sim.slug}/${tab}`;
   if (champs.length === 0) return { label, href };
-  if (champs.length === 1) {
+  if (champs.length === 1 && !alwaysDropdown) {
     // A dropdown of one is redundant. If the parent isn't itself a link and
     // has no "all" head, point straight at the lone championship (Register);
     // otherwise fall back to the tab index (clickable parent still reaches it).
@@ -90,10 +100,21 @@ function tabNavItem(
 function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavItem[] {
   const champsForSim = championships.filter((c) => c.game === sim.game);
   const calendarChamps = champsForSim.filter((c) => c.schedule.length > 0 && !c.teaserOnly);
+  // !teaserOnly gates BOTH sources now — it used to only guard the local
+  // (getStandingsKey) branch, so a teaser championship with an
+  // emperor_championship_id already set (e.g. GT3 Team Series S19, wired up
+  // ahead of actually going live) slipped into the dropdown as a second,
+  // stale entry alongside the one real active championship.
+  //
+  // accsmChampionshipIds covers BOTH shapes — a single-championship event and
+  // a multi-division series, whose emperor_championship_id is NULL by design
+  // (its per-division ids live in championship_accsm_targets). Testing the
+  // single column alone dropped the GT3 Team Series out of this dropdown
+  // entirely.
   const standingsChamps = champsForSim.filter(
-    (c) => c.emperorChampionshipId || (!c.teaserOnly && getStandingsKey(c)),
+    (c) => !c.teaserOnly && (accsmChampionshipIds(c).length > 0 || getStandingsKey(c)),
   );
-  const leaderboardChamps = champsForSim.filter((c) => c.emperorChampionshipId);
+  const leaderboardChamps = champsForSim.filter((c) => accsmChampionshipIds(c).length > 0);
   // Only championships with registration currently OPEN belong in the Register
   // menu — a closed/disabled one drops out (and the whole Register item goes
   // away once none are open).
@@ -147,10 +168,13 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
     tabNavItem(sim, 'Calendar', 'calendar', calendarChamps, false, true),
     // Register always shows. With open championships it's a dropdown of them;
     // with none open it's a plain link to /[sim]/register, which renders the
-    // "coming soon — watch Discord" state.
-    tabNavItem(sim, 'Register', 'register', registerChamps, false),
+    // "coming soon — watch Discord" state. alwaysDropdown keeps the dropdown
+    // affordance even with a single open championship (today, just LIAW) so
+    // it doesn't collapse to a plain link and then change shape on users the
+    // moment a second one opens — same reasoning as Standings below.
+    tabNavItem(sim, 'Register', 'register', registerChamps, false, false, true),
     leaderboardItem,
-    tabNavItem(sim, 'Standings', 'standings', standingsChamps),
+    tabNavItem(sim, 'Standings', 'standings', standingsChamps, true, false, true),
   ];
 }
 

@@ -40,3 +40,5 @@ scripts/drivers_seed.json
 # machine-local state from `supabase link`, not project source. schema.sql
 # (the actual schema snapshot dump-schema.ps1 produces) is committed.
 supabase/.temp/
+.vercel
+.env*

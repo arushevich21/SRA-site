@@ -1,7 +1,13 @@
 'use client';
 
 import { useState, useTransition, useMemo } from 'react';
-import { assignDivision, assignTier, assignBulk, resolveDiscordIds } from './actions';
+import {
+  assignDivision,
+  assignTier,
+  assignBulk,
+  resolveDiscordIds,
+  type AssignResult,
+} from './actions';
 
 export type DriverRow = {
   id: string;
@@ -45,6 +51,9 @@ export default function DivisionsTable({
   const [discordIdsInput, setDiscordIdsInput] = useState('');
   const [resolving, setResolving] = useState(false);
   const [notFoundIds, setNotFoundIds] = useState<string[] | null>(null);
+  // Whether the last write pushed the change to Discord, or was too large
+  // and needs the bot's bulk resync instead.
+  const [discordStatus, setDiscordStatus] = useState<AssignResult['discord'] | null>(null);
 
   const unassignedCount = useMemo(
     () => drivers.filter((d) => d.division_id === null || d.tier === null).length,
@@ -115,7 +124,7 @@ export default function DivisionsTable({
     const newDiv = raw === '' ? null : parseInt(raw);
     patchDrivers([driverId], { division_id: newDiv });
     startTransition(async () => {
-      await assignDivision([driverId], newDiv);
+      setDiscordStatus((await assignDivision([driverId], newDiv)).discord);
     });
   }
 
@@ -123,7 +132,7 @@ export default function DivisionsTable({
     const newTier = raw === '' ? null : (raw as 'gold' | 'silver');
     patchDrivers([driverId], { tier: newTier });
     startTransition(async () => {
-      await assignTier([driverId], newTier);
+      setDiscordStatus((await assignTier([driverId], newTier)).discord);
     });
   }
 
@@ -151,7 +160,7 @@ export default function DivisionsTable({
     setBulkTier('');
 
     startTransition(async () => {
-      await assignBulk(ids, newDiv, newTier);
+      setDiscordStatus((await assignBulk(ids, newDiv, newTier)).discord);
     });
   }
 
@@ -346,6 +355,32 @@ export default function DivisionsTable({
           >
             Clear selection
           </button>
+        </div>
+      )}
+
+      {/* Discord sync outcome — a division written here is only half the
+          change; the member's Discord ROLE comes from the bot re-reading this
+          row after a nudge, so an admin needs to know whether that happened. */}
+      {discordStatus && discordStatus.kind !== 'none' && (
+        <div
+          className={[
+            'border px-4 py-3 mb-3 font-mono text-[12px]',
+            discordStatus.kind === 'deferred-to-bulk'
+              ? 'border-gold-deep/40 bg-gold-deep/5 text-gold-deep'
+              : 'border-line bg-panel text-txt-2',
+          ].join(' ')}
+        >
+          {discordStatus.kind === 'nudged' ? (
+            <>
+              Discord role resync requested for {discordStatus.count} driver
+              {discordStatus.count === 1 ? '' : 's'}.
+            </>
+          ) : (
+            <>
+              {discordStatus.count} drivers updated — too many to push to Discord one at a
+              time. Run SRA-Bot&apos;s bulk resync to apply their division roles.
+            </>
+          )}
         </div>
       )}
 

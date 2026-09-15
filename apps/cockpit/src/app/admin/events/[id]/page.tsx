@@ -1,7 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireAdmin } from '@/lib/require-admin';
-import { getChampionshipRowById } from '@/lib/championships-store';
+import {
+  getAccsmTargetsForKey,
+  getChampionshipRowById,
+  getDivisions,
+  getRaceNightsForChampionship,
+} from '@/lib/championships-store';
 import { getEventRegistrationSummary } from '@/lib/registrations';
 import { EventForm } from '../EventForm';
 import { rowToInput } from '../row-to-input';
@@ -23,6 +28,15 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
       ? await getEventRegistrationSummary(row.registration_key, row.registration_season, row.max_registrations)
       : null;
 
+  // Division targets hang off registration_key, so an event without one has
+  // none by construction — skip the query rather than asking for rows keyed by
+  // null.
+  const [divisionTargets, divisions, raceNights] = await Promise.all([
+    row.registration_key ? getAccsmTargetsForKey(row.registration_key) : Promise.resolve([]),
+    getDivisions(),
+    getRaceNightsForChampionship(id),
+  ]);
+
   return (
     <section className="max-w-[960px] mx-auto px-7 pt-14 pb-24">
       <Link href="/admin/events"
@@ -34,7 +48,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
         Edit Event
       </h1>
 
-      <EventForm initial={rowToInput(row)} isEdit />
+      <EventForm initial={rowToInput(row, divisionTargets, raceNights)} divisions={divisions} isEdit />
 
       {summary && (
         <div className="mt-14 border-t border-line pt-8">

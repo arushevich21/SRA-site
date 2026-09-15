@@ -125,6 +125,16 @@ export default async function ProfilePage() {
         <p className="font-mono text-[11px] tracking-[.35em] uppercase text-gold mb-5">
           Driver Profile
         </p>
+        {(!driver?.first_name || !driver?.last_name || driver?.driver_number == null) && (
+          <div className="border border-gold-deep/30 bg-gold-deep/5 px-5 py-4 mb-5">
+            <p className="font-mono text-[12px] tracking-[.05em] uppercase text-gold-deep">
+              Complete your profile to continue
+            </p>
+            <p className="font-sans text-[13px] text-txt-2 mt-1">
+              Name and driver number are required before you can use the rest of the site.
+            </p>
+          </div>
+        )}
         <ProfileDetailsForm
           firstName={driver?.first_name ?? null}
           lastName={driver?.last_name ?? null}

@@ -27,8 +27,8 @@ export type SRatingData = {
   computedAt: string | null;
 };
 
-const ENGINE = 'v2-openskill';
-const ALIEN_CUTOFF_RANK = 10;
+export const ENGINE = 'v2-openskill';
+export const ALIEN_CUTOFF_RANK = 10;
 
 // drivers.display_name embeds the driver's number as a "┊{number}" suffix
 // (see driver-display-name.ts) — this board shows names only, no numbers, so

@@ -94,7 +94,12 @@ function stripSteamPrefix(playerId: string | undefined): string {
   return playerId.startsWith('S') ? playerId.slice(1) : playerId;
 }
 
-function mapSessionType(raw: string | undefined): AccSessionType {
+// Multi-race championship formats (e.g. LIAW's sprint weekends) tag each race
+// 'R1', 'R2', etc. rather than plain 'R' — confirmed live in acc_race_sessions.
+// AccSessionType stays to its three canonical values; ResultsTabs already
+// numbers multiple 'Race' sessions per event ("Race 1"/"Race 2") from their
+// session date, so collapsing R1/R2/... here doesn't lose that distinction.
+export function mapSessionType(raw: string | undefined): AccSessionType {
   switch (raw) {
     case 'FP':
       return 'Practice';
@@ -103,6 +108,7 @@ function mapSessionType(raw: string | undefined): AccSessionType {
     case 'R':
       return 'Race';
     default:
+      if (raw && /^R\d+$/i.test(raw)) return 'Race';
       return raw as AccSessionType;
   }
 }

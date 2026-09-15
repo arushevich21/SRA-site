@@ -74,6 +74,7 @@ export default function ProfileDetailsForm({
             max={999}
             defaultValue={driverNumber ?? ''}
             placeholder="e.g. 47"
+            required
             className="bg-panel-2 border border-line px-4 py-3 font-mono text-[13px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold w-full"
           />
         </div>

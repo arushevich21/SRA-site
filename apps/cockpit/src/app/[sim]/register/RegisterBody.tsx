@@ -1,18 +1,22 @@
 import { type ReactNode } from 'react';
 import Link from 'next/link';
-import { accCarModelName } from '@sra/domain';
+import { accCarManufacturerIconName, accCarModelName } from '@sra/domain';
 import { createSupabaseServerClient } from '@/lib/supabase-server';
 import { supabase as adminClient } from '@/lib/supabase';
-import type { ChampionshipContent } from '@/content/championships';
+import type { ChampionshipContent, ScheduleRound } from '@/content/championships';
 import type { SimConfig } from '@/content/sims';
+import { eventInstant, eventDateTimeParts, hasEventTime, EVENT_SOURCE_TIMEZONE } from '@/lib/event-time';
+import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
 import RegisterForm from './RegisterForm';
-import CurrentTeam from './CurrentTeam';
+import CurrentTeam, { type NextRoundInfo } from './CurrentTeam';
 import TeamList, { type Team } from './TeamList';
+import { DivisionCapacity } from '@/components/DivisionCapacity';
+import { buildDivisionCapacity } from '@/lib/division-capacity';
 
 // Supabase FK join inference — cast via as unknown as
 type RawMemberJoin = {
   driver_id: string;
-  drivers: { display_name: string | null; tier: string | null } | null;
+  drivers: { display_name: string | null; tier: string | null; is_sralien: boolean | null } | null;
 };
 type RawRegistrationJoin = {
   id: string;
@@ -26,6 +30,54 @@ type RawRegistrationJoin = {
 
 function one<T>(rel: T | T[] | null): T | null {
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
+}
+
+// Sort key for a schedule entry — the real instant for a timed entry,
+// midnight UTC of the authored calendar date for a date-only one (good
+// enough for ordering "which round is next"; event-time.ts's DST-aware
+// instant is reserved for entries that actually carry a time).
+function roundSortKey(date: string): number {
+  if (hasEventTime(date)) return eventInstant(date);
+  const [y, m, d] = date.split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+// The soonest not-yet-happened round on the schedule, or null if every round
+// is undated or already past — CurrentTeam simply omits the panel then
+// rather than showing a stale or empty one.
+function findNextRound(schedule: ScheduleRound[]): ScheduleRound | null {
+  const now = Date.now();
+  return (
+    schedule
+      .filter((r): r is ScheduleRound & { date: string } => r.date != null)
+      .map((r) => ({ round: r, key: roundSortKey(r.date) }))
+      .filter((r) => r.key >= now)
+      .sort((a, b) => a.key - b.key)[0]?.round ?? null
+  );
+}
+
+function toNextRoundInfo(round: ScheduleRound): NextRoundInfo {
+  const { date, time } = eventDateTimeParts(round.date, EVENT_SOURCE_TIMEZONE);
+  return { round: round.round, track: round.track, raceLength: round.raceLength, date, time };
+}
+
+// Manufacturer icon/logo for a car, same resolution every other car display
+// on the site uses (HotLapBoard, TrackHeader, jagoff's board): a
+// @cardog-icons/react icon name where one exists, else our own uploaded SVG
+// logo where the manufacturer has one, else neither — never a generic
+// placeholder glyph. Resolved once here (a server component) and passed
+// down as plain data, since Icon/FallbackLogoImage live in client
+// components (TeamList, CurrentTeam).
+function resolveCarLogo(carModelId: number | null): {
+  manufacturerIconName: string | null;
+  manufacturerLogoUrl: string | null;
+} {
+  if (carModelId == null) return { manufacturerIconName: null, manufacturerLogoUrl: null };
+  const manufacturerIconName = accCarManufacturerIconName(carModelId);
+  return {
+    manufacturerIconName,
+    manufacturerLogoUrl: !manufacturerIconName ? accCarManufacturerLogoUrl(carModelId) : null,
+  };
 }
 
 export async function RegisterBody({
@@ -75,7 +127,7 @@ export async function RegisterBody({
   const { data: rawRegistrations } = await adminClient
     .from('registrations')
     .select(
-      'id, team_id, car_model_id, division_id, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, tier))',
+      'id, team_id, car_model_id, division_id, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, tier, is_sralien))',
     )
     .eq('championship_key', champ.registrationKey)
     .eq('season', champ.registrationSeason)
@@ -87,6 +139,8 @@ export async function RegisterBody({
       id: r.team_id,
       team_name: one(r.teams)?.name ?? 'Unnamed Team',
       car: (r.car_model_id != null ? accCarModelName(r.car_model_id) : null) ?? 'Unknown Car',
+      carModelId: r.car_model_id,
+      ...resolveCarLogo(r.car_model_id),
       division_id: r.division_id,
       // NULL division => ungraded entry; no name to fall back to.
       division_name:
@@ -97,9 +151,32 @@ export async function RegisterBody({
         driver_id: m.driver_id,
         display_name: m.drivers?.display_name ?? null,
         tier: (m.drivers?.tier ?? null) as 'gold' | 'silver' | null,
+        is_sralien: m.drivers?.is_sralien ?? false,
       })),
     }),
   );
+
+  // ── Per-division driver counts ────────────────────────────────────────────
+  // Advisory only (see 20260914c): registration is never blocked at the cap.
+  // Counts DRIVERS, not entries — a team is up to two of them, and the pit-box
+  // ceiling this exists for is measured in cars on the grid.
+  //
+  // Only meaningful for a graded series; a single-grid event (LIAW) has no
+  // divisions to break down and renders nothing.
+  const divisionCapacity =
+    champ.requiresDivision !== false && champ.divisionDriverCap != null
+      ? await (async () => {
+          const { data: divisions } = await adminClient
+            .from('divisions')
+            .select('id, name')
+            .order('id');
+          return buildDivisionCapacity(
+            teams.map((t) => ({ divisionId: t.division_id, driverCount: t.members.length })),
+            (divisions ?? []) as { id: number; name: string }[],
+            champ.divisionDriverCap ?? null,
+          );
+        })()
+      : [];
 
   // Every driver already CLAIMED for this event, confirmed or waitlisted —
   // register_entry()'s unique constraint blocks a second claim regardless of
@@ -122,6 +199,11 @@ export async function RegisterBody({
   } = await supabase.auth.getUser();
 
   let userSection: ReactNode;
+  // Captured inside the branch below (only known once we've resolved a
+  // driver record) and read afterward by TeamList's "mine" row highlight —
+  // undefined for a signed-out viewer or one with no driver record, which
+  // simply never matches any entry-list row.
+  let currentDriverId: string | undefined;
 
   if (!user) {
     userSection = (
@@ -139,9 +221,10 @@ export async function RegisterBody({
   } else {
     const { data: driver } = await adminClient
       .from('drivers')
-      .select('id, display_name, division_id')
+      .select('id, display_name, division_id, allow_gt3_team_series_solo_registration')
       .eq('user_id', user.id)
       .maybeSingle();
+    currentDriverId = driver?.id;
 
     // Divisions are a GT3 Team Series concept. A championship that doesn't
     // grade its entries (League in a Week and friends) has one grid, so an
@@ -218,18 +301,26 @@ export async function RegisterBody({
       );
 
       if (myTeam) {
+        const nextRound = findNextRound(champ.schedule);
         userSection = (
           <CurrentTeam
             teamId={myTeam.id}
             teamName={myTeam.team_name}
             car={myTeam.car}
+            carModelId={myTeam.carModelId}
+            manufacturerIconName={myTeam.manufacturerIconName}
+            manufacturerLogoUrl={myTeam.manufacturerLogoUrl}
+            divisionId={myTeam.division_id}
             divisionName={myTeam.division_name}
             members={myTeam.members}
             currentDriverId={driver.id}
+            currentDriverName={driver.display_name}
             simSlug={simSlug}
             maxTeamSize={champ.maxTeamSize}
             championshipKey={champ.registrationKey}
             season={champ.registrationSeason}
+            allowedCars={champ.allowedCars}
+            nextRound={nextRound ? toNextRoundInfo(nextRound) : null}
           />
         );
       } else {
@@ -243,7 +334,7 @@ export async function RegisterBody({
         // a teammate picker.
         let teammateQuery = adminClient
           .from('drivers')
-          .select('id, display_name, tier')
+          .select('id, display_name, tier, division_id, is_sralien')
           .neq('id', driver.id);
 
         if (requiresDivision) {
@@ -260,6 +351,8 @@ export async function RegisterBody({
             id: string;
             display_name: string | null;
             tier: 'gold' | 'silver' | null;
+            division_id: number | null;
+            is_sralien: boolean | null;
           }[]
         ).filter((d) => !takenSet.has(d.id));
 
@@ -283,6 +376,10 @@ export async function RegisterBody({
             <RegisterForm
               champKey={champ.registrationKey}
               maxTeamSize={champ.maxTeamSize}
+              minTeamSize={champ.minTeamSize ?? 1}
+              // The per-driver exception SRA-Bot grants. Advisory here —
+              // register_entry() is what actually enforces it.
+              canRegisterSolo={driver.allow_gt3_team_series_solo_registration === true}
               allowedCars={champ.allowedCars}
               simSlug={simSlug}
               availableDrivers={availableDrivers}
@@ -298,6 +395,7 @@ export async function RegisterBody({
     <>
       <div className="mb-16">{userSection}</div>
       <div className="border-t border-line pt-12">
+        <DivisionCapacity rows={divisionCapacity} />
         <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3 mb-8">
           Entry List
         </p>
@@ -305,6 +403,7 @@ export async function RegisterBody({
           teams={teams}
           maxTeamSize={champ.maxTeamSize}
           showDivisions={champ.requiresDivision !== false}
+          currentDriverId={currentDriverId}
         />
       </div>
     </>

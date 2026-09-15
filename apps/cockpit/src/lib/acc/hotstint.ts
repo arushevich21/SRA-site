@@ -17,6 +17,7 @@ import { compareSeasonsDesc, seasonalTrackKeys, hasWetSessionRows } from '../sea
 import { applySeasonFilter, displaySeason } from './seasons';
 import { getDriverInfoBySteamIds, driverInfoFor, stripSteamIdPrefix, type DriverInfo } from '../driver-lookup';
 import { classifyLapTier, type LapTier } from './reference-times';
+import { accCarDisplayName } from './car-display-name';
 import type { TrackWithTopTimes } from '@/components/TrackList';
 
 // AccHotLapEntry (reused for stint rows) enriched with the driver's registered
@@ -71,7 +72,7 @@ function toStintEntry(
     driverName: row.driver_name,
     carGroup,
     carModel: carModelId,
-    carModelName: row.car_model,
+    carModelName: accCarDisplayName(carModelId, row.car_model),
     bestLapMs: bestStintMs,
     bestLap: msToLaptime(bestStintMs)!,
     sectorsMs: row.sectors_ms,

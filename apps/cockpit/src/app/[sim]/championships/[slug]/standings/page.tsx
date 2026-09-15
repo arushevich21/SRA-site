@@ -4,14 +4,21 @@ import { getChampionships } from '@/lib/championships-store';
 import { ChampionshipStandingsBody } from '@/components/ChampionshipStandingsBody';
 
 // See [sim]/standings/page.tsx — same mixed Emperor/admin-upload data source.
+//
+// A multi-division championship reads searchParams (division/view/tier), which
+// opts this route into dynamic rendering regardless of the value below; the
+// 300s ceiling still applies to every single-championship standings page.
 export const revalidate = 300;
 
 export default async function ChampionshipStandingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sim: string; slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { sim: simSlug, slug } = await params;
+  const query = await searchParams;
   const sim = getSimBySlug(simSlug);
   if (!sim) notFound();
 
@@ -30,7 +37,11 @@ export default async function ChampionshipStandingsPage({
         {content.title}
       </h1>
 
-      <ChampionshipStandingsBody champ={content} />
+      <ChampionshipStandingsBody
+        champ={content}
+        basePath={`/${simSlug}/championships/${slug}/standings`}
+        searchParams={query}
+      />
     </section>
   );
 }

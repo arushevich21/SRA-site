@@ -196,3 +196,79 @@ describe('request throttling', () => {
     vi.useRealTimers();
   });
 });
+
+describe('getChampionshipStandings', () => {
+  // Shapes taken from a live ACCSM response (LIAW championship, accsm1).
+  // The point of this fixture is what the TEAM rows do NOT contain.
+  const liveShape = {
+    DriverStandings: {
+      '': [
+        {
+          DriverName: 'Joel Moffatt',
+          DriverGUID: 'S76561197960416683',
+          CarModel: 'Ferrari 296 GT3',
+          Points: 805,
+          PointsPenalty: 0,
+          Position: 1,
+        },
+      ],
+    },
+    TeamStandings: {
+      // No Position key — Emperor genuinely does not send one for teams.
+      '': [
+        { TeamName: 'BOP THE LEXUS', Points: 805, PointsPenalty: 0, IgnoredEventIDs: {} },
+        { TeamName: 'Balkan Blast', Points: 723, PointsPenalty: 0, IgnoredEventIDs: {} },
+        { TeamName: 'fake race car, real pain', Points: 654, PointsPenalty: 0, IgnoredEventIDs: {} },
+      ],
+    },
+  };
+
+  it('derives team positions from array order, since Emperor sends none', async () => {
+    stubFetch({ status: 200, body: liveShape });
+    const standings = await new EmperorClient(BASE_URL).getChampionshipStandings('abc');
+
+    expect(standings.teamStandings[''].map((t) => [t.position, t.teamName])).toEqual([
+      [1, 'BOP THE LEXUS'],
+      [2, 'Balkan Blast'],
+      [3, 'fake race car, real pain'],
+    ]);
+  });
+
+  it('preserves Emperor’s own team order rather than re-sorting on points', async () => {
+    // A tie Emperor has already resolved one way must not be reordered by us.
+    stubFetch({
+      status: 200,
+      body: {
+        DriverStandings: { '': [] },
+        TeamStandings: {
+          '': [
+            { TeamName: 'We are so Jason', Points: 654, PointsPenalty: 0 },
+            { TeamName: 'fake race car, real pain', Points: 654, PointsPenalty: 0 },
+          ],
+        },
+      },
+    });
+    const standings = await new EmperorClient(BASE_URL).getChampionshipStandings('abc');
+    expect(standings.teamStandings[''].map((t) => t.teamName)).toEqual([
+      'We are so Jason',
+      'fake race car, real pain',
+    ]);
+  });
+
+  it('reads driver positions from Emperor, which does send them', async () => {
+    stubFetch({ status: 200, body: liveShape });
+    const standings = await new EmperorClient(BASE_URL).getChampionshipStandings('abc');
+    expect(standings.driverStandings[''][0].position).toBe(1);
+    expect(standings.driverStandings[''][0].steamId).toBe('S76561197960416683');
+  });
+
+  it('treats a null class group as empty (Emperor returns null, not [])', async () => {
+    stubFetch({
+      status: 200,
+      body: { DriverStandings: { '': null }, TeamStandings: { '': null } },
+    });
+    const standings = await new EmperorClient(BASE_URL).getChampionshipStandings('abc');
+    expect(standings.driverStandings['']).toEqual([]);
+    expect(standings.teamStandings['']).toEqual([]);
+  });
+});

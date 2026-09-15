@@ -1,6 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import { msToLaptime, accCarClassName, accCarManufacturerIconName } from '@sra/domain';
 import { accCarManufacturerLogoUrl } from './manufacturer-logo';
+import { accCarDisplayName } from './car-display-name';
 import type { AccHotLapEntry } from '@sra/shared-types';
 import type { TrackSummary, TrackTopEntry } from '../track-summary';
 import { supabase } from '../supabase';
@@ -301,7 +302,7 @@ async function fetchAccTrackLeaderboard(
       driverName: row.driver_name as string,
       carGroup,
       carModel: carModelId,
-      carModelName: row.car_model as string | null,
+      carModelName: accCarDisplayName(carModelId, row.car_model as string | null),
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,
       sectorsMs: row.sectors_ms as number[] | null,
@@ -388,7 +389,7 @@ export async function getAccTrackTopTimes(
       driverName: row.driver_name as string,
       carGroup,
       carModel: carModelId,
-      carModelName: row.car_model as string | null,
+      carModelName: accCarDisplayName(carModelId, row.car_model as string | null),
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,
       sectorsMs: row.sectors_ms as number[] | null,

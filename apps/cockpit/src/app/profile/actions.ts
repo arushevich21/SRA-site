@@ -74,12 +74,10 @@ export async function updateProfileDetails(
   if (shortName.length !== 3) return { error: 'Short name must be exactly 3 characters.' };
   if (country && !isValidCountryCode(country)) return { error: 'Select a valid country.' };
 
-  let driverNumber: number | null = null;
-  if (driverNumberRaw) {
-    driverNumber = Number(driverNumberRaw);
-    if (!Number.isInteger(driverNumber) || driverNumber < 2 || driverNumber > 999) {
-      return { error: 'Driver number must be between 2 and 999.' };
-    }
+  if (!driverNumberRaw) return { error: 'Driver number is required.' };
+  const driverNumber = Number(driverNumberRaw);
+  if (!Number.isInteger(driverNumber) || driverNumber < 2 || driverNumber > 999) {
+    return { error: 'Driver number must be between 2 and 999.' };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -89,13 +87,18 @@ export async function updateProfileDetails(
 
   // Mid-season lock: while numbers are locked, non-admins cannot CHANGE their
   // driver_number (other profile fields stay editable). Admins are exempt.
+  // First-time assignment (driver_number currently NULL — the profile-
+  // completion gate in middleware.ts requires one) is never blocked by the
+  // lock: it's completing registration, not swapping an already-raced-with
+  // number mid-season, and the alternative is a genuine lockout — a
+  // brand-new driver who could never satisfy the gate until the lock lifts.
   const { data: caller } = await adminClient
     .from('drivers')
     .select('is_admin, driver_number, is_champion, discord_id')
     .eq('user_id', user.id)
     .maybeSingle();
 
-  const numberChanged = driverNumber !== (caller?.driver_number ?? null);
+  const numberChanged = caller?.driver_number != null && driverNumber !== caller.driver_number;
   if (!caller?.is_admin && numberChanged && (await getNumbersLocked())) {
     return {
       error: 'Driver number changes are locked mid-season. Contact an admin.',

@@ -46,7 +46,14 @@ function toJagoffEntry(
   return {
     rank: entry.position,
     steamId: stripSteamIdPrefix(entry.steamId),
-    driverName: entry.driverName,
+    // acc_hotstint_leaderboard.driver_name is a snapshot written once by the
+    // bot at stint time — a later nickname change never touches it. Prefer
+    // the live drivers.display_name (from driverInfo) whenever the steamId
+    // resolves to a driver row, same as every other name on this page
+    // (driverNumber/division/etc. all come from the same live lookup); fall
+    // back to the snapshot only for a stint set by someone with no linked
+    // drivers row at all.
+    driverName: driverInfo.displayName ?? entry.driverName,
     carModel: accCarModelName(JAGUAR_CAR_MODEL_ID),
     bestLapMs: entry.hotstintMs,
     bestLap: msToLaptime(entry.hotstintMs) ?? '—',
@@ -70,7 +77,8 @@ function toTrackTopEntry(
   return {
     rank: entry.position,
     steamId: stripSteamIdPrefix(entry.steamId),
-    driverName: entry.driverName,
+    // Same live-name preference as toJagoffEntry above.
+    driverName: driverInfo.displayName ?? entry.driverName,
     carLabel: accCarModelName(JAGUAR_CAR_MODEL_ID),
     manufacturerIconName: iconName,
     manufacturerLogoUrl: !iconName ? accCarManufacturerLogoUrl(JAGUAR_CAR_MODEL_ID) : null,

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { msToLaptime } from '@sra/domain';
 import type { AcEvoSessionResult } from '@sra/shared-types';
 import { fetchAcEvoRaceResult, type RaceResultFetch } from '@/app/[sim]/standings/actions';
+import { DriverTierBadge } from './DriverTierBadge';
+import type { DriverInfo } from '@/lib/driver-lookup';
 
 type Round = { round: number; track: string; trackKey: string };
 
@@ -69,14 +71,22 @@ export function AcEvoRaceResultsTabs({ rounds }: { rounds: Round[] }) {
         </p>
       )}
 
-      {active && active.ok && active.data && <RaceResultTable session={active.data} />}
+      {active && active.ok && active.data && (
+        <RaceResultTable session={active.data} driverInfo={active.driverInfo} />
+      )}
     </div>
   );
 }
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
-function RaceResultTable({ session }: { session: AcEvoSessionResult }) {
+function RaceResultTable({
+  session,
+  driverInfo,
+}: {
+  session: AcEvoSessionResult;
+  driverInfo: Record<string, DriverInfo>;
+}) {
   const fastestLapMs = session.results.reduce<number | null>((fastest, r) => {
     if (r.bestLapMs == null) return fastest;
     return fastest == null || r.bestLapMs < fastest ? r.bestLapMs : fastest;
@@ -113,7 +123,16 @@ function RaceResultTable({ session }: { session: AcEvoSessionResult }) {
                   </span>
                 </td>
                 <td className="font-display font-bold text-[15px] uppercase text-txt py-2 pr-3 truncate max-w-[220px]">
-                  {r.driverName}
+                  <span className="inline-flex items-center gap-2">
+                    {r.steamId && driverInfo[r.steamId] && (
+                      <DriverTierBadge
+                        isSralien={driverInfo[r.steamId].isSralien}
+                        division={driverInfo[r.steamId].division}
+                        tier={driverInfo[r.steamId].tier}
+                      />
+                    )}
+                    {r.driverName}
+                  </span>
                 </td>
                 <td className="font-sans text-[13px] text-txt-3 py-2 pr-3 truncate max-w-[200px] hidden lg:table-cell">
                   {r.carModel ?? '—'}

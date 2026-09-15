@@ -1,4 +1,6 @@
 import Image from 'next/image';
+import { DivisionBadge } from '@/components/DivisionBadge';
+import { roundNights } from '@/content/championships';
 import Link from 'next/link';
 import type { ChampionshipContent } from '../../content/championships';
 import { formatScheduleDateTime } from '@/lib/schedule-format';
@@ -27,10 +29,17 @@ const STATUS_TEXT_CLASS: Record<string, string> = {
 export function RealChampionshipBlock({
   content,
   href,
+  roundsWithResults,
 }: {
   content: ChampionshipContent;
   href?: string;
+  // Round numbers with a matched acc_race_sessions event (see
+  // matchAccRoundsToResultEvents) — the ACC equivalent of a round having
+  // emperorRawTrackName set for AC Evo. Omitted entirely by a caller that
+  // hasn't computed it (safe: just means no ACC round shows as a link).
+  roundsWithResults?: Set<number>;
 }) {
+  const divisionIds = content.accsmTargets?.map((t) => t.divisionId) ?? [];
   const status = getChampionshipStatus(content);
   const isActive = status === 'active-open' || status === 'active-closed';
   const isDimmed = !isActive;
@@ -142,11 +151,15 @@ export function RealChampionshipBlock({
           {content.schedule.length > 0 && status !== 'coming-soon' && (
             <div className="mt-5 border border-line/60 bg-carbon-2/40">
               {content.schedule.map((round, i) => {
-                const { time: timeStr } = formatScheduleDateTime(round.date);
+                // A split-night series races this round on more than one
+                // evening — show each, with the divisions that belong to it.
+                const nights = roundNights(round, divisionIds);
+                const hasResults =
+                  Boolean(round.emperorRawTrackName) || (roundsWithResults?.has(round.round) ?? false);
                 const rowClassName = [
                   'flex items-center gap-4 px-4 py-[9px]',
                   i < content.schedule.length - 1 ? 'border-b border-line/40' : '',
-                  round.emperorRawTrackName && sim ? 'hover:bg-panel-2 transition-colors' : '',
+                  hasResults && sim ? 'hover:bg-panel-2 transition-colors' : '',
                 ].join(' ');
                 const rowContent = (
                   <>
@@ -156,15 +169,31 @@ export function RealChampionshipBlock({
                     <span className="font-sans text-[13px] text-txt-2 flex-1 min-w-0 truncate">
                       {round.track}
                     </span>
-                    <span className="flex flex-col items-end shrink-0 leading-tight">
-                      <span className="font-display font-bold text-[12px] uppercase text-txt">
-                        <LocalScheduleDate iso={round.date} />
-                      </span>
-                      {timeStr && (
-                        <span className="font-mono text-[11px] text-txt-3">
-                          <LocalScheduleTime iso={round.date} />
+                    <span className="flex flex-col items-end shrink-0 leading-tight gap-1">
+                      {nights.map((night, ni) => (
+                        <span key={ni} className="flex items-center gap-2">
+                          {/* Which divisions race this night — omitted when
+                              every entrant races together, so a single-night
+                              round stays exactly as it was. */}
+                          {night.divisionIds.length > 0 && (
+                            <span className="flex items-center gap-0.5">
+                              {night.divisionIds.map((d) => (
+                                <DivisionBadge key={d} division={d} height={16} />
+                              ))}
+                            </span>
+                          )}
+                          <span className="flex flex-col items-end leading-tight">
+                            <span className="font-display font-bold text-[12px] uppercase text-txt">
+                              <LocalScheduleDate iso={night.startsAt} />
+                            </span>
+                            {formatScheduleDateTime(night.startsAt).time && (
+                              <span className="font-mono text-[11px] text-txt-3">
+                                <LocalScheduleTime iso={night.startsAt} />
+                              </span>
+                            )}
+                          </span>
                         </span>
-                      )}
+                      ))}
                     </span>
                     <span className="font-mono text-[10px] tracking-[.1em] uppercase text-txt-3/70 shrink-0 w-14 text-right">
                       {round.raceLength}
@@ -172,10 +201,12 @@ export function RealChampionshipBlock({
                   </>
                 );
 
-                // Only rounds with a known Emperor track key have a results
-                // page to link to — other rounds (or sims without a live
-                // results source yet) stay as plain, non-interactive rows.
-                if (round.emperorRawTrackName && sim) {
+                // Only rounds with a known Emperor track key (AC Evo) or a
+                // matched acc_race_sessions event (ACC — see
+                // roundsWithResults) have a results page to link to — other
+                // rounds (or sims without a live results source yet) stay as
+                // plain, non-interactive rows.
+                if (hasResults && sim) {
                   return (
                     <Link
                       key={round.round}

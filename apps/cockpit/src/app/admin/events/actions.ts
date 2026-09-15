@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/require-admin';
 import { supabase } from '@/lib/supabase';
+import { parseAccsmChampionshipId } from '@/lib/accsm-championship-id';
+import { addDaysToEventDate } from '@/lib/event-time';
 
 // Structured payload the EventForm sends. Empty strings mean "unset" and are
 // converted to NULL; numeric-ish strings are parsed. Kept as a plain object
@@ -16,6 +18,21 @@ export type ChampionshipRoundInput = {
   emperorTrack: string;
   emperorRawTrackName: string;
   hotlapReleased: boolean;
+};
+
+// One row of the form's "Division championships" table. Both fields are
+// strings because they come straight off text/select inputs; divisionId is
+// parsed and championshipId is normalized (URL or bare GUID) at save time.
+export type DivisionTargetInput = {
+  divisionId: string;
+  championshipId: string;
+};
+
+// One division's race-night rule: how many days after a round's own date it
+// races. Strings because they come off select inputs.
+export type RaceNightInput = {
+  divisionId: string;
+  dayOffset: string;
 };
 
 export type ChampionshipInput = {
@@ -41,6 +58,7 @@ export type ChampionshipInput = {
   registrationSeason: string;
   registrationOpen: boolean;
   maxTeamSize: string;
+  minTeamSize: string; // '' -> 1 (solo entries allowed)
   maxRegistrations: string; // '' -> NULL (unlimited)
   allowedCars: string[];
   requiresDivision: boolean;
@@ -48,6 +66,11 @@ export type ChampionshipInput = {
   concluded: boolean;
   sortOrder: number;
   rounds: ChampionshipRoundInput[];
+  // Multi-division series only — written to championship_accsm_targets, not
+  // to the championships row. Empty for a single-championship event.
+  divisionTargets: DivisionTargetInput[];
+  // Split-night series only. Divisions absent here race on the round date.
+  raceNights: RaceNightInput[];
 };
 
 export type SaveResult = { ok: true; id: string } | { ok: false; error: string };
@@ -84,6 +107,9 @@ function toRow(input: ChampionshipInput) {
     registration_season: nullIfEmpty(input.registrationSeason),
     registration_open: input.registrationOpen,
     max_team_size: intOrNull(input.maxTeamSize),
+    // NOT NULL in the DB with a default of 1 — an empty field means
+    // "no partner required", not "unknown".
+    min_team_size: intOrNull(input.minTeamSize) ?? 1,
     max_registrations: intOrNull(input.maxRegistrations),
     allowed_cars: input.allowedCars.length > 0 ? input.allowedCars : null,
     requires_division: input.requiresDivision,
@@ -108,11 +134,242 @@ function roundRows(championshipId: string, rounds: ChampionshipRoundInput[]) {
     }));
 }
 
+type ResolvedDivisionTarget = { division_id: number; emperor_championship_id: string };
+
+// Validates + normalizes the form's division rows. Returns an error string
+// rather than throwing so saveChampionship can surface it inline on the form,
+// the same way every other validation here does.
+//
+// Every failure names the offending row. A division target that is silently
+// dropped or stored wrong doesn't fail here - it fails as an empty standings
+// page, or (far worse) as one division's entrylist pushed onto another
+// division's grid, with nothing pointing back at this form.
+function resolveDivisionTargets(
+  rows: DivisionTargetInput[],
+): { ok: true; targets: ResolvedDivisionTarget[] } | { ok: false; error: string } {
+  const targets: ResolvedDivisionTarget[] = [];
+  const seenDivisions = new Set<number>();
+  const seenGuids = new Set<string>();
+
+  for (const row of rows) {
+    // A row where BOTH halves are blank is just an unfilled "+ Add division"
+    // slot - ignore it rather than making the admin delete it to save.
+    if (row.divisionId.trim() === '' && row.championshipId.trim() === '') continue;
+
+    const divisionId = intOrNull(row.divisionId);
+    if (divisionId == null) {
+      return { ok: false, error: 'Every division championship row needs a division selected.' };
+    }
+
+    const guid = parseAccsmChampionshipId(row.championshipId);
+    if (guid == null) {
+      return {
+        ok: false,
+        error:
+          `Division ${divisionId}: "${row.championshipId.trim()}" isn't a valid ACSM championship. ` +
+          'Paste the championship URL (.../championship/<id>) or the ID on its own.',
+      };
+    }
+
+    // (registration_key, division_id) is the table's PK, so a duplicate
+    // division would fail at the DB anyway - caught here to name which one.
+    if (seenDivisions.has(divisionId)) {
+      return { ok: false, error: `Division ${divisionId} is listed twice. Each division gets one championship.` };
+    }
+    // emperor_championship_id is UNIQUE across the whole table: one ACCSM
+    // championship must never serve two divisions, or an entrylist push would
+    // race two rosters against the same file.
+    if (seenGuids.has(guid)) {
+      return { ok: false, error: `Championship ${guid} is assigned to two divisions. Each division needs its own.` };
+    }
+
+    seenDivisions.add(divisionId);
+    seenGuids.add(guid);
+    targets.push({ division_id: divisionId, emperor_championship_id: guid });
+  }
+
+  return { ok: true, targets };
+}
+
+// Reconciles championship_accsm_targets for one registration_key.
+//
+// Upsert-then-delete, NOT the delete-then-reinsert the rounds save uses. These
+// rows are read live by SRA-Bot to decide which registrations belong on which
+// ACCSM grid; a window where they don't exist is a window where a push can
+// resolve nothing and skip a division. Upserting first means the mapping is
+// only ever correct-or-stale, never absent.
+async function saveDivisionTargets(
+  registrationKey: string,
+  targets: ResolvedDivisionTarget[],
+): Promise<string | null> {
+  if (targets.length > 0) {
+    const { error } = await supabase
+      .from('championship_accsm_targets')
+      .upsert(
+        targets.map((t) => ({ ...t, registration_key: registrationKey })),
+        { onConflict: 'registration_key,division_id' },
+      );
+    if (error) {
+      // 23505 here is the emperor_championship_id UNIQUE, not the PK (the PK
+      // is what onConflict just handled). It means a GUID being assigned to
+      // one division is still recorded against another - including another
+      // division of THIS series, when two divisions' ids are swapped in a
+      // single save. Upsert and delete are separate statements, so that swap
+      // can't be resolved in one pass.
+      if (error.code === '23505') {
+        return (
+          'One of these championship IDs is already assigned to a different division. ' +
+          'If you are swapping IDs between divisions, clear one and save, then set the other.'
+        );
+      }
+      return error.message;
+    }
+  }
+
+  // Drop divisions the admin removed. Scoped to this registration_key, and
+  // expressed as "not in the submitted set" so an empty submission clears them
+  // all - which is the correct reading of removing every row from the form.
+  let del = supabase
+    .from('championship_accsm_targets')
+    .delete()
+    .eq('registration_key', registrationKey);
+
+  if (targets.length > 0) {
+    del = del.not('division_id', 'in', `(${targets.map((t) => t.division_id).join(',')})`);
+  }
+
+  const { error: delErr } = await del;
+  return delErr ? delErr.message : null;
+}
+
+// Persists the series-level race-night rule, then REGENERATES
+// championship_round_division_times from it.
+//
+// The rule is the authoring input; those per-round rows are what the site
+// actually reads (roundStartsAtForDivision). Deriving them on every save means
+// the two can never disagree, and that adding or moving a round automatically
+// gets the right second night rather than needing 16 rows retyped.
+//
+// Only offsets > 0 produce rows: offset 0 means "races on the round date",
+// which is exactly what an ABSENT row already means. Writing a row for it
+// would be a redundant duplicate of championship_rounds.starts_at that could
+// later drift from it.
+async function saveRaceNights(
+  championshipId: string,
+  raceNights: RaceNightInput[],
+): Promise<string | null> {
+  const parsed = raceNights
+    .map((n) => ({ divisionId: intOrNull(n.divisionId), dayOffset: intOrNull(n.dayOffset) ?? 0 }))
+    .filter((n): n is { divisionId: number; dayOffset: number } => n.divisionId != null);
+
+  const shifted = parsed.filter((n) => n.dayOffset > 0);
+
+  // ── the rule itself ────────────────────────────────────────────────────
+  if (shifted.length > 0) {
+    const { error } = await supabase
+      .from('championship_division_nights')
+      .upsert(
+        shifted.map((n) => ({
+          championship_id: championshipId,
+          division_id: n.divisionId,
+          day_offset: n.dayOffset,
+        })),
+        { onConflict: 'championship_id,division_id' },
+      );
+    if (error) return error.message;
+  }
+
+  let delRule = supabase
+    .from('championship_division_nights')
+    .delete()
+    .eq('championship_id', championshipId);
+  if (shifted.length > 0) {
+    delRule = delRule.not('division_id', 'in', `(${shifted.map((n) => n.divisionId).join(',')})`);
+  }
+  const { error: delRuleErr } = await delRule;
+  if (delRuleErr) return delRuleErr.message;
+
+  // ── regenerate the per-round times ─────────────────────────────────────
+  const { data: roundRowsForChamp, error: readErr } = await supabase
+    .from('championship_rounds')
+    .select('id, starts_at')
+    .eq('championship_id', championshipId);
+  if (readErr) return readErr.message;
+
+  const generated: { championship_round_id: string; division_id: number; starts_at: string }[] = [];
+  for (const round of roundRowsForChamp ?? []) {
+    const startsAt = round.starts_at as string | null;
+    // A fully-TBA round has no date to offset from. Skipped rather than
+    // guessed — an invented second night would read as a scheduled race.
+    if (!startsAt) continue;
+    for (const { divisionId, dayOffset } of shifted) {
+      generated.push({
+        championship_round_id: round.id as string,
+        division_id: divisionId,
+        starts_at: addDaysToEventDate(startsAt, dayOffset),
+      });
+    }
+  }
+
+  if (generated.length > 0) {
+    const { error } = await supabase
+      .from('championship_round_division_times')
+      .upsert(generated, { onConflict: 'championship_round_id,division_id' });
+    if (error) return error.message;
+  }
+
+  // Clear rows for divisions no longer shifted. Scoped through this
+  // championship's rounds only — this table is shared across championships.
+  const roundIds = (roundRowsForChamp ?? []).map((r) => r.id as string);
+  if (roundIds.length > 0) {
+    let delTimes = supabase
+      .from('championship_round_division_times')
+      .delete()
+      .in('championship_round_id', roundIds);
+    if (shifted.length > 0) {
+      delTimes = delTimes.not('division_id', 'in', `(${shifted.map((n) => n.divisionId).join(',')})`);
+    }
+    const { error } = await delTimes;
+    if (error) return error.message;
+  }
+
+  return null;
+}
+
 export async function saveChampionship(input: ChampionshipInput): Promise<SaveResult> {
   await requireAdmin();
 
   if (input.slug.trim() === '' || input.title.trim() === '' || input.classTag.trim() === '') {
     return { ok: false, error: 'Slug, title, and class tag are required.' };
+  }
+
+  const resolved = resolveDivisionTargets(input.divisionTargets);
+  if (!resolved.ok) return { ok: false, error: resolved.error };
+  const divisionTargets = resolved.targets;
+  const registrationKey = nullIfEmpty(input.registrationKey);
+
+  // An event is EITHER one ACCSM championship or a series spanning several -
+  // never both. Allowing both is how the GT3 Team Series ended up carrying
+  // Division 1's GUID as though it were the whole series', which made every
+  // standings and results page silently show D1 only.
+  if (divisionTargets.length > 0 && nullIfEmpty(input.emperorChampionshipId)) {
+    return {
+      ok: false,
+      error:
+        'This event has per-division championships, so the single "ACSM championship ID" must be empty. ' +
+        'Clear it, or remove the division rows.',
+    };
+  }
+
+  // championship_accsm_targets.registration_key is a real FK to
+  // championships.registration_key - without one there is nothing to hang the
+  // targets off, and the insert would fail with a foreign-key error that says
+  // nothing about which field the admin actually needs to fill in.
+  if (divisionTargets.length > 0 && !registrationKey) {
+    return {
+      ok: false,
+      error: 'Per-division championships need a Registration key set (Registration section below).',
+    };
   }
 
   const row = toRow(input);
@@ -137,17 +394,46 @@ export async function saveChampionship(input: ChampionshipInput): Promise<SaveRe
     championshipId = data.id as string;
   }
 
-  // Replace rounds wholesale (matches the seed script's approach).
-  const { error: delErr } = await supabase
+  // Upsert rounds on (championship_id, round) — NOT the delete-and-reinsert
+  // this used to do.
+  //
+  // That pattern gave every round a NEW id on every save, and
+  // championship_round_division_times references championship_rounds(id) ON
+  // DELETE CASCADE. So one innocuous save of an event silently destroyed every
+  // per-division race night it had — confirmed live: all 16 of S19's rows
+  // vanished the first time the event was opened and saved, leaving D2/D4
+  // shown as racing the Tuesday.
+  //
+  // Upserting preserves ids, so anything hanging off a round survives an edit.
+  const rows = roundRows(championshipId, input.rounds);
+  if (rows.length > 0) {
+    const { error: upErr } = await supabase
+      .from('championship_rounds')
+      .upsert(rows, { onConflict: 'championship_id,round' });
+    if (upErr) return { ok: false, error: upErr.message };
+  }
+
+  // Then drop only the rounds the admin actually removed. Expressed as "not in
+  // the submitted set" so clearing every round still clears them.
+  let delRounds = supabase
     .from('championship_rounds')
     .delete()
     .eq('championship_id', championshipId);
+  if (rows.length > 0) {
+    delRounds = delRounds.not('round', 'in', `(${rows.map((r) => r.round).join(',')})`);
+  }
+  const { error: delErr } = await delRounds;
   if (delErr) return { ok: false, error: delErr.message };
 
-  const rows = roundRows(championshipId, input.rounds);
-  if (rows.length > 0) {
-    const { error: insErr } = await supabase.from('championship_rounds').insert(rows);
-    if (insErr) return { ok: false, error: insErr.message };
+  const raceNightErr = await saveRaceNights(championshipId, input.raceNights);
+  if (raceNightErr) return { ok: false, error: raceNightErr };
+
+  // After the championships write, so a registration_key set or renamed in
+  // this same save exists (and has cascaded to any existing targets) before
+  // these rows reference it.
+  if (registrationKey) {
+    const targetErr = await saveDivisionTargets(registrationKey, divisionTargets);
+    if (targetErr) return { ok: false, error: targetErr };
   }
 
   revalidatePath('/', 'layout');

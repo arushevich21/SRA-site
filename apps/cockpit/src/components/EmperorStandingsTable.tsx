@@ -1,5 +1,7 @@
 import { sortStandingsWithTiebreak } from '@sra/domain';
 import type { EmperorChampionshipStandings, EmperorDriverStanding } from '@sra/shared-types';
+import { DriverTierBadge } from './DriverTierBadge';
+import { stripSteamIdPrefix, type DriverInfo } from '@/lib/driver-lookup';
 
 type RoundPoints = { round: number; track: string; points: Record<string, number> };
 
@@ -29,9 +31,11 @@ function withResolvedPositions(
 export function EmperorStandingsTable({
   data,
   rounds,
+  driverInfo = {},
 }: {
   data: EmperorChampionshipStandings;
   rounds?: RoundPoints[];
+  driverInfo?: Record<string, DriverInfo>;
 }) {
   const classGroups = Object.entries(data.driverStandings).map(
     ([className, standings]) => [className, withResolvedPositions(standings, rounds)] as const,
@@ -83,7 +87,17 @@ export function EmperorStandingsTable({
                       {entry.position}
                     </td>
                     <td className="font-display font-bold text-[16px] uppercase text-txt py-2 pr-3 truncate max-w-[220px]">
-                      {entry.driverName}
+                      {(() => {
+                        const info = driverInfo[stripSteamIdPrefix(entry.steamId)];
+                        return (
+                          <span className="inline-flex items-center gap-2">
+                            {info && (
+                              <DriverTierBadge isSralien={info.isSralien} division={info.division} tier={info.tier} />
+                            )}
+                            {entry.driverName}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 truncate max-w-[200px] hidden lg:table-cell">
                       {entry.carModel ?? '—'}

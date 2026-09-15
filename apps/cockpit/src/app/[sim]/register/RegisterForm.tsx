@@ -1,17 +1,22 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { DriverTierBadge } from '@/components/DriverTierBadge';
 import { registerTeam, type RegisterState } from './actions';
 
 type AvailableDriver = {
   id: string;
   display_name: string | null;
   tier: 'gold' | 'silver' | null;
+  division_id: number | null;
+  is_sralien: boolean | null;
 };
 
 type Props = {
   champKey: string;
   maxTeamSize: number;
+  minTeamSize: number;
+  canRegisterSolo: boolean;
   allowedCars: string[];
   simSlug: string;
   availableDrivers: AvailableDriver[];
@@ -21,6 +26,8 @@ type Props = {
 export default function RegisterForm({
   champKey,
   maxTeamSize,
+  minTeamSize,
+  canRegisterSolo,
   allowedCars,
   simSlug,
   availableDrivers,
@@ -34,6 +41,17 @@ export default function RegisterForm({
   const [search, setSearch] = useState('');
   const [teamName, setTeamName] = useState('');
   const maxTeammates = maxTeamSize - 1;
+
+  // How many teammates this driver must pick. A championship with
+  // minTeamSize > 1 requires a partner, UNLESS this driver has been granted
+  // solo registration by SRA-Bot (drivers.allow_gt3_team_series_solo_
+  // registration) — the last-resort exception for someone who can't find one.
+  //
+  // register_entry() enforces this for real (SOLO_NOT_PERMITTED, see
+  // 20260914d); everything here is so the driver finds out before submitting
+  // rather than after a rejected round-trip.
+  const requiredTeammates = canRegisterSolo ? 0 : Math.max(0, minTeamSize - 1);
+  const needsMoreTeammates = selected.size < requiredTeammates;
 
   const takenNames = new Set(existingTeamNames.map((n) => n.trim().toLowerCase()));
   const isNameTaken = teamName.trim() !== '' && takenNames.has(teamName.trim().toLowerCase());
@@ -115,7 +133,8 @@ export default function RegisterForm({
       {maxTeammates > 0 && (
         <div>
           <label className="block font-mono text-[11px] tracking-[.3em] uppercase text-txt-3 mb-2">
-            Teammate{maxTeammates > 1 ? 's' : ''}{' '}
+            Teammate{maxTeammates > 1 ? 's' : ''}
+            {requiredTeammates > 0 && <span className="text-gold"> *</span>}{' '}
             <span className="text-txt-3/50 normal-case tracking-normal">
               {selected.size}/{maxTeammates} · same division only
             </span>
@@ -124,6 +143,13 @@ export default function RegisterForm({
           {availableDrivers.length === 0 ? (
             <p className="font-mono text-[12px] text-txt-3 px-4 py-4 border border-line">
               No available drivers in your division right now.
+              {requiredTeammates > 0 && (
+                <>
+                  {' '}
+                  This championship requires a teammate — ask an admin in
+                  #admin-help to enable solo registration if you can&apos;t find one.
+                </>
+              )}
             </p>
           ) : (
             <>
@@ -162,21 +188,14 @@ export default function RegisterForm({
                         onChange={() => toggle(driver.id)}
                         className="cursor-pointer"
                       />
+                      <DriverTierBadge
+                        isSralien={driver.is_sralien ?? false}
+                        division={driver.division_id}
+                        tier={driver.tier}
+                      />
                       <span className="font-mono text-[12px] text-txt flex-1">
                         {driver.display_name ?? '—'}
                       </span>
-                      {driver.tier && (
-                        <span
-                          className={[
-                            'font-mono text-[10px] tracking-[.15em] uppercase',
-                            driver.tier === 'gold'
-                              ? 'text-[#e6b53d]'
-                              : 'text-txt-3',
-                          ].join(' ')}
-                        >
-                          {driver.tier}
-                        </span>
-                      )}
                     </label>
                   );
                 })}
@@ -192,10 +211,23 @@ export default function RegisterForm({
         </p>
       )}
 
+      {needsMoreTeammates && (
+        <p className="font-mono text-[11px] tracking-[.15em] uppercase text-gold-deep">
+          Select {requiredTeammates - selected.size} more teammate
+          {requiredTeammates - selected.size === 1 ? '' : 's'} to register
+        </p>
+      )}
+
+      {canRegisterSolo && minTeamSize > 1 && (
+        <p className="font-mono text-[11px] text-txt-3">
+          Solo registration is enabled for your account — a teammate is optional.
+        </p>
+      )}
+
       <button
         type="submit"
-        disabled={pending || isNameTaken}
-        className="self-start font-mono text-[12px] tracking-[.2em] uppercase px-6 py-3 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors disabled:opacity-50"
+        disabled={pending || isNameTaken || needsMoreTeammates}
+        className="self-start font-mono text-[12px] tracking-[.2em] uppercase px-6 py-3 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {pending ? 'Registering…' : 'Register Team'}
       </button>

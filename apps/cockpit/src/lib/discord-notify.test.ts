@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { notifyDiscordProfileUpdated } from './discord-notify.js';
+import {
+  notifyDiscordProfileUpdated,
+  notifyDiscordProfileUpdatedMany,
+  DISCORD_NUDGE_LIMIT,
+} from './discord-notify.js';
 
 const WEBHOOK = 'https://discord.com/api/webhooks/1021527577724190800/token';
 
@@ -83,5 +87,70 @@ describe('notifyDiscordProfileUpdated', () => {
 
     await expect(notifyDiscordProfileUpdated('123456789012345678')).resolves.toBeUndefined();
     expect(console.error).toHaveBeenCalled();
+  });
+});
+
+// The throttle is real time and irrelevant to what these assert.
+const NO_THROTTLE = { spacingMs: 0 };
+
+describe('notifyDiscordProfileUpdatedMany', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    process.env.DISCORD_INTEGRATION_WEBHOOK_URL = WEBHOOK;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    delete process.env.DISCORD_INTEGRATION_WEBHOOK_URL;
+  });
+
+  // Built as strings, not by adding to a numeric literal: a Discord snowflake
+  // is well past Number.MAX_SAFE_INTEGER, so `1000…000 + i` yields the SAME
+  // string for every i and the dedup below folds them all into one.
+  const ids = (n: number) =>
+    Array.from({ length: n }, (_, i) => `1000000000000${String(i).padStart(5, '0')}`);
+
+  it('nudges each driver in a small batch', async () => {
+    const result = await notifyDiscordProfileUpdatedMany(ids(3), NO_THROTTLE);
+    expect(result).toEqual({ kind: 'nudged', count: 3 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('nudges right up to the limit', async () => {
+    const result = await notifyDiscordProfileUpdatedMany(ids(DISCORD_NUDGE_LIMIT), NO_THROTTLE);
+    expect(result).toEqual({ kind: 'nudged', count: DISCORD_NUDGE_LIMIT });
+    expect(fetchMock).toHaveBeenCalledTimes(DISCORD_NUDGE_LIMIT);
+  });
+
+  it('defers past the limit instead of rate-limiting itself into a stall', async () => {
+    // The 221-driver classification run is exactly this case.
+    const result = await notifyDiscordProfileUpdatedMany(ids(DISCORD_NUDGE_LIMIT + 1), NO_THROTTLE);
+    expect(result).toEqual({ kind: 'deferred-to-bulk', count: DISCORD_NUDGE_LIMIT + 1 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates, so a repeated id counts once against the limit', async () => {
+    const result = await notifyDiscordProfileUpdatedMany(['123456789012345678', '123456789012345678'], NO_THROTTLE);
+    expect(result).toEqual({ kind: 'nudged', count: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports none when no driver has a usable discord id', async () => {
+    const result = await notifyDiscordProfileUpdatedMany([null, undefined, '', '   '], NO_THROTTLE);
+    expect(result).toEqual({ kind: 'none' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps going when one nudge fails — a grading write must not be undone', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('discord down'));
+    const result = await notifyDiscordProfileUpdatedMany(ids(3), NO_THROTTLE);
+    expect(result).toEqual({ kind: 'nudged', count: 3 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

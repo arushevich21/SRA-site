@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mapChampionship, type ChampionshipRow } from './championships-map.js';
+import { mapChampionship, type AccsmTargetRow, type ChampionshipRow } from './championships-map.js';
+import { accsmChampionshipIds, isMultiDivision } from '../content/championships.js';
 
 function row(overrides: Partial<ChampionshipRow> = {}): ChampionshipRow {
   return {
@@ -107,5 +108,47 @@ describe('mapChampionship', () => {
     expect(c.rulesBullets).toEqual([]);
     expect(c.discordLinks).toEqual([]);
     expect(c.schedule).toEqual([]);
+  });
+  it('omits accsmTargets entirely when the event has none', () => {
+    const c = mapChampionship(row());
+    expect('accsmTargets' in c).toBe(false);
+    expect(isMultiDivision(c)).toBe(false);
+  });
+
+  it('maps division targets into division order regardless of row order', () => {
+    // Deliberately out of order: PostgREST gives no ordering guarantee on a
+    // secondary query, and the tab strip reads position 0 as "first division".
+    const targets: AccsmTargetRow[] = [
+      { division_id: 3, emperor_championship_id: 'guid-3', divisions: { name: 'Division 3' } },
+      { division_id: 1, emperor_championship_id: 'guid-1', divisions: { name: 'Division 1' } },
+      { division_id: 2, emperor_championship_id: 'guid-2', divisions: [{ name: 'Division 2' }] },
+    ];
+    const c = mapChampionship(row({ registration_key: 'acc-gt3-s19' }), targets);
+
+    expect(c.accsmTargets?.map((t) => t.divisionId)).toEqual([1, 2, 3]);
+    expect(c.accsmTargets?.map((t) => t.divisionName)).toEqual([
+      'Division 1',
+      'Division 2',
+      'Division 3',
+    ]);
+    expect(accsmChampionshipIds(c)).toEqual(['guid-1', 'guid-2', 'guid-3']);
+    expect(isMultiDivision(c)).toBe(true);
+  });
+
+  it('falls back to a synthetic division name when the join returns none', () => {
+    const c = mapChampionship(row(), [
+      { division_id: 4, emperor_championship_id: 'guid-4', divisions: null },
+    ]);
+    expect(c.accsmTargets?.[0].divisionName).toBe('Division 4');
+  });
+
+  it('prefers division targets over a stray single championship id', () => {
+    // Belt-and-braces: saveChampionship rejects this combination, but a row
+    // written before that validation existed must not silently render one
+    // division's standings as the whole series'.
+    const c = mapChampionship(row({ emperor_championship_id: 'single-guid' }), [
+      { division_id: 1, emperor_championship_id: 'guid-1', divisions: null },
+    ]);
+    expect(accsmChampionshipIds(c)).toEqual(['guid-1']);
   });
 });
