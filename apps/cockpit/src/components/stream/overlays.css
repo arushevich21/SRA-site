@@ -121,7 +121,7 @@ body:has(.ov-transparent)::after { display: none; }
 .ov-ticker-track {
   display: inline-flex;
   width: max-content;
-  animation: ov-ticker-scroll 60s linear infinite;
+  animation: ov-ticker-scroll 150s linear infinite;
 }
 .ov-ticker-track > span { display: inline-block; padding-right: 3em; }
 .ov-ticker-track i { font-style: normal; color: var(--ov-gold); padding: 0 0.6em; }
