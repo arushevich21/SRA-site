@@ -539,25 +539,13 @@ body:has(.ov-transparent)::after { display: none; }
   container-type: size;
 }
 /* A true circle: the square is the smaller of the box's two sides. */
-.ov-booth-avatar img,
-.ov-booth-avatar span {
+.ov-booth-avatar img {
   grid-area: 1 / 1;
   width: min(100cqw, 100cqh);
   height: min(100cqw, 100cqh);
   border-radius: 50%;
   object-fit: cover;
   box-shadow: 0 0 0 calc(0.2 * var(--u)) var(--ov-line-2), 0 calc(0.6 * var(--u)) calc(2 * var(--u)) rgba(0,0,0,0.5);
-}
-/* Initials sit underneath the picture, so a stale Discord avatar URL (the
-   hash changes when someone updates their picture) falls back to them. */
-.ov-booth-avatar span {
-  display: grid;
-  place-items: center;
-  background: var(--ov-panel-2);
-  font-family: var(--ov-display);
-  font-weight: 800;
-  font-size: calc(5 * var(--u));
-  color: var(--ov-txt-3);
 }
 .ov-booth-name {
   display: grid;

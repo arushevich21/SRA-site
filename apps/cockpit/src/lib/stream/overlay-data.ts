@@ -192,13 +192,14 @@ export function streamDivisionIds(champ: ChampionshipContent): number[] {
 export type BoothMember = {
   name: string;
   role: string | null;
-  // Discord avatar captured on the driver row (drivers.avatar_url) — null
-  // when the name matched nobody or they have no avatar.
-  avatarUrl: string | null;
+  // The broadcast photo they uploaded on /profile (drivers.photo_url) — null
+  // when the name matched nobody or they haven't uploaded one, and the
+  // overlay shows the stock image. Deliberately not the Discord avatar.
+  photoUrl: string | null;
 };
 
 // Resolves the operator's ?names= list against the drivers table so each
-// commentator gets their real display name and Discord avatar. Matching is
+// commentator gets their real display name and broadcast photo. Matching is
 // by display name prefix, case-insensitive, so "Anton Rushevich" finds
 // "Anton Rushevich┊1". An unmatched name is still shown, just without a
 // picture — a typo shouldn't blank a card on air.
@@ -210,11 +211,11 @@ export async function getBoothRoster(
   const pattern = requested.map((r) => `display_name.ilike.${escapeLike(r.name)}%`).join(',');
   const { data, error } = await supabase
     .from('drivers')
-    .select('display_name, avatar_url')
+    .select('display_name, photo_url')
     .or(pattern);
   if (error) console.error('booth roster lookup failed:', error.message);
 
-  const rows = (data ?? []) as { display_name: string; avatar_url: string | null }[];
+  const rows = (data ?? []) as { display_name: string; photo_url: string | null }[];
   return requested.map((r) => {
     const match = rows.find((row) =>
       bareDriverName(row.display_name).toLowerCase().startsWith(r.name.toLowerCase()),
@@ -222,7 +223,7 @@ export async function getBoothRoster(
     return {
       name: match ? bareDriverName(match.display_name) : r.name,
       role: r.role,
-      avatarUrl: match?.avatar_url ?? null,
+      photoUrl: match?.photo_url ?? null,
     };
   });
 }

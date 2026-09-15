@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6QuJumKoS79S8G78jMu1VLGZjht4sp0NbgolwuuQhPfVtDHFoP81a8MIeoiHAJv
+\restrict lVPjNCiR18iOsBMwI6vTfSYsGu2Odi9kkgweenZY2WTjMzKbKzIU7aeROuYHMdI
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -995,10 +995,18 @@ CREATE TABLE public.drivers (
     discord_mention_laptime_updates boolean,
     is_sponsor boolean,
     is_champion boolean DEFAULT false NOT NULL,
+    photo_url text,
     CONSTRAINT drivers_country_len CHECK (((country IS NULL) OR (char_length(country) = 2))),
     CONSTRAINT drivers_number_range CHECK (((driver_number IS NULL) OR ((driver_number >= 2) AND (driver_number <= 999)))),
     CONSTRAINT drivers_short_name_len CHECK (((short_name IS NULL) OR (char_length((short_name)::text) = 3)))
 );
+
+
+--
+-- Name: COLUMN drivers.photo_url; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.drivers.photo_url IS 'Broadcast photo chosen by the driver on /profile (driver-photos bucket). NULL = stock image on stream. Not the Discord avatar.';
 
 
 --
@@ -2853,5 +2861,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6QuJumKoS79S8G78jMu1VLGZjht4sp0NbgolwuuQhPfVtDHFoP81a8MIeoiHAJv
+\unrestrict lVPjNCiR18iOsBMwI6vTfSYsGu2Odi9kkgweenZY2WTjMzKbKzIU7aeROuYHMdI
 

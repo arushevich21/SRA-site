@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import SteamLinkForm from './SteamLinkForm';
 import ProfileDetailsForm from './ProfileDetailsForm';
+import DriverPhotoForm from './DriverPhotoForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export default async function ProfilePage() {
   const { data: driver } = await supabase
     .from('drivers')
     .select(
-      'display_name, avatar_url, steam_id, steam_verified, discord_id, is_admin, first_name, last_name, short_name, country, driver_number'
+      'display_name, avatar_url, photo_url, steam_id, steam_verified, discord_id, is_admin, first_name, last_name, short_name, country, driver_number'
     )
     .eq('user_id', user.id)
     .maybeSingle();
@@ -119,6 +120,13 @@ export default async function ProfilePage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="border border-line bg-panel px-7 py-6 max-w-[1280px] mb-6">
+        <p className="font-mono text-[11px] tracking-[.35em] uppercase text-gold mb-5">
+          Broadcast Photo
+        </p>
+        <DriverPhotoForm photoUrl={driver?.photo_url ?? null} />
       </div>
 
       <div className="border border-line bg-panel px-7 py-6 max-w-[1280px]">
