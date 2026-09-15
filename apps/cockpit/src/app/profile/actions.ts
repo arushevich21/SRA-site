@@ -147,3 +147,93 @@ export async function updateProfileDetails(
   revalidatePath('/profile');
   return { success: true };
 }
+
+// ── Broadcast photo ──────────────────────────────────────────────────────
+//
+// The picture shown on stream (intermission / commentator lower-third).
+// Distinct from avatar_url (Discord): this one the driver chooses for air.
+// Service-role upload keyed by the driver's own uuid — the object path is
+// derived server-side from the session, never from the form, so a user can
+// only ever write their own file. See 20260916_driver_photos.sql.
+
+export type PhotoState = { error?: string; success?: boolean } | null;
+
+const PHOTO_BUCKET = 'driver-photos';
+const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+const PHOTO_TYPES: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+};
+
+export async function uploadDriverPhoto(_prev: PhotoState, formData: FormData): Promise<PhotoState> {
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) return { error: 'Choose an image first.' };
+  const ext = PHOTO_TYPES[file.type];
+  if (!ext) return { error: 'Use a PNG, JPG or WebP image.' };
+  if (file.size > PHOTO_MAX_BYTES) return { error: 'Image must be under 2 MB.' };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated.' };
+
+  const { data: driver } = await adminClient
+    .from('drivers')
+    .select('id, photo_url')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!driver) return { error: 'No driver profile found for this account.' };
+
+  // A changed extension would otherwise leave the old object behind.
+  await removeStoredPhoto(driver.photo_url);
+
+  const path = `${driver.id}.${ext}`;
+  const { error: uploadError } = await adminClient.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: true });
+  if (uploadError) return { error: `Upload failed: ${uploadError.message}` };
+
+  // Cache-bust: the path is stable across re-uploads, and OBS/browsers would
+  // otherwise keep showing the previous picture until their cache expired.
+  const { data } = adminClient.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+  const photoUrl = `${data.publicUrl}?v=${Date.now()}`;
+
+  const { error } = await adminClient.from('drivers').update({ photo_url: photoUrl }).eq('id', driver.id);
+  if (error) return { error: 'Failed to save. Please try again.' };
+
+  revalidatePath('/profile');
+  return { success: true };
+}
+
+export async function removeDriverPhoto(): Promise<PhotoState> {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Not authenticated.' };
+
+  const { data: driver } = await adminClient
+    .from('drivers')
+    .select('id, photo_url')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!driver) return { error: 'No driver profile found for this account.' };
+
+  await removeStoredPhoto(driver.photo_url);
+  const { error } = await adminClient.from('drivers').update({ photo_url: null }).eq('id', driver.id);
+  if (error) return { error: 'Failed to remove. Please try again.' };
+
+  revalidatePath('/profile');
+  return { success: true };
+}
+
+// Deletes the object a stored photo_url points at. Best-effort: a missing
+// object is fine, and a storage hiccup must not block the row update.
+async function removeStoredPhoto(photoUrl: string | null): Promise<void> {
+  if (!photoUrl) return;
+  const marker = `/${PHOTO_BUCKET}/`;
+  const index = photoUrl.indexOf(marker);
+  if (index === -1) return;
+  const path = photoUrl.slice(index + marker.length).split('?')[0];
+  if (!path) return;
+  const { error } = await adminClient.storage.from(PHOTO_BUCKET).remove([path]);
+  if (error) console.error('driver photo remove failed (continuing):', error.message);
+}
