@@ -1,7 +1,7 @@
 import type { ChampionshipContent } from '@/content/championships';
 import { eventDateTimeParts } from '@/lib/event-time';
 import type { StreamRound } from '@/lib/stream/overlay-data';
-import { OverlayFoot, OverlayFrame, OverlayLockup } from './OverlayPrimitives';
+import { OverlayFoot, OverlayFrame, OverlayLockup, TrackFlag } from './OverlayPrimitives';
 import { trackFacts, trackMapUrl } from './track-maps';
 
 export function TrackOverlay({
@@ -41,6 +41,7 @@ export function TrackOverlay({
         <div className="ov-track-facts">
           <h2 className="ov-track-name">
             <small>{round ? `Round ${round.round.round}` : 'Circuit'}</small>
+            <TrackFlag track={track} large />
             {track}
           </h2>
           <div className="ov-facts">

@@ -4,7 +4,7 @@ import type { DivisionStandings, StreamRound } from '@/lib/stream/overlay-data';
 import { bareDriverName } from '@/lib/driver-display-name';
 import { stripSteamIdPrefix } from '@/lib/driver-lookup';
 import type { Commentator } from './commentators';
-import { OverlayFoot, OverlayFrame, OverlayLockup } from './OverlayPrimitives';
+import { OverlayFoot, OverlayFrame, OverlayLockup, TrackFlag } from './OverlayPrimitives';
 import { isTbaTrack, trackFacts, trackMapUrl } from './track-maps';
 
 // Between sessions: tonight's round on the left, the booth on the right.
@@ -40,6 +40,7 @@ export function IntermissionOverlay({
         <section className="ov-next">
           <h2 className="ov-track-name">
             <small>{round ? `Tonight · Round ${round.round.round}` : 'Tonight'}</small>
+            {round && !isTbaTrack(track) && <TrackFlag track={track} large />}
             {round ? (isTbaTrack(track) ? 'Track TBA' : track) : 'Race night'}
           </h2>
           <div className="ov-next-map">

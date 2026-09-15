@@ -2,7 +2,7 @@ import type { ChampionshipContent } from '@/content/championships';
 import { eventDateTimeParts } from '@/lib/event-time';
 import type { StreamRound } from '@/lib/stream/overlay-data';
 import { seasonLabel } from '@/lib/stream/labels';
-import { OverlayFoot, OverlayFrame, OverlayLockup } from './OverlayPrimitives';
+import { OverlayFoot, OverlayFrame, OverlayLockup, TrackFlag } from './OverlayPrimitives';
 import { isTbaTrack, trackMapUrl } from './track-maps';
 
 export function CalendarOverlay({
@@ -38,7 +38,10 @@ export function CalendarOverlay({
               {r.isCurrent && <span className="ov-round-tag">This week</span>}
               <div className="ov-round-head">
                 <b>R{r.round.round}</b>
-                <strong className={tba ? 'is-tba' : ''}>{tba ? 'Track TBA' : r.round.track}</strong>
+                <strong className={tba ? 'is-tba' : ''}>
+                  {!tba && <TrackFlag track={r.round.track} />}
+                  {tba ? 'Track TBA' : r.round.track}
+                </strong>
               </div>
               <div className="ov-round-map">
                 {map ? (

@@ -231,6 +231,10 @@ body:has(.ov-transparent)::after { display: none; }
   margin-top: calc(0.25 * var(--u));
 }
 
+/* Circuit country flag — inline with whatever names the track. */
+.ov-flag { display: inline-block; height: 1em; width: auto; margin-right: 0.45em; vertical-align: -0.1em; border-radius: 0.1em; box-shadow: 0 0 0 calc(0.06 * var(--u)) rgba(255,255,255,0.18); }
+.ov-flag.is-large { height: 0.62em; vertical-align: 0.06em; }
+
 /* ── Footer strip ────────────────────────────────────────────────────────── */
 .ov-foot {
   display: flex;

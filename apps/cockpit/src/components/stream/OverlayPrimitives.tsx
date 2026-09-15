@@ -4,6 +4,8 @@ import type { StreamRound } from '@/lib/stream/overlay-data';
 import { seasonLabel } from '@/lib/stream/labels';
 import { SUPPORTERS } from '@/content/supporters';
 import { shortTrackName } from '@/components/RoundCells';
+import { countryFlagUrl } from '@/lib/country-flag';
+import { trackFacts } from './track-maps';
 
 // The pieces every full-screen scene is assembled from. Layout lives in
 // overlays.css; these only decide what goes where.
@@ -79,7 +81,10 @@ export function OverlayLockup({
           {round && (
             <div className="ov-context-round">
               <b>Round {round.round.round}</b>
-              <span>{shortTrackName(round.round.track)}</span>
+              <span>
+                <TrackFlag track={round.round.track} />
+                {shortTrackName(round.round.track)}
+              </span>
             </div>
           )}
         </div>
@@ -121,4 +126,16 @@ export function SponsorTicker() {
       </div>
     </div>
   );
+}
+
+// The circuit's country flag (flagcdn, same source as the leaderboards).
+// Nothing for a TBA or unknown track.
+export function TrackFlag({ track, large = false }: { track: string; large?: boolean }) {
+  const country = trackFacts(track)?.country;
+  if (!country) return null;
+  // The site's helper serves the 40px asset; the headline flag needs the
+  // 160px one or it pixelates at broadcast size.
+  const src = large ? countryFlagUrl(country).replace('/w40/', '/w160/') : countryFlagUrl(country);
+  // eslint-disable-next-line @next/next/no-img-element -- external CDN flag
+  return <img className={`ov-flag ${large ? 'is-large' : ''}`} src={src} alt="" />;
 }
