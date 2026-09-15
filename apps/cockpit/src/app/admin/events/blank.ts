@@ -19,7 +19,7 @@ export function blankInput(): ChampionshipInput {
     rulesBullets: [], discordLinks: [], resultsUrl: '', resultsLabel: '',
     emperorChampionshipId: '', simgridId: '', standingsKey: '',
     registrationKey: '', registrationSeason: '', registrationOpen: false,
-    maxTeamSize: '', minTeamSize: '', maxRegistrations: '', allowedCars: [], requiresDivision: true, teaserOnly: false, concluded: false,
+    maxTeamSize: '', minTeamSize: '', maxRegistrations: '', allowedCars: [], requiresDivision: true, sharedCar: false, teaserOnly: false, concluded: false,
     sortOrder: 0, rounds: [], divisionTargets: [], raceNights: [],
   };
 }

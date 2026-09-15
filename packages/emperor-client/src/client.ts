@@ -29,9 +29,18 @@ type RawDriverStanding = {
   Points: number;
   PointsPenalty: number;
   Position: number;
-  // Keyed by team name; the value carries that team's per-event points, which
-  // we don't use. Absent for an unattached driver.
-  Teams?: Record<string, unknown> | null;
+  // Keyed by team name. Each value carries the driver's per-event points
+  // scored under that team — the only per-round breakdown in the payload.
+  // Absent for an unattached driver.
+  Teams?: Record<string, RawTeamEntry | null> | null;
+  // Events excluded from Points (drop rounds). Keyed by event id; the values
+  // are empty objects.
+  IgnoredEventIDs?: Record<string, unknown> | null;
+};
+
+type RawTeamEntry = {
+  EventIDs?: Record<string, { RaceNumber?: number; Points?: number } | null> | null;
+  Points?: number;
 };
 
 // NOTE: no Position. Unlike DriverStandings, Emperor's TeamStandings rows
@@ -204,6 +213,9 @@ function normalizeChampionshipStandings(
       points: d.Points,
       pointsPenalty: d.PointsPenalty,
       teamNames: Object.keys(d.Teams ?? {}),
+      eventPoints: sumEventPoints(d.Teams),
+      teamEventPoints: perTeamEventPoints(d.Teams),
+      droppedEventIds: Object.keys(d.IgnoredEventIDs ?? {}),
     }));
   }
 
@@ -219,8 +231,38 @@ function normalizeChampionshipStandings(
       teamName: t.TeamName,
       points: t.Points,
       pointsPenalty: t.PointsPenalty,
+      droppedEventIds: Object.keys(t.IgnoredEventIDs ?? {}),
     }));
   }
 
   return { driverStandings, teamStandings };
+}
+
+// A driver who changed team mid-season has the same event under at most one
+// team, but sum defensively rather than pick — the total then always agrees
+// with what Emperor added up for `Points` (before the drop).
+function perTeamEventPoints(
+  teams: RawDriverStanding['Teams'],
+): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const [teamName, team] of Object.entries(teams ?? {})) {
+    const events: Record<string, number> = {};
+    for (const [eventId, entry] of Object.entries(team?.EventIDs ?? {})) {
+      if (typeof entry?.Points === 'number') events[eventId] = entry.Points;
+    }
+    out[teamName] = events;
+  }
+  return out;
+}
+
+function sumEventPoints(teams: RawDriverStanding['Teams']): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const team of Object.values(teams ?? {})) {
+    for (const [eventId, entry] of Object.entries(team?.EventIDs ?? {})) {
+      const pts = entry?.Points;
+      if (typeof pts !== 'number') continue;
+      out[eventId] = (out[eventId] ?? 0) + pts;
+    }
+  }
+  return out;
 }

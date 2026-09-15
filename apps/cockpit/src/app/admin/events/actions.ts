@@ -62,6 +62,10 @@ export type ChampionshipInput = {
   maxRegistrations: string; // '' -> NULL (unlimited)
   allowedCars: string[];
   requiresDivision: boolean;
+  // Endurance: every driver on an entry shares one car, so register_entry()
+  // writes one registrations row per team. Off (GT3 Team Series, LIAW) means
+  // one row per driver. See 20260915.
+  sharedCar: boolean;
   teaserOnly: boolean;
   concluded: boolean;
   sortOrder: number;
@@ -113,6 +117,7 @@ function toRow(input: ChampionshipInput) {
     max_registrations: intOrNull(input.maxRegistrations),
     allowed_cars: input.allowedCars.length > 0 ? input.allowedCars : null,
     requires_division: input.requiresDivision,
+    shared_car: input.sharedCar,
     teaser_only: input.teaserOnly,
     concluded: input.concluded,
     sort_order: input.sortOrder,

@@ -210,13 +210,24 @@ describe('getChampionshipStandings', () => {
           Points: 805,
           PointsPenalty: 0,
           Position: 1,
+          Teams: {
+            'BOP THE LEXUS': {
+              EventIDs: {
+                'ev-zandvoort': { RaceNumber: 64, Points: 180 },
+                'ev-ricard': { RaceNumber: 64, Points: 192 },
+                'ev-bathurst': { RaceNumber: 64, Points: 157 },
+              },
+              Points: 529,
+            },
+          },
+          IgnoredEventIDs: { 'ev-bathurst': {} },
         },
       ],
     },
     TeamStandings: {
       // No Position key — Emperor genuinely does not send one for teams.
       '': [
-        { TeamName: 'BOP THE LEXUS', Points: 805, PointsPenalty: 0, IgnoredEventIDs: {} },
+        { TeamName: 'BOP THE LEXUS', Points: 805, PointsPenalty: 0, IgnoredEventIDs: { 'ev-bathurst': {} } },
         { TeamName: 'Balkan Blast', Points: 723, PointsPenalty: 0, IgnoredEventIDs: {} },
         { TeamName: 'fake race car, real pain', Points: 654, PointsPenalty: 0, IgnoredEventIDs: {} },
       ],
@@ -260,6 +271,44 @@ describe('getChampionshipStandings', () => {
     const standings = await new EmperorClient(BASE_URL).getChampionshipStandings('abc');
     expect(standings.driverStandings[''][0].position).toBe(1);
     expect(standings.driverStandings[''][0].steamId).toBe('S76561197960416683');
+  });
+
+  it('keeps per-event points and the dropped event on driver rows', async () => {
+    stubFetch({ status: 200, body: liveShape });
+    const [joel] = (await new EmperorClient(BASE_URL).getChampionshipStandings('abc')).driverStandings[''];
+    expect(joel.eventPoints).toEqual({ 'ev-zandvoort': 180, 'ev-ricard': 192, 'ev-bathurst': 157 });
+    expect(joel.droppedEventIds).toEqual(['ev-bathurst']);
+  });
+
+  it('keeps the dropped event on team rows, and tolerates its absence', async () => {
+    stubFetch({ status: 200, body: liveShape });
+    const teams = (await new EmperorClient(BASE_URL).getChampionshipStandings('abc')).teamStandings[''];
+    expect(teams[0].droppedEventIds).toEqual(['ev-bathurst']);
+    expect(teams[1].droppedEventIds).toEqual([]);
+  });
+
+  it('sums the same event across teams for a driver who switched mid-season', async () => {
+    stubFetch({
+      status: 200,
+      body: {
+        DriverStandings: {
+          '': [
+            {
+              DriverName: 'X', DriverGUID: 'S1', CarModel: null, Points: 0, PointsPenalty: 0, Position: 1,
+              Teams: {
+                A: { EventIDs: { e1: { Points: 10 } } },
+                B: { EventIDs: { e1: { Points: 5 }, e2: { Points: 7 } } },
+              },
+            },
+          ],
+        },
+        TeamStandings: { '': [] },
+      },
+    });
+    const [x] = (await new EmperorClient(BASE_URL).getChampionshipStandings('abc')).driverStandings[''];
+    expect(x.eventPoints).toEqual({ e1: 15, e2: 7 });
+    expect(x.teamEventPoints).toEqual({ A: { e1: 10 }, B: { e1: 5, e2: 7 } });
+    expect(x.teamNames).toEqual(['A', 'B']);
   });
 
   it('treats a null class group as empty (Emperor returns null, not [])', async () => {

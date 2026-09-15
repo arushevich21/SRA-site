@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { AccsmTarget } from '@/content/championships';
 import { DivisionBadge } from './DivisionBadge';
+import { DriverTierBadge } from './DriverTierBadge';
 import {
   standingsViewHref,
   type StandingsTierFilter,
@@ -72,11 +73,18 @@ export function StandingsViewControls({
   view: StandingsView;
   hasTeamStandings: boolean;
 }) {
-  const tiers: { value: StandingsTierFilter; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'gold', label: 'Gold' },
-    { value: 'silver', label: 'Silver' },
+  // Gold/Silver show the division's own tier badge (the same asset drivers
+  // wear next to their name in the table) instead of the word, so the filter
+  // reads as "show me these badges". Only possible when a division is
+  // resolved — a single-grid event (LIAW) has no division badge to show, so
+  // it keeps the text. The label stays as the link's accessible name either
+  // way (sr-only when the badge renders).
+  const tiers: { value: StandingsTierFilter; label: string; badgeTier: 'gold' | 'silver' | null }[] = [
+    { value: 'all', label: 'All', badgeTier: null },
+    { value: 'gold', label: 'Gold', badgeTier: 'gold' },
+    { value: 'silver', label: 'Silver', badgeTier: 'silver' },
   ];
+  const badgeDivision = view.division ?? null;
 
   return (
     <div className="flex items-center justify-between gap-6 flex-wrap mb-5">
@@ -115,20 +123,37 @@ export function StandingsViewControls({
         <div className="flex items-center gap-2">
           <span className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3">Tier</span>
           <div className="flex gap-1">
-            {tiers.map((t) => (
-              <Link
-                key={t.value}
-                href={standingsViewHref(basePath, view, { tier: t.value })}
-                className={[
-                  PILL_BASE,
-                  view.tier === t.value
-                    ? 'text-gold border-gold bg-gold/5'
-                    : 'text-txt-3 border-line hover:text-txt-2',
-                ].join(' ')}
-              >
-                {t.label}
-              </Link>
-            ))}
+            {tiers.map((t) => {
+              const showBadge = t.badgeTier != null && badgeDivision != null;
+              return (
+                <Link
+                  key={t.value}
+                  href={standingsViewHref(basePath, view, { tier: t.value })}
+                  title={showBadge ? `D${badgeDivision} ${t.label}` : undefined}
+                  className={[
+                    PILL_BASE,
+                    'inline-flex items-center',
+                    // Badge pills: same height as the text pills, tighter
+                    // horizontal padding so the graphic isn't floating in a box.
+                    showBadge ? 'px-2 py-1' : '',
+                    view.tier === t.value
+                      ? 'text-gold border-gold bg-gold/5'
+                      : 'text-txt-3 border-line hover:text-txt-2',
+                    // Inactive badge pills sit back a little so the selected one reads.
+                    showBadge && view.tier !== t.value ? 'opacity-60 hover:opacity-100' : '',
+                  ].join(' ')}
+                >
+                  {showBadge ? (
+                    <>
+                      <DriverTierBadge isSralien={false} division={badgeDivision} tier={t.badgeTier} />
+                      <span className="sr-only">{t.label}</span>
+                    </>
+                  ) : (
+                    t.label
+                  )}
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

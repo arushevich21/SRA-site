@@ -4,6 +4,10 @@ import { useState, useTransition } from 'react';
 import { deleteRegistration, removeMember, setEntryClass } from './actions';
 
 export type AdminMember = {
+  // The registrations row (car) this driver sits in — on a car-per-driver
+  // championship each member has their own; on a shared-car one they all
+  // share the team's single row.
+  registration_id: string;
   driver_id: string;
   display_name: string | null;
   steam_id: string | null;
@@ -13,9 +17,13 @@ export type AdminMember = {
 };
 
 export type AdminTeam = {
-  // A `registrations` row id (one entry / one car in one event) — not a
-  // `teams.id`. The admin actions key off this.
+  // Display/grouping key (teams.id + status) — see page.tsx. NOT something
+  // the actions key off; they take registrationIds.
   id: string;
+  // Every `registrations` row (car) in this team for this event: one per
+  // driver on a car-per-driver championship, exactly one on a shared-car
+  // one. Team-level actions apply to all of them.
+  registrationIds: string[];
   team_name: string;
   car: string;
   division_id: number | null;
@@ -106,7 +114,7 @@ export default function RegistrationsAdmin({
       )
     )
       return;
-    run(team.id, () => deleteRegistration(team.id));
+    run(team.id, () => deleteRegistration(team.registrationIds));
   }
 
   function onRemoveMember(team: AdminTeam, m: AdminMember) {
@@ -116,11 +124,11 @@ export default function RegistrationsAdmin({
       )
     )
       return;
-    run(`${team.id}:${m.driver_id}`, () => removeMember(team.id, m.driver_id));
+    run(`${team.id}:${m.driver_id}`, () => removeMember(m.registration_id, m.driver_id));
   }
 
   function onSetClass(team: AdminTeam, value: string) {
-    run(`class:${team.id}`, () => setEntryClass(team.id, value || null));
+    run(`class:${team.id}`, () => setEntryClass(team.registrationIds, value || null));
   }
 
   function exportCsv() {
