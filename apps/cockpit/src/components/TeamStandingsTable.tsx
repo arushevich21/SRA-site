@@ -1,5 +1,6 @@
-import { accCarModelIdFromName } from '@sra/domain';
-import type { EmperorTeamStanding } from '@sra/shared-types';
+import { accCarModelIdFromName, buildTeamRounds, type RoundEvent, type TeamRoundCell } from '@sra/domain';
+import type { EmperorDriverStanding, EmperorTeamStanding } from '@sra/shared-types';
+import { RoundHeaders, PODIUM_CLASS } from './RoundCells';
 import { bareDriverName } from '@/lib/driver-display-name';
 import { resolveCarLogo } from '@/lib/acc/manufacturer-logo';
 import { CarLogo } from './CarLogo';
@@ -14,21 +15,32 @@ import type { TeamMember } from '@/lib/team-rosters';
 // badges below are each DRIVER's own classification, not a property of the
 // team.
 //
-// Thinner than EmperorStandingsTable by necessity: Emperor's team rows carry
-// no car and no per-round breakdown, and no position either (it's derived from
-// order in @sra/emperor-client — see normalizeChampionshipStandings).
+// Emperor's team rows carry no car and no position (derived from order in
+// @sra/emperor-client — see normalizeChampionshipStandings). Per-round
+// points aren't on the team row either — they're each driver's per-team
+// event points added up (buildTeamRounds), with the team's own drop round.
 export function TeamStandingsTable({
   groups,
   rosters,
   driverInfo = {},
+  rounds,
+  driverStandings,
 }: {
   groups: [className: string, standings: EmperorTeamStanding[]][];
   rosters: Map<string, TeamMember[]>;
   driverInfo?: Record<string, DriverInfo>;
+  // Round columns + the driver rows they're summed from. Both or neither.
+  rounds?: RoundEvent[];
+  driverStandings?: Record<string, EmperorDriverStanding[]>;
 }) {
+  const hasRounds = (rounds?.length ?? 0) > 0 && driverStandings != null;
+  const allDrivers = hasRounds ? Object.values(driverStandings!).flat() : [];
+
   return (
     <div className="flex flex-col gap-10">
-      {groups.map(([className, standings]) => (
+      {groups.map(([className, standings]) => {
+        const teamRounds = hasRounds ? buildTeamRounds(standings, allDrivers, rounds!) : null;
+        return (
         <div key={className || 'overall'}>
           {className && (
             <p className="font-mono text-[15px] tracking-[.25em] uppercase text-txt-3 mb-2">
@@ -51,6 +63,7 @@ export function TeamStandingsTable({
                   <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-5 w-20 text-right">
                     Pts
                   </th>
+                  {teamRounds && <RoundHeaders rounds={rounds!} />}
                 </tr>
               </thead>
               <tbody>
@@ -86,6 +99,15 @@ export function TeamStandingsTable({
                       >
                         {entry.points}
                       </td>
+                      {teamRounds &&
+                        (teamRounds.get(entry.teamName) ?? []).map((cell, i) => (
+                          <td
+                            key={rounds![i].eventId}
+                            className="font-mono text-[15px] py-3 pl-5 text-center hidden sm:table-cell"
+                          >
+                            <TeamRoundCellView cell={cell} />
+                          </td>
+                        ))}
                     </tr>
                   );
                 })}
@@ -93,9 +115,41 @@ export function TeamStandingsTable({
             </table>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
+}
+
+// Team round cell: the team's combined points that night. Colour is the
+// team's RANK among teams that round (there's no "team finishing position"
+// in a race), so the superscript reads "1st that night", not a race result.
+function TeamRoundCellView({ cell }: { cell: TeamRoundCell }) {
+  if (cell.points == null && !cell.dropped) {
+    return <span className="text-txt-3/35">—</span>;
+  }
+  const podium = cell.rank != null && cell.rank <= 3 ? PODIUM_CLASS[cell.rank] : '';
+  return (
+    <span
+      className={[
+        'inline-flex items-baseline gap-0.5',
+        cell.dropped ? 'text-txt-3/55 line-through decoration-txt-3/70' : podium || 'text-txt-2',
+        podium && !cell.dropped ? 'font-bold' : '',
+      ].join(' ')}
+      title={cell.dropped ? 'Dropped round' : cell.rank != null ? `${cell.rank}${ordinal(cell.rank)} that round` : undefined}
+    >
+      {cell.points ?? '—'}
+      {podium && !cell.dropped && (
+        <sup className="text-[9px] tracking-[.05em] opacity-85">{cell.rank}{ordinal(cell.rank!)}</sup>
+      )}
+    </span>
+  );
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return s[(v - 20) % 10] ?? s[v] ?? s[0];
 }
 
 function Roster({

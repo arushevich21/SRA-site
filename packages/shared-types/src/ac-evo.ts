@@ -60,6 +60,19 @@ export type EmperorDriverStanding = {
   // Usually one; more than one means the driver changed team mid-season
   // (confirmed live on LIAW), and empty means they raced unattached.
   teamNames: string[];
+  // Points scored per championship EVENT (Emperor's event id, an opaque uuid),
+  // summed across every team the driver scored it under. This is the
+  // per-round breakdown behind `points`; an event the driver didn't score is
+  // simply absent. Event ids resolve to a round/track through
+  // acc_race_sessions.season_id (metaData "championship:<champ>:<event>").
+  eventPoints: Record<string, number>;
+  // The same points split by the team they were scored under — keyed by
+  // team name, then event id. Feeds team-standings round totals; a driver
+  // who switched teams mid-season contributes each night to the right one.
+  teamEventPoints: Record<string, Record<string, number>>;
+  // Events Emperor excluded from `points` — the drop round(s). Still present
+  // in eventPoints with their raw score, so a table can show them struck.
+  droppedEventIds: string[];
 };
 
 export type EmperorTeamStanding = {
@@ -67,6 +80,9 @@ export type EmperorTeamStanding = {
   teamName: string;
   points: number;
   pointsPenalty: number;
+  // The team's own drop round(s) — Emperor drops the team's worst COMBINED
+  // event, which need not be either driver's individual drop.
+  droppedEventIds: string[];
 };
 
 // Keyed by class name; single-class championships use the "" key Emperor returns.

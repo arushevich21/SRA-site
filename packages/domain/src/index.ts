@@ -89,3 +89,14 @@ export {
   type HotStintLapInput,
   type HotStintDriverResult,
 } from './acc/hot-stint.js';
+
+export {
+  buildDriverRounds,
+  buildTeamRounds,
+  pairOrphanEvents,
+  type RoundEvent,
+  type RoundRaceResult,
+  type DriverRoundCell,
+  type DriverRounds,
+  type TeamRoundCell,
+} from './acc/round-standings.js';
