@@ -111,7 +111,6 @@ function DriverColumns({
             return (
               <article className={`ov-row ${podiumClass(row.position, live)}`} key={row.steamId}>
                 <span className="ov-pos">{row.position}</span>
-                <span className="ov-num">{info?.driverNumber ?? ''}</span>
                 <span className="ov-badge">
                   {badge && (
                     // eslint-disable-next-line @next/next/no-img-element -- static badge art
@@ -120,7 +119,10 @@ function DriverColumns({
                 </span>
                 <div className="ov-driver">
                   <b>{bareDriverName(info?.displayName ?? row.driverName)}</b>
-                  <span>{row.teamNames[0] ?? row.carModel ?? ''}</span>
+                  <span>
+                    {info?.driverNumber != null && <em>#{info.driverNumber}</em>}
+                    {row.teamNames[0] ?? row.carModel ?? ''}
+                  </span>
                 </div>
                 <span className="ov-car">
                   <CarLogo {...logo} alt={row.carModel ?? ''} size={24} />
@@ -192,15 +194,12 @@ function Points({
   position: number;
   live: boolean;
 }) {
+  // Only the podium shows its gap — every row carrying "−611" was noise.
   const gap = leaderPoints - points;
   return (
     <span className="ov-points">
       <b>{points}</b>
-      {live && (
-        <small className={position === 1 ? 'is-leader' : ''}>
-          {position === 1 ? 'LEADER' : `−${gap}`}
-        </small>
-      )}
+      {live && position > 1 && position <= 3 && <small>−{gap}</small>}
     </span>
   );
 }
