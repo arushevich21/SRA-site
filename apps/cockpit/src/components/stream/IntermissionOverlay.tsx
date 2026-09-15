@@ -1,11 +1,12 @@
 import type { ChampionshipContent } from '@/content/championships';
 import type { BoothMember, StreamRound } from '@/lib/stream/overlay-data';
 import { OverlayFoot, OverlayFrame, OverlayLockup } from './OverlayPrimitives';
+import { seriesName } from '@/lib/stream/labels';
 
 // Stock image for anyone without an uploaded photo (public/badges).
 const DRIVER_PHOTO_PLACEHOLDER = '/badges/driver-placeholder.png';
 
-// Between sessions: whoever is in the booth, and nothing else. One card per
+// The between-scenes bed: whoever is in the booth, and nothing else. One card per
 // commentator, sized to however many there are, with the photo they chose on
 // /profile — or the stock image.
 export function IntermissionOverlay({
@@ -23,14 +24,14 @@ export function IntermissionOverlay({
     <OverlayFrame ticker>
       <OverlayLockup
         championship={championship}
-        title="We'll be right back"
-        subtitle={booth.length ? 'Live from the booth' : undefined}
+        title="Live from the booth"
+        subtitle={seriesName(championship)}
         division={division}
         round={round}
       />
 
       {booth.length === 0 ? (
-        <div className="ov-empty">Back shortly</div>
+        <div className="ov-empty">Booth</div>
       ) : (
         <div className="ov-booth-grid" data-count={Math.min(booth.length, 4)}>
           {booth.map((member) => (
