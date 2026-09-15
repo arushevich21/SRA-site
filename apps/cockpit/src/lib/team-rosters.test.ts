@@ -16,6 +16,9 @@ function driver(
     points: 100 - position,
     pointsPenalty: 0,
     teamNames,
+    eventPoints: {},
+    teamEventPoints: {},
+    droppedEventIds: [],
   };
 }
 

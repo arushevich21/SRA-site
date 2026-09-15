@@ -25,3 +25,10 @@ export function computeDriverDisplayName(input: {
   const number = input.isChampion ? 1 : input.driverNumber;
   return number != null ? `${full}┊${number}` : full;
 }
+
+// The inverse for display surfaces that want the name without the number
+// (register page entry list, ratings board): everything before the ┊. A
+// display_name with no number (fallback Discord name) passes through as-is.
+export function bareDriverName(displayName: string): string {
+  return displayName.split('┊')[0].trim() || displayName;
+}

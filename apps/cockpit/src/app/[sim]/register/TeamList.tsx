@@ -2,8 +2,7 @@
 
 import { DivisionBadge } from '@/components/DivisionBadge';
 import { useState } from 'react';
-import { Icon, type IconName } from '@cardog-icons/react';
-import { FallbackLogoImage } from '@/components/FallbackLogoImage';
+import { CarLogo } from '@/components/CarLogo';
 import { DriverTierBadge } from '@/components/DriverTierBadge';
 
 export type Member = {
@@ -242,20 +241,13 @@ function TeamRow({
       </td>
 
       <td className="py-2.5 pr-3 align-middle">
-        <span className="flex items-center gap-2 font-sans text-[13px] text-txt-3">
-          {team.manufacturerIconName ? (
-            <span className="relative w-4 h-4 shrink-0 flex items-center justify-center">
-              <Icon name={team.manufacturerIconName as IconName} size={16} />
-            </span>
-          ) : (
-            team.manufacturerLogoUrl && (
-              <span className="relative w-4 h-4 shrink-0">
-                <FallbackLogoImage src={team.manufacturerLogoUrl} alt={team.car} sizes="16px" />
-              </span>
-            )
-          )}
-          {team.car}
-        </span>
+        <CarLabel
+          car={team.car}
+          manufacturerIconName={team.manufacturerIconName}
+          manufacturerLogoUrl={team.manufacturerLogoUrl}
+          className="font-sans text-[14px] text-txt-3"
+          iconSize={26}
+        />
       </td>
 
       {/* Division — omitted entirely on an ungraded championship rather than
@@ -275,23 +267,54 @@ function TeamRow({
       )}
 
       <td className="py-2.5 align-middle">
-        <div className="flex flex-wrap gap-4">
+        {/* Stacked, one driver per line — a car-per-driver team reads as a
+            roster, not a row of names. */}
+        <div className="flex flex-col gap-1.5">
           {team.members.map((m) => (
             <div key={m.driver_id} className="flex items-center gap-2">
               <DriverTierBadge isSralien={m.is_sralien} division={team.division_id} tier={m.tier} />
-              <span className="font-display font-bold text-[13px] uppercase text-txt">
+              <span className="font-display font-bold text-[16px] uppercase text-txt">
                 {m.display_name ?? '—'}
               </span>
             </div>
           ))}
           {spotsOpen > 0 && (
-            <span className="font-mono text-[10px] text-txt-3/40 italic self-center">
+            <span className="font-mono text-[10px] text-txt-3/40 italic">
               {spotsOpen} open
             </span>
           )}
         </div>
       </td>
     </tr>
+  );
+}
+
+// Manufacturer icon/logo + car name, shared by the entry rows and the car
+// breakdown so a car looks the same in both. Icon where @cardog-icons has
+// one, else our uploaded SVG logo, else just the name (no generic glyph).
+function CarLabel({
+  car,
+  manufacturerIconName,
+  manufacturerLogoUrl,
+  className,
+  iconSize = 16,
+}: {
+  car: string;
+  manufacturerIconName: string | null;
+  manufacturerLogoUrl: string | null;
+  className: string;
+  iconSize?: number;
+}) {
+  return (
+    <span className={`flex items-center gap-3 ${className}`}>
+      <CarLogo
+        manufacturerIconName={manufacturerIconName}
+        manufacturerLogoUrl={manufacturerLogoUrl}
+        alt={car}
+        size={iconSize}
+      />
+      {car}
+    </span>
   );
 }
 
@@ -314,6 +337,27 @@ function BreakdownTable({
   }
 
   const cars = [...new Set(teams.map((t) => t.car))].sort();
+
+  // Logo per car name — every team on the same car resolved the same
+  // icon/logo server-side, so the first one seen is as good as any.
+  const logoFor = new Map<string, Pick<Team, 'manufacturerIconName' | 'manufacturerLogoUrl'>>();
+  for (const t of teams) {
+    if (!logoFor.has(t.car)) {
+      logoFor.set(t.car, {
+        manufacturerIconName: t.manufacturerIconName,
+        manufacturerLogoUrl: t.manufacturerLogoUrl,
+      });
+    }
+  }
+  const carCell = (car: string) => (
+    <CarLabel
+      car={car}
+      manufacturerIconName={logoFor.get(car)?.manufacturerIconName ?? null}
+      manufacturerLogoUrl={logoFor.get(car)?.manufacturerLogoUrl ?? null}
+      className="font-mono text-[12px] text-txt"
+      iconSize={20}
+    />
+  );
 
   if (cars.length === 0) {
     return (
@@ -351,8 +395,8 @@ function BreakdownTable({
                   i % 2 === 1 ? 'bg-panel-2/20' : '',
                 ].join(' ')}
               >
-                <td className="px-5 py-2.5 font-mono text-[12px] text-txt">
-                  {car}
+                <td className="px-5 py-2.5">
+                  {carCell(car)}
                 </td>
                 <td className="text-center px-4 py-2.5 font-mono text-[12px] font-bold text-txt">
                   {n}
@@ -408,8 +452,8 @@ function BreakdownTable({
                   i % 2 === 1 ? 'bg-panel-2/20' : '',
                 ].join(' ')}
               >
-                <td className="px-5 py-2.5 font-mono text-[12px] text-txt">
-                  {car}
+                <td className="px-5 py-2.5">
+                  {carCell(car)}
                 </td>
                 {DIVISIONS.map((d) => (
                   <td

@@ -54,6 +54,7 @@ export {
   ACC_CAR_MANUFACTURER_ICON_NAMES,
   ACC_CAR_MANUFACTURER_CDN_SLUGS,
   accCarModelName,
+  accCarModelIdFromName,
   accCupCategoryName,
   accCarClassName,
   accCarManufacturerIconName,
@@ -88,3 +89,14 @@ export {
   type HotStintLapInput,
   type HotStintDriverResult,
 } from './acc/hot-stint.js';
+
+export {
+  buildDriverRounds,
+  buildTeamRounds,
+  pairOrphanEvents,
+  type RoundEvent,
+  type RoundRaceResult,
+  type DriverRoundCell,
+  type DriverRounds,
+  type TeamRoundCell,
+} from './acc/round-standings.js';

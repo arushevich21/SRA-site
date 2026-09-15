@@ -42,6 +42,7 @@ export type ChampionshipRow = {
   max_registrations: number | null;
   allowed_cars: string[] | null;
   requires_division?: boolean | null;
+  shared_car?: boolean | null;
   division_driver_cap?: number | null;
   teaser_only: boolean;
   concluded: boolean;

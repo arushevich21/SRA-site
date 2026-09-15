@@ -2,10 +2,12 @@ import { accCarModelName } from '@sra/domain';
 import type {
   EmperorChampionshipStandings,
   EmperorDriverStanding,
+  EmperorTeamStanding,
 } from '@sra/shared-types';
 import {
   accsmTargetForDivision,
   getStandingsKey,
+  roundStartsAtForDivision,
   isMultiDivision,
   type ChampionshipContent,
 } from '@/content/championships';
@@ -20,6 +22,9 @@ import { TeamStandingsTable } from './TeamStandingsTable';
 import { buildTeamRosters } from '@/lib/team-rosters';
 import { getAcEvoStandings, getAccStandings } from '@/lib/emperor-standings';
 import { getRoundPoints } from '@/lib/acevo-hotlaps';
+import { getChampionshipRoundEvents } from '@/lib/acc/championship-rounds';
+import { SPLIT_NIGHT_MATCH_WINDOW_MS } from '@/lib/acc/round-match';
+import type { RoundEvent } from '@sra/domain';
 import { readStandings } from '@/lib/standings-store';
 import { getDriverInfoBySteamIds, stripSteamIdPrefix, type DriverInfo } from '@/lib/driver-lookup';
 import { supabase as adminClient } from '@/lib/supabase';
@@ -163,6 +168,9 @@ async function getEntryListAsZeroStandings(
         teamNames: e.teamNames,
         points: 0,
         pointsPenalty: 0,
+        eventPoints: {},
+        teamEventPoints: {},
+        droppedEventIds: [],
       })),
     },
     teamStandings: {},
@@ -242,19 +250,64 @@ async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) 
     );
   }
 
+  // ACC (LIAW and any other single-championship ACC event): round columns
+  // from Emperor's per-event points joined to our ingested race sessions —
+  // the same path the multi-division Team Series uses.
+  if (champ.game !== 'AC Evo') {
+    const rounds = await getChampionshipRoundEvents(champ.emperorChampionshipId!, result.data, champ.schedule);
+    return (
+      <EmperorStandingsTable
+        data={result.data}
+        rounds={rounds}
+        driverInfo={await getDriverInfoForStandings(result.data)}
+      />
+    );
+  }
+
+  // AC Evo's per-round points come from OUR round-points cache (positions +
+  // pole/fastest-lap bonuses computed from downloaded results), not from
+  // Emperor's per-event map, and are keyed by track rather than event id.
+  // Adapt them to the table's RoundEvent shape: one synthetic event per
+  // scheduled round, and each driver's eventPoints rewritten to those ids.
+  // No race results are attached, so cells show points only — no finish
+  // colour or fastest-lap marks here (that data lives in the ACC ingest).
   const roundsWithTrack = champ.schedule.filter((r) => r.emperorRawTrackName);
-  const rounds = await Promise.all(
+  const roundPoints = await Promise.all(
     roundsWithTrack.map(async (r) => ({
+      eventId: `acevo-round-${r.round}`,
       round: r.round,
       track: r.track,
       points: await getRoundPoints(r.emperorRawTrackName!, r.emperorTrack),
     })),
   );
+  const rounds: RoundEvent[] = roundPoints.map(({ eventId, round, track }) => ({
+    eventId,
+    round,
+    track,
+    races: [],
+  }));
+  const withRoundPoints: EmperorChampionshipStandings = {
+    ...result.data,
+    driverStandings: Object.fromEntries(
+      Object.entries(result.data.driverStandings).map(([cls, standings]) => [
+        cls,
+        standings.map((d) => ({
+          ...d,
+          eventPoints: Object.fromEntries(
+            roundPoints
+              .filter((r) => d.steamId in r.points)
+              .map((r) => [r.eventId, r.points[d.steamId]]),
+          ),
+          droppedEventIds: [],
+        })),
+      ]),
+    ),
+  };
 
   return (
     <div>
       <EmperorStandingsTable
-        data={result.data}
+        data={withRoundPoints}
         rounds={rounds}
         driverInfo={await getDriverInfoForStandings(result.data)}
       />
@@ -412,6 +465,50 @@ async function MultiDivisionStandingsSection({
     }
 
     const driverInfo = await getDriverInfoForStandings(entryListStandings);
+
+    const preRaceNote = (
+      <p className="font-mono text-[12px] tracking-[.1em] uppercase text-txt-3 italic mb-4">
+        No races scored yet — showing {target.divisionName}&apos;s confirmed entry list at 0
+        points.
+      </p>
+    );
+
+    // Teams view before any race: the same entry list grouped by team, every
+    // team at 0. Emperor has no team rows yet, but the registrations DO know
+    // the teams (teamNames on each driver row, via getEntryListAsZeroStandings),
+    // so the toggle is offered here too — it's the only way to see rosters
+    // before R1, which is exactly when people are checking who's paired with
+    // whom. Alphabetical, since there's nothing to rank on.
+    if (view.entrant === 'teams') {
+      const rosters = buildTeamRosters(entryListStandings.driverStandings);
+      const teamGroups: [string, EmperorTeamStanding[]][] = Object.entries(
+        entryListStandings.driverStandings,
+      ).map(([className, standings]) => {
+        const names = [...new Set(standings.flatMap((d) => d.teamNames))].sort((a, b) =>
+          a.localeCompare(b),
+        );
+        return [
+          className,
+          names.map((teamName, i) => ({
+            position: i + 1,
+            teamName,
+            points: 0,
+            pointsPenalty: 0,
+            droppedEventIds: [],
+          })),
+        ];
+      });
+
+      return (
+        <div>
+          {tabs}
+          <StandingsViewControls basePath={basePath} view={resolvedView} hasTeamStandings />
+          {preRaceNote}
+          <TeamStandingsTable groups={teamGroups} rosters={rosters} driverInfo={driverInfo} />
+        </div>
+      );
+    }
+
     const groups = Object.entries(entryListStandings.driverStandings).map(
       ([className, standings]) =>
         [className, filterAndRankByTier(standings, driverInfo, view.tier)] as const,
@@ -420,14 +517,9 @@ async function MultiDivisionStandingsSection({
     return (
       <div>
         {tabs}
-        {/* No entrant toggle here: there are no team standings to switch to
-            before a race has been scored, and the entry list is per-driver. */}
-        <StandingsViewControls basePath={basePath} view={resolvedView} hasTeamStandings={false} />
+        <StandingsViewControls basePath={basePath} view={resolvedView} hasTeamStandings />
         <SubChampionshipNote tier={view.tier} />
-        <p className="font-mono text-[12px] tracking-[.1em] uppercase text-txt-3 italic mb-4">
-          No races scored yet — showing {target.divisionName}&apos;s confirmed entry list at 0
-          points.
-        </p>
+        {preRaceNote}
         <EmperorStandingsTable
           data={{
             driverStandings: Object.fromEntries(groups),
@@ -439,6 +531,21 @@ async function MultiDivisionStandingsSection({
       </div>
     );
   }
+
+  // Round columns: this division's ingested races, labelled from the
+  // schedule. Same division-aware dates + split-night window the results page
+  // uses, so D1/D3's Tuesday race never matches D2/D4's Wednesday one at the
+  // same track (see round-match.ts / roundStartsAtForDivision).
+  const rounds = await getChampionshipRoundEvents(
+    target.emperorChampionshipId,
+    result.data,
+    champ.schedule.map((r) => ({
+      round: r.round,
+      track: r.track,
+      date: roundStartsAtForDivision(r, activeDivision),
+    })),
+    SPLIT_NIGHT_MATCH_WINDOW_MS,
+  );
 
   if (view.entrant === 'teams') {
     // Rosters come from the DRIVER standings (the only place Emperor records
@@ -454,6 +561,8 @@ async function MultiDivisionStandingsSection({
           groups={Object.entries(result.data.teamStandings)}
           rosters={rosters}
           driverInfo={await getDriverInfoForStandings(result.data)}
+          rounds={rounds}
+          driverStandings={result.data.driverStandings}
         />
       </div>
     );
@@ -471,6 +580,7 @@ async function MultiDivisionStandingsSection({
       <SubChampionshipNote tier={view.tier} />
       <EmperorStandingsTable
         data={{ driverStandings: Object.fromEntries(groups), teamStandings: {} }}
+        rounds={rounds}
         driverInfo={driverInfo}
       />
       <EmptyTierNote groups={groups} tier={view.tier} />

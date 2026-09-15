@@ -176,7 +176,10 @@ export async function registerTeam(
 
   // ── 7. Create the entry — division derivation, driver-claim uniqueness, ───
   // and the team_members roster write all happen atomically inside this one
-  // call (see register_entry(), 20260814d/e/f).
+  // call (see register_entry(), 20260814d/e/f). The roster is passed whole;
+  // register_entry() decides the row shape from championships.shared_car —
+  // one registrations row per driver (GT3 Team Series) or one shared row
+  // (Endurance). See 20260915.
   const result = await createRegistration({
     series: champ.classTag,
     season: champ.registrationSeason,
@@ -218,16 +221,19 @@ export async function leaveTeam(
     .maybeSingle();
   if (!driver) return;
 
-  // The registrations row for this team+event — needed for both the
-  // membership check below and the cleanup in step 5.
-  const { data: registration } = await adminClient
+  // Every registrations row for this team+event — needed for both the
+  // membership check below and the cleanup in step 5. Plural: on a
+  // car-per-driver championship (GT3 Team Series, championships.shared_car =
+  // false) a team is one row per driver sharing team_id; on a shared-car one
+  // it's a single row. See 20260915.
+  const { data: registrationRows } = await adminClient
     .from('registrations')
     .select('id')
     .eq('team_id', teamId)
     .eq('championship_key', championshipKey)
-    .eq('season', season)
-    .maybeSingle();
-  if (!registration) return;
+    .eq('season', season);
+  const registrationIds = (registrationRows ?? []).map((r) => r.id as string);
+  if (registrationIds.length === 0) return;
 
   // ── 3. Verify driver is on this team (prevents cross-team tampering) ──────
   // Was checking team_members here, which register_entry() has never
@@ -243,7 +249,7 @@ export async function leaveTeam(
   const { data: membership } = await adminClient
     .from('registration_drivers')
     .select('driver_id')
-    .eq('registration_id', registration.id)
+    .in('registration_id', registrationIds)
     .eq('driver_id', driver.id)
     .maybeSingle();
   if (!membership) return;
@@ -272,17 +278,21 @@ export async function leaveTeam(
     .eq('season', season);
 
   // ── 5. Clean up now-empty parents ──────────────────────────────────────────
-  // Deleting the last driver's registration_drivers row above does NOT delete
-  // the parent registrations row (no cascade in that direction) — left alone,
-  // a solo (or now fully-vacated) entry keeps showing in the public entry
-  // list with zero members, and keeps occupying a max_registrations slot
-  // forever.
-  const { count } = await adminClient
+  // Deleting a driver's registration_drivers row above does NOT delete the
+  // parent registrations row (no cascade in that direction) — left alone,
+  // a vacated car keeps showing in the public entry list with zero members,
+  // keeps occupying a max_registrations slot, and gets pushed to the ACCSM
+  // grid as a driverless entry. On a car-per-driver championship this is the
+  // leaver's own car; on a shared-car one it only fires when the last driver
+  // leaves. Either way: any of this team's rows with nobody left in it goes.
+  const { data: remaining } = await adminClient
     .from('registration_drivers')
-    .select('driver_id', { count: 'exact', head: true })
-    .eq('registration_id', registration.id);
-  if ((count ?? 0) === 0) {
-    await adminClient.from('registrations').delete().eq('id', registration.id);
+    .select('registration_id')
+    .in('registration_id', registrationIds);
+  const stillOccupied = new Set((remaining ?? []).map((r) => r.registration_id as string));
+  const emptyIds = registrationIds.filter((id) => !stillOccupied.has(id));
+  if (emptyIds.length > 0) {
+    await adminClient.from('registrations').delete().in('id', emptyIds);
   }
 
   // Same idea for the team roster itself: once nobody is left on it anywhere
@@ -346,19 +356,22 @@ export async function updateRegistration(
     .maybeSingle();
   if (!driver) return { error: 'Driver record not found — contact an admin' };
 
-  const { data: registration } = await adminClient
+  // Plural for the same reason as leaveTeam(): one row per car, and a
+  // car-per-driver team has several. The car change below applies to all of
+  // them — a team runs one model.
+  const { data: registrationRows } = await adminClient
     .from('registrations')
     .select('id')
     .eq('team_id', teamId)
     .eq('championship_key', champ.registrationKey)
-    .eq('season', champ.registrationSeason)
-    .maybeSingle();
-  if (!registration) return { error: 'Registration not found' };
+    .eq('season', champ.registrationSeason);
+  const registrationIds = (registrationRows ?? []).map((r) => r.id as string);
+  if (registrationIds.length === 0) return { error: 'Registration not found' };
 
   const { data: membership } = await adminClient
     .from('registration_drivers')
     .select('driver_id')
-    .eq('registration_id', registration.id)
+    .in('registration_id', registrationIds)
     .eq('driver_id', driver.id)
     .maybeSingle();
   if (!membership) return { error: "You're not on this team" };
@@ -378,7 +391,7 @@ export async function updateRegistration(
   const { error: carError } = await adminClient
     .from('registrations')
     .update({ car_model_id: carModelId })
-    .eq('id', registration.id);
+    .in('id', registrationIds);
   if (carError) return { error: 'Failed to update car — contact an admin' };
 
   // ── 5. Validate + apply the team name change ───────────────────────────────

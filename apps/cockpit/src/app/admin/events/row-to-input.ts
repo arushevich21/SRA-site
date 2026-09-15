@@ -40,6 +40,7 @@ export function rowToInput(
     maxRegistrations: row.max_registrations != null ? String(row.max_registrations) : '',
     allowedCars: row.allowed_cars ?? [],
     requiresDivision: row.requires_division ?? true,
+    sharedCar: row.shared_car ?? false,
     teaserOnly: row.teaser_only,
     concluded: row.concluded,
     sortOrder: row.sort_order,

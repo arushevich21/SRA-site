@@ -1,4 +1,4 @@
-import { ACC_CAR_MANUFACTURER_CDN_SLUGS } from '@sra/domain';
+import { ACC_CAR_MANUFACTURER_CDN_SLUGS, accCarManufacturerIconName } from '@sra/domain';
 
 // Public URL for a manufacturer's uploaded logo in the manufacturer-logos
 // Supabase Storage bucket — our own hosting, since the old site's CDN (where
@@ -18,4 +18,25 @@ export function accCarManufacturerLogoUrl(carModel: number): string | null {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!base) return null;
   return `${base}/storage/v1/object/public/manufacturer-logos/${slug}.svg`;
+}
+
+export type CarLogoSource = {
+  manufacturerIconName: string | null;
+  manufacturerLogoUrl: string | null;
+};
+
+// Manufacturer icon/logo for a car, the same resolution every car display on
+// the site uses (register entry list, standings, HotLapBoard, TrackHeader):
+// a @cardog-icons/react icon name where one exists, else our own uploaded
+// SVG logo where the manufacturer has one, else neither — never a generic
+// placeholder glyph. At most one field is non-null. Server-side only (reads
+// NEXT_PUBLIC_SUPABASE_URL via accCarManufacturerLogoUrl); pass the result
+// down to <CarLogo> as plain data.
+export function resolveCarLogo(carModelId: number | null): CarLogoSource {
+  if (carModelId == null) return { manufacturerIconName: null, manufacturerLogoUrl: null };
+  const manufacturerIconName = accCarManufacturerIconName(carModelId);
+  return {
+    manufacturerIconName,
+    manufacturerLogoUrl: !manufacturerIconName ? accCarManufacturerLogoUrl(carModelId) : null,
+  };
 }
