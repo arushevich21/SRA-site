@@ -313,11 +313,11 @@ body:has(.ov-transparent)::after { display: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(1.9 * var(--u));
-  height: calc(1.9 * var(--u));
+  width: calc(2.8 * var(--u));
+  height: calc(2.8 * var(--u));
   color: var(--ov-txt-2);
 }
-.ov-car > span { width: calc(1.7 * var(--u)) !important; height: calc(1.7 * var(--u)) !important; }
+.ov-car > span { width: calc(2.6 * var(--u)) !important; height: calc(2.6 * var(--u)) !important; }
 .ov-car svg, .ov-car img { width: 100%; height: 100%; object-fit: contain; }
 .ov-points {
   display: flex;
@@ -362,8 +362,8 @@ body:has(.ov-transparent)::after { display: none; }
   color: var(--ov-txt-2);
   white-space: nowrap;
 }
-.ov-roster .ov-car { width: calc(1.3 * var(--u)); height: calc(1.3 * var(--u)); }
-.ov-roster .ov-car > span { width: calc(1.2 * var(--u)) !important; height: calc(1.2 * var(--u)) !important; }
+.ov-roster .ov-car { width: calc(1.7 * var(--u)); height: calc(1.7 * var(--u)); }
+.ov-roster .ov-car > span { width: calc(1.6 * var(--u)) !important; height: calc(1.6 * var(--u)) !important; }
 
 .ov-empty {
   display: grid;

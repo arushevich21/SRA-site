@@ -125,7 +125,7 @@ function DriverColumns({
                   </span>
                 </div>
                 <span className="ov-car">
-                  <CarLogo {...logo} alt={row.carModel ?? ''} size={24} />
+                  <CarLogo {...logo} alt={row.carModel ?? ''} size={40} />
                 </span>
                 <Points points={row.points} leaderPoints={leaderPoints} position={row.position} live={live} />
               </article>
@@ -174,7 +174,7 @@ function Roster({ members }: { members: TeamMember[] }) {
       {members.slice(0, 2).map((m) => (
         <span key={m.steamId}>
           <span className="ov-car">
-            <CarLogo {...resolveCarLogo(accCarModelIdFromName(m.carModel))} alt={m.carModel ?? ''} size={16} />
+            <CarLogo {...resolveCarLogo(accCarModelIdFromName(m.carModel))} alt={m.carModel ?? ''} size={24} />
           </span>
           {bareDriverName(m.driverName)}
         </span>
