@@ -11,6 +11,47 @@ export const PODIUM_CLASS: Record<number, string> = {
   3: 'text-[#cd7f4f]',
 };
 
+// Short forms for the round header, where a column is ~90px wide. Keyed on
+// the normalized schedule/track name so either the schedule's wording or a
+// prettified track_key resolves. Anything not listed shows as written.
+const SHORT_TRACK_NAMES: Readonly<Record<string, string>> = {
+  circuitoftheamericas: 'COTA',
+  cota: 'COTA',
+  mountpanorama: 'Mount Panorama',
+  mountpanoramacircuit: 'Mount Panorama',
+  nurburgring: 'Nürburgring',
+  nurburgring24h: 'Nürburgring 24h',
+  spafrancorchamps: 'Spa',
+  spa: 'Spa',
+  paulricard: 'Paul Ricard',
+  brandshatch: 'Brands Hatch',
+  watkinsglen: 'Watkins Glen',
+  indianapolis: 'Indy',
+  redbullring: 'Red Bull Ring',
+  hungaroring: 'Hungaroring',
+  laguna: 'Laguna Seca',
+  lagunaseca: 'Laguna Seca',
+  silverstone: 'Silverstone',
+  kyalami: 'Kyalami',
+  suzuka: 'Suzuka',
+  valencia: 'Valencia',
+  donington: 'Donington',
+  oulton: 'Oulton Park',
+  oultonpark: 'Oulton Park',
+  snetterton: 'Snetterton',
+  imola: 'Imola',
+  monza: 'Monza',
+  misano: 'Misano',
+  zolder: 'Zolder',
+  zandvoort: 'Zandvoort',
+  barcelona: 'Barcelona',
+};
+
+export function shortTrackName(name: string): string {
+  const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return SHORT_TRACK_NAMES[key] ?? name;
+}
+
 export function RoundHeaders({ rounds }: { rounds: RoundEvent[] }) {
   return (
     <>
@@ -22,7 +63,7 @@ export function RoundHeaders({ rounds }: { rounds: RoundEvent[] }) {
         >
           R{r.round}
           <span className="block font-mono text-[10px] tracking-[.1em] normal-case text-txt-3/70 mt-0.5 truncate max-w-[88px] mx-auto">
-            {r.track}
+            {shortTrackName(r.track)}
           </span>
         </th>
       ))}
