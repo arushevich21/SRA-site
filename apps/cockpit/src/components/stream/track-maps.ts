@@ -31,7 +31,7 @@ export const TRACK_FACTS: Record<string, TrackFacts> = {
   mount_panorama: { location: 'Bathurst, Australia', country: 'au', length: '6.213 km', turns: 23 },
   nurburgring: { location: 'Nürburg, Germany', country: 'de', length: '5.148 km', turns: 16 },
   oulton_park: { location: 'Cheshire, United Kingdom', country: 'gb', length: '4.332 km', turns: 17 },
-  paul_ricard: { location: 'Le Castellet, France', country: 'fr', length: '5.842 km', turns: 15 },
+  paul_ricard: { location: 'Le Castellet, France', country: 'fr', length: '5.842 km', turns: 13 },
   red_bull_ring: { location: 'Spielberg, Austria', country: 'at', length: '4.318 km', turns: 10 },
   silverstone: { location: 'Northamptonshire, United Kingdom', country: 'gb', length: '5.891 km', turns: 18 },
   snetterton: { location: 'Norfolk, United Kingdom', country: 'gb', length: '4.778 km', turns: 12 },
