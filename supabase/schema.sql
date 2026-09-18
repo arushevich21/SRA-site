@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict lVPjNCiR18iOsBMwI6vTfSYsGu2Odi9kkgweenZY2WTjMzKbKzIU7aeROuYHMdI
+\restrict aaknUchPMys4gMIHziGavxQf7OuT9RXu2dTyU9RCeVEeBTENxLqlHr6WrysMp4x
 
 -- Dumped from database version 17.6
--- Dumped by pg_dump version 17.10
+-- Dumped by pg_dump version 17.6
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1262,6 +1262,38 @@ CREATE TABLE public.standings (
 
 
 --
+-- Name: stream_booth; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stream_booth (
+    channel_id text NOT NULL,
+    members jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE stream_booth; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.stream_booth IS 'Live roster of each commentary voice channel, written by SRA-Bot. Read by /overlay/commentators and /overlay/intermission.';
+
+
+--
+-- Name: COLUMN stream_booth.channel_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.stream_booth.channel_id IS 'Discord voice channel id.';
+
+
+--
+-- Name: COLUMN stream_booth.members; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.stream_booth.members IS 'Current members in join order: [{ discord_id, joined_at }]. Bots excluded.';
+
+
+--
 -- Name: team_members; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1748,6 +1780,14 @@ ALTER TABLE ONLY public.srating_history
 
 ALTER TABLE ONLY public.standings
     ADD CONSTRAINT standings_pkey PRIMARY KEY (standings_key);
+
+
+--
+-- Name: stream_booth stream_booth_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stream_booth
+    ADD CONSTRAINT stream_booth_pkey PRIMARY KEY (channel_id);
 
 
 --
@@ -2808,6 +2848,12 @@ ALTER TABLE public.srating_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.standings ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: stream_booth; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stream_booth ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: team_members; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2861,5 +2907,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lVPjNCiR18iOsBMwI6vTfSYsGu2Odi9kkgweenZY2WTjMzKbKzIU7aeROuYHMdI
+\unrestrict aaknUchPMys4gMIHziGavxQf7OuT9RXu2dTyU9RCeVEeBTENxLqlHr6WrysMp4x
 
