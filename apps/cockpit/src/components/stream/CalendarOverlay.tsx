@@ -3,7 +3,7 @@ import { eventDateTimeParts } from '@/lib/event-time';
 import type { StreamRound } from '@/lib/stream/overlay-data';
 import { seasonLabel } from '@/lib/stream/labels';
 import { OverlayFoot, OverlayFrame, OverlayLockup, TrackFlag } from './OverlayPrimitives';
-import { isTbaTrack, trackMapUrl } from './track-maps';
+import { isTbaTrack, trackMapUrl, trackPhotoUrl } from './track-maps';
 
 export function CalendarOverlay({
   championship,
@@ -31,10 +31,15 @@ export function CalendarOverlay({
         {rounds.slice(0, 8).map((r, i) => {
           const tba = isTbaTrack(r.round.track);
           const map = tba ? null : trackMapUrl(r.round.track);
+          const photo = tba ? null : trackPhotoUrl(r.round.track);
           const when = eventDateTimeParts(r.startsAt, 'America/New_York');
           const state = r.isCurrent ? 'is-current' : i < currentIndex ? 'is-past' : '';
           return (
-            <article className={`ov-round ${state}`} key={r.round.round}>
+            <article className={`ov-round ${state} ${photo ? 'has-splash' : ''}`} key={r.round.round}>
+              {photo && (
+                // eslint-disable-next-line @next/next/no-img-element -- static splash art
+                <img className="ov-splash" src={photo} alt="" />
+              )}
               {r.isCurrent && <span className="ov-round-tag">This week</span>}
               <div className="ov-round-head">
                 <b>R{r.round.round}</b>

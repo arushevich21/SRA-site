@@ -15,6 +15,7 @@ import { buildTeamRosters, type TeamMember } from '@/lib/team-rosters';
 import type { DriverInfo } from '@/lib/driver-lookup';
 import { supabase } from '@/lib/supabase';
 import { bareDriverName } from '@/lib/driver-display-name';
+import { boothChannelForDivision } from '@/lib/stream/booths';
 
 // Data behind the OBS browser-source overlays (/overlay/...). Everything here
 // reads the same sources the public site renders from — Emperor standings,
@@ -198,12 +199,54 @@ export type BoothMember = {
   photoUrl: string | null;
 };
 
-// Resolves the operator's ?names= list against the drivers table so each
-// commentator gets their real display name and broadcast photo. Matching is
-// by display name prefix, case-insensitive, so "Anton Rushevich" finds
-// "Anton Rushevich┊1". An unmatched name is still shown, just without a
-// picture — a typo shouldn't blank a card on air.
-export async function getBoothRoster(
+// Who's on air for a division: the members of its commentary voice channel,
+// as SRA-Bot last wrote them to stream_booth, each joined to their drivers row
+// for the real display name and broadcast photo. Whoever has been in the
+// channel longest is first. An empty channel is an empty booth — there is no
+// fallback to a typed list, because a guessed name is wrong often enough to
+// be worse than nothing.
+export async function getBoothRoster(division: number | null): Promise<BoothMember[]> {
+  const channelId = boothChannelForDivision(division);
+  if (!channelId) return [];
+
+  const { data: booth, error: boothError } = await supabase
+    .from('stream_booth')
+    .select('members')
+    .eq('channel_id', channelId)
+    .maybeSingle();
+  if (boothError) console.error('stream_booth lookup failed:', boothError.message);
+
+  const members = ((booth?.members ?? []) as { discord_id: string; joined_at?: string }[]).filter(
+    (m) => typeof m.discord_id === 'string' && m.discord_id,
+  );
+  if (members.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('drivers')
+    .select('discord_id, display_name, photo_url')
+    .in(
+      'discord_id',
+      members.map((m) => m.discord_id),
+    );
+  if (error) console.error('booth drivers lookup failed:', error.message);
+
+  const rows = (data ?? []) as { discord_id: string; display_name: string; photo_url: string | null }[];
+  // Someone in the channel without a drivers row can't be named, so they
+  // aren't shown — a card with a Discord snowflake on it isn't a commentator.
+  return members.flatMap((m) => {
+    const row = rows.find((r) => r.discord_id === m.discord_id);
+    if (!row) return [];
+    return [{ name: bareDriverName(row.display_name), role: null, photoUrl: row.photo_url }];
+  });
+}
+
+// The explicit override: ?names= on the browser-source URL. Resolves each
+// name against the drivers table so the commentator gets their real display
+// name and broadcast photo. Matching is by display name prefix,
+// case-insensitive, so "Anton Rushevich" finds "Anton Rushevich┊1". An
+// unmatched name is still shown, just without a picture — a typo shouldn't
+// blank a card on air.
+export async function getNamedBoothRoster(
   requested: { name: string; role: string | null }[],
 ): Promise<BoothMember[]> {
   if (requested.length === 0) return [];

@@ -1,6 +1,7 @@
-// Track map artwork (public/tracks/maps — the 24 ACC circuits, re-hosted from
-// the old static CDN, see lib/acc/tracks.ts) and the circuit facts the track
-// scene shows. Pure lookups keyed on the schedule's human track name.
+// Track map artwork and circuit photography (public/tracks/maps and
+// public/tracks/photos — the 24 ACC circuits, re-hosted from the old static
+// CDN, see lib/acc/tracks.ts) plus the circuit facts the track scene shows.
+// Pure lookups keyed on the schedule's human track name.
 
 const TRACK_ALIASES: Record<string, string> = {
   'circuit of the americas': 'cota',
@@ -50,6 +51,14 @@ export function trackMapKey(track: string): string {
 export function trackMapUrl(track: string): string | null {
   const key = trackMapKey(track);
   return key in TRACK_FACTS ? `/tracks/maps/map_${key}.png` : null;
+}
+
+// The same circuit photo the hot-lap boards use as their splash art
+// (TRACK_PHOTO_OVERRIDES in lib/acc/tracks.ts). Both asset sets are named off
+// the same key, so the path is derived rather than tabled a second time.
+export function trackPhotoUrl(track: string): string | null {
+  const key = trackMapKey(track);
+  return key in TRACK_FACTS ? `/tracks/photos/photo_${key}.jpg` : null;
 }
 
 export function trackFacts(track: string): TrackFacts | null {
