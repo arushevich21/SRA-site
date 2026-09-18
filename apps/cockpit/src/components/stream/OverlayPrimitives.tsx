@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ChampionshipContent } from '@/content/championships';
 import type { StreamRound } from '@/lib/stream/overlay-data';
 import { seasonLabel } from '@/lib/stream/labels';
-import { SUPPORTERS } from '@/content/supporters';
+import { SUPPORTER_TIERS, type Supporter } from '@/content/supporters';
 import { shortTrackName } from '@/components/RoundCells';
 import { countryFlagUrl } from '@/lib/country-flag';
 import { trackFacts } from './track-maps';
@@ -114,12 +114,16 @@ export function OverlayLockup({
   subtitle,
   division,
   round,
+  badge,
 }: {
   championship: ChampionshipContent;
   title: string;
   subtitle?: string;
   division?: number | null;
   round?: StreamRound | null;
+  // A logo on the right in place of the division/round chip, for scenes
+  // that aren't about one round (public/ path).
+  badge?: string;
 }) {
   return (
     <header className="ov-lockup">
@@ -130,12 +134,16 @@ export function OverlayLockup({
         <h1 className="ov-title">{title}</h1>
         {subtitle && <p className="ov-subtitle">{subtitle}</p>}
       </div>
-      {(division != null || round) && (
+      {badge && (
+        // eslint-disable-next-line @next/next/no-img-element -- static logo
+        <img className="ov-lockup-brand" src={badge} alt="" />
+      )}
+      {!badge && (division != null || round) && (
         <div className="ov-context">
           {division != null && (
             <div className="ov-context-division">
               <small>DIV</small>
-              {division}
+              <b>{division}</b>
             </div>
           )}
           {round && (
@@ -162,22 +170,44 @@ export function OverlayFoot({ left, right }: { left: ReactNode; right?: ReactNod
   );
 }
 
+// A supporter's name with their flag, and the star for someone backing SRA
+// on both Discord and Patreon.
+export function SupporterName({ person }: { person: Supporter }) {
+  return (
+    <>
+      {person.country && (
+        // eslint-disable-next-line @next/next/no-img-element -- external CDN flag
+        <img className="ov-flag" src={countryFlagUrl(person.country)} alt="" />
+      )}
+      {person.name}
+      {person.both && <b className="ov-star" title="Subscribed on Discord and Patreon">★</b>}
+    </>
+  );
+}
+
+// Every tier scrolls past in turn under its own label, the way the old scene
+// collection's ticker read. Runs on every scene, holding screens included.
 export function SponsorTicker() {
   const message = (
     <>
-      {SUPPORTERS.map((name, index) => (
-        <span key={name}>
-          {index > 0 && <i>•</i>}
-          {name}
+      {SUPPORTER_TIERS.map((tier) => (
+        <span key={tier.key} className="ov-ticker-tier">
+          <em>{tier.short}:</em>
+          {tier.members.map((person, index) => (
+            <span key={person.name}>
+              {index > 0 && <i>•</i>}
+              <SupporterName person={person} />
+            </span>
+          ))}
+          <i>•</i>
         </span>
       ))}
-      <i>•</i>
       Thank you for supporting SRA
     </>
   );
   return (
     <div className="ov-ticker">
-      <div className="ov-ticker-label">SUPPORTERS</div>
+      <div className="ov-ticker-label">THANK YOU</div>
       <div className="ov-ticker-window">
         <div className="ov-ticker-track">
           <span>{message}</span>
