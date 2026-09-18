@@ -24,6 +24,7 @@ import { IntermissionOverlay } from '@/components/stream/IntermissionOverlay';
 import { SponsorsOverlay } from '@/components/stream/SponsorsOverlay';
 import { PartnersOverlay } from '@/components/stream/PartnersOverlay';
 import { CommentatorsOverlay } from '@/components/stream/CommentatorsOverlay';
+import { CAM_WINDOWS, ShowOverlay } from '@/components/stream/ShowOverlay';
 import { parseCommentators } from '@/components/stream/commentators';
 import { eventInstant, hasEventTime } from '@/lib/event-time';
 
@@ -40,8 +41,11 @@ import { eventInstant, hasEventTime } from '@/lib/event-time';
 //   /overlay/commentators/1                transparent lower-third, same source
 //     (…?names=A|Lead,B|Analyst on either overrides the channel with a typed list)
 //   /overlay/sponsors?footer_message=STREAM%20STARTING%20SOON|...&opacity=.5
+//   /overlay/sponsors?video=1&footer_message=...   same, over the ACC hero video
 //   /overlay/sponsors?mode=horizontal_marquee   transparent ticker strip
 //   /overlay/partners                      transparent logo slideshow
+//   /overlay/show?title=...&names=A,B,C    talk-show bed: three camera windows
+//     cut through the page (cameras go underneath in OBS), names left to right
 //
 // Every source renders at 2560×1440 natively — set that as the browser
 // source width/height in OBS. A 1080p stream is OBS downscaling that render;
@@ -184,9 +188,23 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
   if (scene === 'sponsors') {
     const parsed = query.opacity === undefined ? NaN : Number(query.opacity);
     const opacity = Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed)) : undefined;
+    const video = query.video && query.video !== '0' ? '/videos/acc_hero.mov' : undefined;
     return (
-      <OverlayCanvas refresh={refresh} opacity={opacity}>
+      <OverlayCanvas refresh={refresh} opacity={opacity} video={video}>
         <SponsorsOverlay championship={championship} message={query.footer_message} />
+      </OverlayCanvas>
+    );
+  }
+
+  if (scene === 'show') {
+    return (
+      <OverlayCanvas refresh={refresh} cutouts={CAM_WINDOWS}>
+        <ShowOverlay
+          championship={championship}
+          title={query.title?.trim() || 'Live Show'}
+          subtitle={query.subtitle?.trim() || undefined}
+          hosts={parseCommentators(query.names)}
+        />
       </OverlayCanvas>
     );
   }

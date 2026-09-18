@@ -30,12 +30,30 @@ html, body { background: transparent !important; }
 body::before, body::after { display: none !important; }
 `;
 
+export type CanvasRect = { x: number; y: number; w: number; h: number }; // canvas units
+
+// Holes through the whole page, so an OBS source underneath shows through
+// exactly there and nowhere else. One polygon with even-odd fill: the outer
+// rectangle, then each hole traced from and back to the same corner along a
+// zero-width cut, which cancels itself out.
+function cutoutClipPath(rects: CanvasRect[]): string {
+  const u = (n: number) => `calc(${n} * var(--u))`;
+  const points = ['0 0', '100% 0', '100% 100%', '0 100%'];
+  for (const r of rects) {
+    const [x1, y1, x2, y2] = [u(r.x), u(r.y), u(r.x + r.w), u(r.y + r.h)];
+    points.push(`${x1} ${y1}`, `${x1} ${y2}`, `${x2} ${y2}`, `${x2} ${y1}`, `${x1} ${y1}`, '0 100%');
+  }
+  return `polygon(evenodd, ${points.join(', ')})`;
+}
+
 export function OverlayCanvas({
   children,
   transparent = false,
   opacity,
   className = '',
   refresh,
+  cutouts,
+  video,
 }: {
   children: ReactNode;
   transparent?: boolean;
@@ -43,15 +61,32 @@ export function OverlayCanvas({
   className?: string;
   // When this source re-fetches itself; see OverlayRefresh.
   refresh?: OverlayRefreshPlan;
+  // Windows cut through the page (canvas units). The body goes transparent
+  // so what's in OBS beneath shows through them; the canvas itself stays
+  // painted everywhere else.
+  cutouts?: CanvasRect[];
+  // A looping, muted video bed under the canvas art (public/ path).
+  video?: string;
 }) {
+  const seeThrough = transparent || (cutouts?.length ?? 0) > 0;
   return (
     <div
-      className={`overlay-root ${transparent ? 'ov-transparent' : ''} ${className}`}
+      className={`overlay-root ${transparent ? 'ov-transparent' : ''} ${seeThrough ? 'ov-see-through' : ''} ${video ? 'ov-has-video' : ''} ${className}`}
       style={opacity === undefined ? undefined : { opacity }}
     >
-      <style>{SITE_CHROME_OFF + (transparent ? TRANSPARENT_BODY : '')}</style>
+      <style>{SITE_CHROME_OFF + (seeThrough ? TRANSPARENT_BODY : '')}</style>
       {refresh && <OverlayRefresh at={refresh.at} every={refresh.every} />}
-      <div className="overlay-canvas">{children}</div>
+      <div
+        className="overlay-canvas"
+        style={cutouts?.length ? { clipPath: cutoutClipPath(cutouts) } : undefined}
+      >
+        {video && (
+          // Muted + playsInline is what lets Chromium autoplay without a gesture,
+          // which an OBS browser source never gets.
+          <video className="ov-video" src={video} autoPlay muted loop playsInline aria-hidden="true" />
+        )}
+        {children}
+      </div>
     </div>
   );
 }

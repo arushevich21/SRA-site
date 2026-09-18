@@ -65,8 +65,10 @@
     linear-gradient(180deg, #0e1014 0%, #0a0b0e 100%);
 }
 
-/* Scenes composited over the game feed. The html/body part is inline in
+/* Anything OBS has underneath must reach the page: a fully transparent scene,
+   or one with windows cut through it. The html/body part is inline in
    OverlayCanvas for the same :has() reason as above. */
+.overlay-root.ov-see-through { background: transparent; }
 .overlay-root.ov-transparent,
 .overlay-root.ov-transparent .overlay-canvas { background: transparent; }
 
@@ -668,6 +670,89 @@
   text-wrap: balance;
 }
 .ov-message small { display: block; margin-top: calc(0.4 * var(--u)); font-family: var(--ov-mono); font-weight: 400; font-size: calc(0.85 * var(--u)); letter-spacing: 0.3em; color: var(--ov-txt-2); }
+
+/* ── Video bed ───────────────────────────────────────────────────────────── */
+/* The site's hero treatment (app/[sim]/page.tsx) adapted for a scene that has
+   type at the top as well as the bottom: the clip full-bleed under a carbon
+   veil that is heavy at both ends, lighter through the middle where the
+   panels carry their own bed, and climbs in from the left. The clip opens on
+   sky, so the top can't be lighter than this. */
+.ov-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+.ov-has-video .overlay-canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(10, 11, 14, 0.88) 0%, rgba(10, 11, 14, 0.62) 22%, rgba(10, 11, 14, 0.58) 70%, rgba(10, 11, 14, 0.94) 100%),
+    linear-gradient(90deg, rgba(10, 11, 14, 0.45) 0%, rgba(10, 11, 14, 0) 55%),
+    repeating-linear-gradient(-32deg, rgba(255, 255, 255, 0.018) 0 calc(0.12 * var(--u)), transparent calc(0.12 * var(--u)) calc(0.62 * var(--u)));
+}
+.ov-has-video .ov-frame { z-index: 1; }
+.ov-has-video .ov-ticker { z-index: 5; }
+/* Panels go glassy so the clip reads through; names and logos stay on a bed. */
+.ov-has-video .ov-thanks-panel { background: rgba(19, 22, 28, 0.78); }
+.ov-has-video .ov-partner-grid > div { background: rgba(14, 16, 20, 0.7); }
+
+/* ── Show: three camera windows ──────────────────────────────────────────── */
+/* .ov-cam is placed in canvas units to match the clip-path holes OverlayCanvas
+   cuts (ShowOverlay CAM_WINDOWS). .ov-show stays in grid flow (so the footer
+   keeps its row) but is not positioned, so each .ov-cam resolves against
+   .ov-frame — inset 0 on the canvas — i.e. canvas coordinates. The border is
+   drawn outside the window so the hole never eats it. */
+.ov-show { min-height: 0; }
+.ov-cam { position: absolute; }
+.ov-cam-frame {
+  position: absolute;
+  inset: calc(-0.2 * var(--u));
+  border: calc(0.2 * var(--u)) solid var(--ov-gold);
+  box-shadow: 0 calc(0.6 * var(--u)) calc(2.2 * var(--u)) rgba(0, 0, 0, 0.55);
+}
+.ov-cam-frame::before {
+  /* the sim stripe on the top edge, like the lockup rule */
+  content: '';
+  position: absolute;
+  top: calc(-0.2 * var(--u));
+  left: calc(-0.2 * var(--u));
+  width: calc(6 * var(--u));
+  height: calc(0.2 * var(--u));
+  background: var(--ov-acc);
+}
+.ov-cam-name {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: calc(1.1 * var(--u));
+  text-align: center;
+}
+.ov-cam-name b {
+  display: block;
+  font-family: var(--ov-display);
+  font-weight: 800;
+  font-size: calc(2.2 * var(--u));
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--ov-txt);
+}
+.ov-cam-name em { font-style: normal; color: var(--ov-gold); }
+.ov-cam-name span {
+  display: block;
+  margin-top: calc(0.45 * var(--u));
+  font-family: var(--ov-mono);
+  font-size: calc(0.7 * var(--u));
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ov-txt-3);
+}
 
 /* ── Partners slideshow (transparent, corner source) ─────────────────────── */
 .ov-slideshow { position: absolute; inset: 0; display: grid; place-items: center; }
