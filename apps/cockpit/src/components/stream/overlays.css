@@ -72,6 +72,21 @@
 .overlay-root.ov-transparent,
 .overlay-root.ov-transparent .overlay-canvas { background: transparent; }
 
+/* ── Track list: the calendar's cards with weather ──────────────────────── */
+/* Weather sits at the head's right edge, opposite the round and track. */
+.ov-round-weather {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(0.45 * var(--u));
+  font-family: var(--ov-mono);
+  font-size: calc(0.7 * var(--u));
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ov-txt-2);
+}
+.ov-round-weather img { height: calc(1.6 * var(--u)); width: auto; }
+
 /* ── Splash photo: circuit photography behind a panel ────────────────────── */
 /* The same splash art the hot-lap boards run behind TrackHeader / TrackList,
    darkened so type stays legible. A panel opts in with .has-splash and sets
@@ -142,6 +157,9 @@
 }
 .ov-ticker-track > span { display: inline-block; padding-right: 3em; }
 .ov-ticker-track i { font-style: normal; color: var(--ov-gold); padding: 0 0.6em; }
+.ov-ticker-tier em { font-style: normal; font-weight: 700; color: var(--ov-gold); letter-spacing: 0.14em; margin-right: 0.8em; }
+.ov-ticker .ov-flag { height: 0.85em; margin-right: 0.4em; vertical-align: -0.08em; }
+.ov-ticker .ov-star { margin-left: 0.3em; }
 @keyframes ov-ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
 /* Stand-alone marquee source (sponsors?mode=horizontal_marquee). */
@@ -173,6 +191,7 @@
   height: calc(3.6 * var(--u));
   object-fit: contain;
 }
+.ov-lockup-brand { display: block; height: calc(5.2 * var(--u)); width: auto; justify-self: end; }
 .ov-kicker {
   margin: 0 0 calc(0.15 * var(--u));
   font-family: var(--ov-mono);
@@ -205,9 +224,14 @@
   border: calc(0.12 * var(--u)) solid var(--ov-line-2);
   background: var(--ov-panel);
 }
+/* Children un-skew so type stays upright — except the gold division block,
+   which keeps the container's slant so both of its edges run diagonal and it
+   reads as one parallelogram. Only its text is un-skewed. */
 .ov-context > * { transform: skewX(9deg); }
+.ov-context > .ov-context-division { transform: none; }
+.ov-context-division > * { transform: skewX(9deg); }
 .ov-context-division {
-  padding: calc(0.5 * var(--u)) calc(1.1 * var(--u)) calc(0.5 * var(--u)) calc(1.3 * var(--u));
+  padding: calc(0.5 * var(--u)) calc(1.3 * var(--u)) calc(0.5 * var(--u)) calc(1.5 * var(--u));
   background: var(--ov-gold);
   color: #08090c;
   font-family: var(--ov-display);
@@ -219,6 +243,7 @@
   align-items: center;
   gap: calc(0.5 * var(--u));
 }
+.ov-context-division b { font-weight: inherit; }
 .ov-context-division small {
   font-family: var(--ov-mono);
   font-size: calc(0.62 * var(--u));
@@ -443,13 +468,17 @@
   text-overflow: ellipsis;
 }
 .ov-round-head strong.is-tba { color: var(--ov-txt-3); }
+/* The map is absolute inside the row so its size comes from the row itself —
+   a percentage max-height on a grid item does not reliably resolve, and on a
+   wide card the map would otherwise spill out at its natural size. */
 .ov-round-map {
+  position: relative;
   display: grid;
   place-items: center;
   min-height: 0;
   margin: calc(0.5 * var(--u)) 0;
 }
-.ov-round-map img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 calc(0.2 * var(--u)) calc(0.6 * var(--u)) rgba(0,0,0,0.5)); }
+.ov-round-map img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 calc(0.2 * var(--u)) calc(0.6 * var(--u)) rgba(0,0,0,0.5)); }
 .ov-round-map span { font-family: var(--ov-mono); font-size: calc(0.8 * var(--u)); letter-spacing: 0.3em; color: var(--ov-txt-3); }
 .ov-round-date {
   display: flex;
@@ -526,6 +555,63 @@
 .ov-fact span { font-family: var(--ov-mono); font-size: calc(0.62 * var(--u)); letter-spacing: 0.26em; text-transform: uppercase; color: var(--ov-txt-3); }
 .ov-fact b { font-family: var(--ov-display); font-weight: 700; font-size: calc(1.5 * var(--u)); line-height: 1; }
 .ov-fact.is-wide { grid-column: 1 / -1; }
+
+/* ── Schedule reveal ─────────────────────────────────────────────────────── */
+/* Timeline, driven by two custom properties RevealOverlay sets (both 0s when
+   ?intro=0): the clip alone for --ov-intro-hold, then over --ov-intro-move it
+   scales and translates into CLIP_FRAME while the ticker, lockup and facts
+   fade in around it. The clip is scaled rather than resized: both rectangles
+   are 16:9, so a single transform does it with no reflow. */
+.ov-reveal { position: absolute; inset: 0; }
+.ov-reveal-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform-origin: 0 0;
+  animation: ov-reveal-stage var(--ov-intro-move) cubic-bezier(0.4, 0, 0.2, 1) var(--ov-intro-hold) both;
+}
+.ov-reveal-stage video { display: block; width: 100%; height: 100%; object-fit: cover; }
+@keyframes ov-reveal-stage {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(var(--ov-clip-x), var(--ov-clip-y)) scale(var(--ov-clip-scale)); }
+}
+/* The gold frame the clip lands in; drawn outside the rect so it never
+   covers the picture. */
+.ov-reveal-frame {
+  position: absolute;
+  z-index: 2;
+  outline: calc(0.2 * var(--u)) solid var(--ov-gold);
+  box-shadow: 0 calc(0.6 * var(--u)) calc(2.2 * var(--u)) rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  animation: ov-fade-in 0.5s ease calc(var(--ov-intro-hold) + var(--ov-intro-move) * 0.6) both;
+}
+.ov-reveal .ov-frame { z-index: 3; }
+.ov-reveal .ov-ticker,
+.ov-reveal .ov-lockup,
+.ov-reveal .ov-foot {
+  opacity: 0;
+  animation: ov-fade-in 0.6s ease calc(var(--ov-intro-hold) + var(--ov-intro-move) * 0.3) both;
+}
+.ov-reveal-body { min-height: 0; }
+.ov-reveal-facts {
+  position: absolute;
+  right: calc(3 * var(--u));
+  width: calc(36 * var(--u));
+  display: flex;
+  flex-direction: column;
+  gap: calc(1.1 * var(--u));
+  opacity: 0;
+  animation: ov-slide-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) calc(var(--ov-intro-hold) + var(--ov-intro-move) * 0.5) both;
+}
+/* The map takes the rest of the column. Absolute inside a relative box so
+   its size comes from the box itself, not a percentage that may not resolve. */
+.ov-reveal-map { position: relative; flex: 1; min-height: 0; margin-top: calc(0.6 * var(--u)); }
+.ov-reveal-map img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 calc(0.3 * var(--u)) calc(1 * var(--u)) rgba(0,0,0,0.6)); }
+.ov-reveal-location { margin: calc(-0.4 * var(--u)) 0 0; font-size: calc(1 * var(--u)); color: var(--ov-txt-2); }
+.ov-fact-weather b { display: flex; align-items: center; gap: calc(0.7 * var(--u)); }
+.ov-fact-weather img { height: calc(2.2 * var(--u)); width: auto; }
+@keyframes ov-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ov-slide-in { from { opacity: 0; transform: translateX(calc(3 * var(--u))); } to { opacity: 1; transform: none; } }
 
 /* ── Race label (composited over ACC, top centre) ────────────────────────── */
 .ov-race-label {
@@ -644,20 +730,63 @@
 .ov-lower-third-body b { display: block; font-family: var(--ov-display); font-weight: 700; font-size: calc(1.35 * var(--u)); line-height: 1; text-transform: uppercase; }
 .ov-lower-third-body span { display: block; margin-top: calc(0.25 * var(--u)); font-family: var(--ov-mono); font-size: calc(0.6 * var(--u)); letter-spacing: 0.2em; text-transform: uppercase; color: var(--ov-txt-3); }
 
-/* ── Sponsors / supporters ───────────────────────────────────────────────── */
+/* ── Sponsors / holding screen ───────────────────────────────────────────── */
+/* The people are on the ticker; the middle is left to the clip. The partner
+   strip sits at the foot of the content area, one row of logos on a glass
+   bed, directly above the headline. */
 .ov-thanks {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: calc(1.6 * var(--u));
+  align-content: end;
+  gap: calc(1.4 * var(--u));
   min-height: 0;
 }
-.ov-thanks-panel { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: calc(0.8 * var(--u)); min-height: 0; padding: calc(1.1 * var(--u)) calc(1.3 * var(--u)); background: var(--ov-panel); border: calc(0.12 * var(--u)) solid var(--ov-line); }
-.ov-thanks-panel h2 { margin: 0; font-family: var(--ov-mono); font-size: calc(0.72 * var(--u)); letter-spacing: 0.32em; text-transform: uppercase; color: var(--ov-gold); }
-.ov-partner-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: calc(0.6 * var(--u)); min-height: 0; }
-.ov-partner-grid > div { display: grid; place-items: center; padding: calc(0.8 * var(--u)); background: var(--ov-carbon-2); min-height: 0; }
-.ov-partner-grid img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.ov-supporter-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: space-evenly; gap: calc(0.25 * var(--u)) calc(1 * var(--u)); min-height: 0; overflow: hidden; }
-.ov-supporter-list span { font-size: calc(0.95 * var(--u)); font-weight: 600; color: var(--ov-txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Sign-off variant: headline up under the lockup, strip stays at the foot. */
+.ov-thanks.is-headline-top { align-content: space-between; }
+.ov-thanks.is-headline-top .ov-message { padding-top: calc(1.2 * var(--u)); }
+/* The three tiers stack in one cell and take turns: each fades in over the
+   first ~3% of the cycle, holds for its third, fades out, and waits. */
+.ov-partner-cycle { display: grid; }
+.ov-partner-cycle > .ov-partner-strip {
+  grid-area: 1 / 1;
+  opacity: 0;
+  animation: ov-partner-cycle var(--ov-cycle-total) infinite both;
+  animation-delay: var(--ov-cycle-delay);
+}
+@keyframes ov-partner-cycle {
+  0% { opacity: 0; }
+  3% { opacity: 1; }
+  30.5% { opacity: 1; }
+  33.3% { opacity: 0; }
+  100% { opacity: 0; }
+}
+.ov-partner-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: calc(1.4 * var(--u));
+  padding: calc(0.7 * var(--u)) calc(1.3 * var(--u));
+  background: rgba(19, 22, 28, 0.78);
+  border: calc(0.12 * var(--u)) solid var(--ov-line);
+  border-left: calc(0.2 * var(--u)) solid var(--ov-gold);
+}
+.ov-partner-strip h2 {
+  margin: 0;
+  font-family: var(--ov-mono);
+  font-size: calc(0.72 * var(--u));
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ov-gold);
+  width: calc(9 * var(--u));
+}
+.ov-partner-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: calc(0.5 * var(--u)); min-width: 0; }
+.ov-partner-row > div { display: grid; place-items: center; height: calc(4.6 * var(--u)); padding: calc(0.5 * var(--u)) calc(0.6 * var(--u)); background: rgba(14, 16, 20, 0.7); }
+/* Every logo gets the same box and object-fit centres it inside, so a row
+   lines up whatever the artwork's aspect. (A percentage max-height on a
+   grid item doesn't reliably resolve, which is how logos were overflowing
+   their cells.) The width cap keeps a three-logo row of word-marks from
+   dwarfing a badge. */
+.ov-partner-row img { display: block; width: 100%; max-width: calc(17 * var(--u)); height: calc(3.6 * var(--u)); object-fit: contain; }
+.ov-star { font-style: normal; font-weight: 400; color: var(--ov-gold); margin-left: 0.35em; }
 .ov-message {
   margin: 0;
   text-align: center;
@@ -689,17 +818,16 @@
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 0;
+  /* above the clip (0), below the frame (2) — both siblings, so this has to
+     be explicit or DOM order puts the video on top of its own veil */
+  z-index: 1;
   background:
     linear-gradient(180deg, rgba(10, 11, 14, 0.88) 0%, rgba(10, 11, 14, 0.62) 22%, rgba(10, 11, 14, 0.58) 70%, rgba(10, 11, 14, 0.94) 100%),
     linear-gradient(90deg, rgba(10, 11, 14, 0.45) 0%, rgba(10, 11, 14, 0) 55%),
     repeating-linear-gradient(-32deg, rgba(255, 255, 255, 0.018) 0 calc(0.12 * var(--u)), transparent calc(0.12 * var(--u)) calc(0.62 * var(--u)));
 }
-.ov-has-video .ov-frame { z-index: 1; }
+.ov-has-video .ov-frame { z-index: 2; }
 .ov-has-video .ov-ticker { z-index: 5; }
-/* Panels go glassy so the clip reads through; names and logos stay on a bed. */
-.ov-has-video .ov-thanks-panel { background: rgba(19, 22, 28, 0.78); }
-.ov-has-video .ov-partner-grid > div { background: rgba(14, 16, 20, 0.7); }
 
 /* ── Show: three camera windows ──────────────────────────────────────────── */
 /* .ov-cam is placed in canvas units to match the clip-path holes OverlayCanvas
@@ -714,16 +842,6 @@
   inset: calc(-0.2 * var(--u));
   border: calc(0.2 * var(--u)) solid var(--ov-gold);
   box-shadow: 0 calc(0.6 * var(--u)) calc(2.2 * var(--u)) rgba(0, 0, 0, 0.55);
-}
-.ov-cam-frame::before {
-  /* the sim stripe on the top edge, like the lockup rule */
-  content: '';
-  position: absolute;
-  top: calc(-0.2 * var(--u));
-  left: calc(-0.2 * var(--u));
-  width: calc(6 * var(--u));
-  height: calc(0.2 * var(--u));
-  background: var(--ov-acc);
 }
 .ov-cam-name {
   position: absolute;
@@ -744,6 +862,46 @@
   color: var(--ov-txt);
 }
 .ov-cam-name em { font-style: normal; color: var(--ov-gold); }
+/* Livery reveal: the small camera column scales the name plate down; the
+   team plate is a gold-outlined slot above the livery stage. */
+.ov-team-plate {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: calc(0.14 * var(--u)) solid var(--ov-gold);
+  background: rgba(8, 9, 12, 0.55);
+  box-shadow: 0 calc(0.4 * var(--u)) calc(1.4 * var(--u)) rgba(0, 0, 0, 0.45);
+}
+.ov-team-plate b {
+  font-family: var(--ov-display);
+  font-weight: 800;
+  font-size: calc(2.6 * var(--u));
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--ov-txt);
+  white-space: nowrap;
+}
+.ov-cam-small .ov-cam-name { margin-top: calc(0.7 * var(--u)); }
+.ov-cam-small .ov-cam-name b { font-size: calc(1.35 * var(--u)); }
+.ov-cam-small .ov-cam-name span { margin-top: calc(0.3 * var(--u)); font-size: calc(0.55 * var(--u)); }
+/* The chat window: same frame, thinner, with a small tag so the crew knows
+   what goes there. */
+.ov-chat .ov-cam-frame { inset: calc(-0.14 * var(--u)); border-width: calc(0.14 * var(--u)); box-shadow: 0 calc(0.4 * var(--u)) calc(1.4 * var(--u)) rgba(0, 0, 0, 0.45); }
+.ov-chat-tag {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: calc(0.45 * var(--u));
+  padding: calc(0.14 * var(--u)) calc(0.55 * var(--u)) calc(0.18 * var(--u));
+  background: var(--ov-gold);
+  color: #08090c;
+  font-family: var(--ov-mono);
+  font-size: calc(0.58 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
 .ov-cam-name span {
   display: block;
   margin-top: calc(0.45 * var(--u));
@@ -760,6 +918,7 @@
 @keyframes ov-slide { 0% { opacity: 0; } 1% { opacity: 1; } 7.5% { opacity: 1; } 9% { opacity: 0; } 100% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .ov-ticker-track, .ov-live-dot, .ov-slideshow img { animation: none; }
-  .ov-slideshow img:first-child { opacity: 1; }
+  .ov-ticker-track, .ov-live-dot, .ov-slideshow img, .ov-partner-cycle > .ov-partner-strip { animation: none; }
+  .ov-reveal-stage, .ov-reveal-frame, .ov-reveal .ov-ticker, .ov-reveal .ov-lockup, .ov-reveal .ov-foot, .ov-reveal-facts { animation-duration: 0s; animation-delay: 0s; }
+  .ov-slideshow img:first-child, .ov-partner-cycle > .ov-partner-strip:first-child { opacity: 1; }
 }

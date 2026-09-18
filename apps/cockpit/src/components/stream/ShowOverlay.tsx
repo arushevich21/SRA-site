@@ -19,6 +19,11 @@ import type { Commentator } from './commentators';
 // width: 30u wide, 2u apart, starting at the frame's 3u left padding.
 // At 2560×1440 (1u = 25.6px): x 76.8 / 896 / 1715.2, y 486.4, 768×432.
 export const CAM_WINDOWS = [3, 35, 67].map((x) => ({ x, y: 19, w: 30, h: 16.875 }));
+// The live-chat window, bottom right under the third camera, same frame
+// treatment at a smaller size. At 2560×1440: x 1715.2, y 1062.4, 768×268.8.
+export const CHAT_WINDOW = { x: 67, y: 41.5, w: 30, h: 10.5 };
+// Every hole OverlayCanvas cuts for this scene.
+export const SHOW_WINDOWS = [...CAM_WINDOWS, CHAT_WINDOW];
 
 export function ShowOverlay({
   championship,
@@ -64,7 +69,20 @@ export function ShowOverlay({
         })}
       </div>
 
-      <OverlayFoot left={<>{seriesName(championship)}</>} right="discord.gg/SimRacingAlliance" />
+      <div
+        className="ov-cam ov-chat"
+        style={{
+          left: `calc(${CHAT_WINDOW.x} * var(--u))`,
+          top: `calc(${CHAT_WINDOW.y} * var(--u))`,
+          width: `calc(${CHAT_WINDOW.w} * var(--u))`,
+          height: `calc(${CHAT_WINDOW.h} * var(--u))`,
+        }}
+      >
+        <div className="ov-cam-frame" />
+        <span className="ov-chat-tag">Live chat</span>
+      </div>
+
+      <OverlayFoot left="discord.gg/SimRacingAlliance" />
     </OverlayFrame>
   );
 }
