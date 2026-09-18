@@ -2,7 +2,7 @@ import type { ChampionshipContent } from '@/content/championships';
 import { eventDateTimeParts } from '@/lib/event-time';
 import type { StreamRound } from '@/lib/stream/overlay-data';
 import { OverlayFoot, OverlayFrame, OverlayLockup, TrackFlag } from './OverlayPrimitives';
-import { trackFacts, trackMapUrl } from './track-maps';
+import { trackFacts, trackMapUrl, trackPhotoUrl } from './track-maps';
 
 export function TrackOverlay({
   championship,
@@ -16,6 +16,7 @@ export function TrackOverlay({
   round: StreamRound | null;
 }) {
   const map = trackMapUrl(track);
+  const photo = trackPhotoUrl(track);
   const facts = trackFacts(track);
   const when = round ? eventDateTimeParts(round.startsAt, 'America/New_York') : null;
 
@@ -29,7 +30,11 @@ export function TrackOverlay({
         round={round}
       />
 
-      <div className="ov-track">
+      <div className={`ov-track ${photo ? 'has-splash' : ''}`}>
+        {photo && (
+          // eslint-disable-next-line @next/next/no-img-element -- static splash art
+          <img className="ov-splash" src={photo} alt="" />
+        )}
         <div className="ov-track-map">
           {map ? (
             // eslint-disable-next-line @next/next/no-img-element -- static map art

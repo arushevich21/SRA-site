@@ -11,6 +11,8 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import process from 'node:process';
+import console from 'node:console';
 
 const HERE = import.meta.dirname;
 const src = process.argv[2];

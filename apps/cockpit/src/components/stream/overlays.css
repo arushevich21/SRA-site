@@ -1,8 +1,11 @@
 /* ── SRA broadcast overlays ─────────────────────────────────────────────────
-   Rendered inside OBS browser sources (1920×1080 or 2560×1440, 16:9). Every
-   dimension is in canvas units (--u) so both resolutions produce the same picture, and
-   nothing is thinner than ~2px at 1080p — hairlines don't survive stream
-   compression. Colours are the site's own tokens (globals.css @theme).
+   Rendered inside OBS browser sources at 2560×1440 (16:9) — the native canvas
+   for every scene. A 1080p stream is OBS downscaling that same render, not a
+   second layout, so nothing here is authored twice. Every dimension is in
+   canvas units (--u), which keeps the picture identical at any source size;
+   the hairline floor is 0.12u, which reads at 1440p and still lands at ~2px
+   after the downscale — thinner than that does not survive stream
+   compression. Colours are the site’s own tokens (globals.css @theme).
    ───────────────────────────────────────────────────────────────────────── */
 
 .overlay-root {
@@ -28,7 +31,7 @@
   --ov-skew: skewX(-9deg);
   /* One canvas unit = 1% of canvas width. The canvas is the largest 16:9
      rectangle the viewport holds, so a short preview window scales the whole
-     picture instead of crushing rows; OBS at 1920×1080 is exactly 1u = 19.2px. */
+     picture instead of crushing rows; OBS at 2560×1440 is exactly 1u = 25.6px. */
   --u: min(1vw, 1.7778vh);
 
   position: relative;
@@ -44,13 +47,10 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Overlay routes share the root layout; the site chrome is hidden rather than
-   re-implementing a second layout tree. OBS (Chromium) supports :has. */
-body:has(.overlay-root) > header,
-body:has(.overlay-root) > footer,
-body:has(.overlay-root) > div.border-t { display: none !important; }
-body:has(.overlay-root) > main { padding-top: 0 !important; }
-body:has(.overlay-root) { background: var(--ov-carbon, #0a0b0e) !important; }
+/* Overlay routes share the root layout. The rules that switch the site chrome
+   off live in OverlayCanvas as an inline <style>, not here — OBS 30's browser
+   source (Chromium 103) can't evaluate :has(), so they can't be guarded on
+   .overlay-root from a global stylesheet. */
 
 .overlay-canvas {
   position: relative;
@@ -65,17 +65,32 @@ body:has(.overlay-root) { background: var(--ov-carbon, #0a0b0e) !important; }
     linear-gradient(180deg, #0e1014 0%, #0a0b0e 100%);
 }
 
-/* Scenes composited over the game feed. */
+/* Scenes composited over the game feed. The html/body part is inline in
+   OverlayCanvas for the same :has() reason as above. */
 .overlay-root.ov-transparent,
 .overlay-root.ov-transparent .overlay-canvas { background: transparent; }
-body:has(.ov-transparent) { background: transparent !important; }
-/* The site's fixed body::before/::after backdrop (globals.css) would paint
-   behind a transparent source — that's the game feed's space. */
-body:has(.ov-transparent)::before,
-body:has(.ov-transparent)::after,
-html:has(.ov-transparent) { background: transparent !important; }
-body:has(.ov-transparent)::before,
-body:has(.ov-transparent)::after { display: none; }
+
+/* ── Splash photo: circuit photography behind a panel ────────────────────── */
+/* The same splash art the hot-lap boards run behind TrackHeader / TrackList,
+   darkened so type stays legible. A panel opts in with .has-splash and sets
+   --ov-splash-scrim for how much of the photo survives; whatever the panel
+   actually says has to sit at z-index 2 or above. */
+.has-splash { position: relative; --ov-splash-scrim: 0.75; }
+.ov-splash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+.has-splash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 11, 14, var(--ov-splash-scrim));
+  z-index: 1;
+}
 
 /* ── Frame: the safe area every full-screen scene lays out inside ────────── */
 .ov-frame {
@@ -397,6 +412,13 @@ body:has(.ov-transparent)::after { display: none; }
   background: var(--ov-panel);
   border: calc(0.12 * var(--u)) solid var(--ov-line);
 }
+
+/* Calendar cards carry mono text and white map art over a small crop, so the
+   scrim runs heavier than the track hero's. */
+.ov-round { --ov-splash-scrim: 0.82; }
+.ov-round-head,
+.ov-round-map,
+.ov-round-date { position: relative; z-index: 2; }
 .ov-round.is-current { border-color: var(--ov-gold); box-shadow: 0 0 0 calc(0.12 * var(--u)) rgba(230, 181, 61, 0.35), 0 0 calc(2.5 * var(--u)) rgba(230, 181, 61, 0.18); }
 .ov-round.is-past { opacity: 0.55; }
 .ov-round-head { display: flex; align-items: baseline; gap: calc(0.6 * var(--u)); min-width: 0; }
@@ -440,6 +462,7 @@ body:has(.ov-transparent)::after { display: none; }
 .ov-round-date span { color: var(--ov-txt-3); }
 .ov-round-tag {
   position: absolute;
+  z-index: 2;
   top: calc(-0.12 * var(--u));
   right: calc(0.9 * var(--u));
   padding: calc(0.18 * var(--u)) calc(0.6 * var(--u)) calc(0.22 * var(--u));
@@ -459,6 +482,14 @@ body:has(.ov-transparent)::after { display: none; }
   gap: calc(1.6 * var(--u));
   min-height: 0;
 }
+/* With a photo the block is one framed hero, the way TrackHeader is on the
+   site: map and facts sit directly on the darkened circuit. */
+.ov-track.has-splash {
+  padding: calc(1.6 * var(--u));
+  border: calc(0.12 * var(--u)) solid var(--ov-line);
+}
+.ov-track-map,
+.ov-track-facts { position: relative; z-index: 2; }
 .ov-track-map {
   display: grid;
   place-items: center;
@@ -467,6 +498,7 @@ body:has(.ov-transparent)::after { display: none; }
   background: var(--ov-panel);
   border: calc(0.12 * var(--u)) solid var(--ov-line);
 }
+.ov-track.has-splash .ov-track-map { background: transparent; border-color: transparent; }
 .ov-track-map img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 calc(0.4 * var(--u)) calc(1.2 * var(--u)) rgba(0,0,0,0.6)); }
 .ov-track-facts { display: flex; flex-direction: column; justify-content: center; gap: calc(1.1 * var(--u)); min-width: 0; }
 .ov-track-name {

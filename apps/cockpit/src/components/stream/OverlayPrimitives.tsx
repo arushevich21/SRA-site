@@ -6,26 +6,51 @@ import { SUPPORTERS } from '@/content/supporters';
 import { shortTrackName } from '@/components/RoundCells';
 import { countryFlagUrl } from '@/lib/country-flag';
 import { trackFacts } from './track-maps';
+import { OverlayRefresh } from './OverlayRefresh';
+import type { OverlayRefreshPlan } from '@/lib/stream/refresh';
 
 // The pieces every full-screen scene is assembled from. Layout lives in
 // overlays.css; these only decide what goes where.
+
+// Overlay routes share the site's root layout, and the chrome is switched off
+// from here rather than by a second layout tree. It is an inline <style>, not
+// a `body:has(.overlay-root)` rule in overlays.css, because OBS 30's browser
+// source is Chromium 103 and :has() only arrived in 105 — under it the nav bar
+// rendered above every scene and transparent scenes got an opaque body. The
+// rules are unguarded, which is fine: this element only exists on /overlay.
+const SITE_CHROME_OFF = `
+body > header, body > footer, body > div.border-t { display: none !important; }
+body > main { padding-top: 0 !important; }
+body { background: #0a0b0e !important; }
+`;
+// The site's fixed body::before/::after backdrop (globals.css) would paint
+// behind a transparent source — that's the game feed's space.
+const TRANSPARENT_BODY = `
+html, body { background: transparent !important; }
+body::before, body::after { display: none !important; }
+`;
 
 export function OverlayCanvas({
   children,
   transparent = false,
   opacity,
   className = '',
+  refresh,
 }: {
   children: ReactNode;
   transparent?: boolean;
   opacity?: number;
   className?: string;
+  // When this source re-fetches itself; see OverlayRefresh.
+  refresh?: OverlayRefreshPlan;
 }) {
   return (
     <div
       className={`overlay-root ${transparent ? 'ov-transparent' : ''} ${className}`}
       style={opacity === undefined ? undefined : { opacity }}
     >
+      <style>{SITE_CHROME_OFF + (transparent ? TRANSPARENT_BODY : '')}</style>
+      {refresh && <OverlayRefresh at={refresh.at} every={refresh.every} />}
       <div className="overlay-canvas">{children}</div>
     </div>
   );

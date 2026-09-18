@@ -15,6 +15,13 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import process from 'node:process';
+import console from 'node:console';
+import { Buffer } from 'node:buffer';
+import { setTimeout } from 'node:timers';
+// fetch is a Node 18+ global; named here so the script's lint config (no
+// browser or node globals declared) sees it the same way it sees process.
+const { fetch } = globalThis;
 import path from 'node:path';
 import WebSocket from 'ws';
 

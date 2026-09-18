@@ -1,12 +1,13 @@
-// Who's in the booth. There is no live source yet — the plan is for SRA-Bot
-// to POST Discord voice-channel snapshots (two booth channels, one per
-// concurrent broadcast) to a site endpoint and for this to read the roster
-// for the active stream, keeping the last good snapshot across OBS refreshes.
-// Until then the operator sets the booth on the browser-source URL:
+// Who's in the booth comes from the division's commentary voice channel
+// (lib/stream/booths.ts, written by SRA-Bot). This parser is the explicit
+// override for when the operator wants to name the booth on the
+// browser-source URL instead — a pre-produced segment, a guest who isn't on
+// Discord:
 //
 //   /overlay/commentators/1?names=Alex Mercer|Lead commentator,Jordan Blake|Analyst
 //
-// Name and role separated by "|", people by ",". Role is optional.
+// Name and role separated by "|", people by ",". Role is optional. Absent
+// ?names= means the voice channel, never a typed fallback.
 
 export type Commentator = { name: string; role: string | null };
 

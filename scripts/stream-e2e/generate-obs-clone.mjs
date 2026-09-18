@@ -15,6 +15,13 @@ if (!input || !output) {
   throw new Error('Usage: node generate-obs-clone.mjs --input <OBS JSON> --output <clone JSON> [--base <URL>]');
 }
 
+// The overlays are authored for a 2560×1440 native canvas; a 1080p stream is
+// OBS downscaling that render, never a second layout. The clone resizes every
+// browser source to match, and compensates each scene item's scale so the
+// on-canvas geometry is untouched — only the render resolution goes up.
+const NATIVE_WIDTH = 2560;
+const NATIVE_HEIGHT = 1440;
+
 const document = JSON.parse(await fs.readFile(input, 'utf8'));
 const overlay = (route) => `${base}/overlay/${route}`;
 const mock = (kind) => `${base}/stream-mocks/external.html?kind=${kind}`;
@@ -46,12 +53,42 @@ function localUrl(source) {
 }
 
 let browserSourceCount = 0;
+// name -> how much every scene item of that source must shrink to stay put.
+const rescaled = new Map();
 for (const source of document.sources ?? []) {
   if (source.id !== 'browser_source') continue;
   source.settings.url = localUrl(source);
+
+  const previousWidth = source.settings.width ?? NATIVE_WIDTH;
+  const previousHeight = source.settings.height ?? NATIVE_HEIGHT;
+  source.settings.width = NATIVE_WIDTH;
+  source.settings.height = NATIVE_HEIGHT;
+  if (previousWidth !== NATIVE_WIDTH || previousHeight !== NATIVE_HEIGHT) {
+    rescaled.set(source.name, {
+      x: previousWidth / NATIVE_WIDTH,
+      y: previousHeight / NATIVE_HEIGHT,
+    });
+  }
   browserSourceCount += 1;
+}
+
+// A scene item with bounds is already sized by its bounding box, so a bigger
+// source only sharpens it. Everything else is placed by `scale`, which counts
+// the source's own pixels and so has to come down by the same ratio.
+let rescaledItemCount = 0;
+for (const source of document.sources ?? []) {
+  for (const item of source.settings?.items ?? []) {
+    const ratio = rescaled.get(item.name);
+    if (!ratio) continue;
+    if ((item.bounds_type ?? 0) !== 0) continue;
+    item.scale = { x: (item.scale?.x ?? 1) * ratio.x, y: (item.scale?.y ?? 1) * ratio.y };
+    rescaledItemCount += 1;
+  }
 }
 
 await fs.mkdir(path.dirname(output), { recursive: true });
 await fs.writeFile(output, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
-process.stdout.write(`Wrote ${output} with ${browserSourceCount} local browser-source URLs using ${base}\n`);
+process.stdout.write(
+  `Wrote ${output} with ${browserSourceCount} local browser-source URLs using ${base}; ` +
+    `${rescaled.size} resized to ${NATIVE_WIDTH}×${NATIVE_HEIGHT} (${rescaledItemCount} scene items rescaled)\n`,
+);
