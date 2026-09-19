@@ -22,9 +22,9 @@ export const CAM_WINDOWS = [3, 35, 67].map((x) => ({ x, y: 19, w: 30, h: 16.875 
 // The live-chat window, bottom right under the third camera: it takes every
 // row between that camera's name plate and the footer, with its tag turned
 // on its side so none of the height goes to the label.
-// At 2560×1440: x 1715.2, y 1036.8, 768×230.4 — sized to what the
+// At 2560×1440: x 1715.2, y 1162.2, 768×230.4 — sized to what the
 // StreamElements widget actually paints, so no dead band under the messages.
-export const CHAT_WINDOW = { x: 67, y: 40.5, w: 30, h: 9 };
+export const CHAT_WINDOW = { x: 67, y: 45.4, w: 30, h: 9 };
 // Every hole OverlayCanvas cuts for this scene.
 export const SHOW_WINDOWS = [...CAM_WINDOWS, CHAT_WINDOW];
 
