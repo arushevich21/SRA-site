@@ -55,7 +55,7 @@ export function OverlayCanvas({
   cutouts,
   video,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   transparent?: boolean;
   opacity?: number;
   className?: string;

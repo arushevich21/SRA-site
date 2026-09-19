@@ -50,6 +50,8 @@ import { eventInstant, hasEventTime } from '@/lib/event-time';
 //   /overlay/partners                      transparent logo slideshow
 //   /overlay/show?title=...&names=A,B,C    talk-show bed: three camera windows
 //     cut through the page (cameras go underneath in OBS), names left to right
+//   /overlay/backdrop[?video=1]   the branded bed on its own, nothing on it:
+//     a background for guest clips (?video=1 for the ACC hero clip instead)
 //   /overlay/livery?team=Team Name[&names=A,B,C]   livery reveal bed: three
 //     camera windows down the left, team plate over a clear stage for the shots
 //   /overlay/reveal/5?track=Valencia&weather=wet   schedule reveal: the circuit's
@@ -238,6 +240,11 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
         />
       </OverlayCanvas>
     );
+  }
+
+  if (scene === 'backdrop') {
+    const video = query.video && query.video !== '0' ? '/videos/acc_hero.mov' : undefined;
+    return <OverlayCanvas refresh={refresh} video={video} />;
   }
 
   if (scene === 'livery') {
