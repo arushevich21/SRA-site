@@ -77,7 +77,7 @@ export function LiveryOverlay({
         })}
       </div>
 
-      <OverlayFoot left="discord.gg/SimRacingAlliance" right="sra.gg" />
+      <OverlayFoot left="discord.gg/SimRacingAlliance" />
     </OverlayFrame>
   );
 }
