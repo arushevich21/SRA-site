@@ -26,8 +26,8 @@ export function SponsorsOverlay({
     <OverlayFrame ticker>
       <OverlayLockup
         championship={championship}
-        title={lines.length ? 'Sim Racing Alliance' : 'Thank you'}
-        subtitle="To our partners, and everyone supporting SRA on Discord and Patreon · ★ subscribed on both"
+        title={lines.length ? 'Sponsors' : 'Thank you'}
+        subtitle="Thanks to our partners, and everyone supporting SRA on Discord and Patreon"
       />
 
       <div className={`ov-thanks ${headline === 'top' ? 'is-headline-top' : ''}`}>
