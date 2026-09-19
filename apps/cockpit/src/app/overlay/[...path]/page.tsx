@@ -50,6 +50,8 @@ import { eventInstant, hasEventTime } from '@/lib/event-time';
 //   /overlay/partners                      transparent logo slideshow
 //   /overlay/show?title=...&names=A,B,C    talk-show bed: three camera windows
 //     cut through the page (cameras go underneath in OBS), names left to right
+//   /overlay/music?v=VIDEO_ID   a YouTube video looping in an iframe, for a
+//     background-music browser source (YouTube refuses embeds with no referrer)
 //   /overlay/backdrop[?video=1]   the branded bed on its own, nothing on it:
 //     a background for guest clips (?video=1 for the ACC hero clip instead)
 //   /overlay/livery?team=Team Name[&names=A,B,C]   livery reveal bed: three
@@ -238,6 +240,17 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
           weather={parseWeather(query.weather)}
           intro={query.intro !== '0'}
         />
+      </OverlayCanvas>
+    );
+  }
+
+  if (scene === 'music') {
+    const v = query.v?.trim();
+    if (!v || !/^[A-Za-z0-9_-]{6,20}$/.test(v)) notFound();
+    const src = `https://www.youtube-nocookie.com/embed/${v}?autoplay=1&loop=1&playlist=${v}&controls=0&rel=0`;
+    return (
+      <OverlayCanvas transparent className="ov-music">
+        <iframe src={src} title="Background music" allow="autoplay; encrypted-media" />
       </OverlayCanvas>
     );
   }
