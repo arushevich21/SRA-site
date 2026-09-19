@@ -890,9 +890,11 @@
 .ov-chat .ov-cam-frame { inset: calc(-0.14 * var(--u)); border-width: calc(0.14 * var(--u)); box-shadow: 0 calc(0.4 * var(--u)) calc(1.4 * var(--u)) rgba(0, 0, 0, 0.45); }
 .ov-chat-tag {
   position: absolute;
-  bottom: 100%;
-  left: 0;
-  margin-bottom: calc(0.45 * var(--u));
+  top: 0;
+  right: 100%;
+  margin-right: calc(0.45 * var(--u));
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
   padding: calc(0.14 * var(--u)) calc(0.55 * var(--u)) calc(0.18 * var(--u));
   background: var(--ov-gold);
   color: #08090c;
