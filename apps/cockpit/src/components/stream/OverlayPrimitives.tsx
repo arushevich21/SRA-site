@@ -207,7 +207,7 @@ export function SponsorTicker() {
   );
   return (
     <div className="ov-ticker">
-      <div className="ov-ticker-label">THANK YOU</div>
+      <div className="ov-ticker-label">SPONSORS</div>
       <div className="ov-ticker-window">
         <div className="ov-ticker-track">
           <span>{message}</span>
