@@ -206,7 +206,7 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
         <SponsorsOverlay
           championship={championship}
           message={query.footer_message}
-          headline={query.headline === 'top' ? 'top' : 'bottom'}
+          headline={query.headline === 'top' || query.headline === 'middle' ? query.headline : 'bottom'}
         />
       </OverlayCanvas>
     );
