@@ -17,8 +17,9 @@ export function SponsorsOverlay({
   championship: ChampionshipContent;
   message?: string;
   // Where the headline sits: over the partner strip at the foot of the scene,
-  // or up under the lockup rule with the clip between it and the strip.
-  headline?: 'top' | 'bottom';
+  // up under the lockup rule with the clip between it and the strip, or
+  // centred in the open space when there's no clip (the offline card).
+  headline?: 'top' | 'middle' | 'bottom';
 }) {
   const lines = message?.split('|').map((s) => s.trim()).filter(Boolean) ?? [];
 
@@ -30,7 +31,7 @@ export function SponsorsOverlay({
         subtitle="Thanks to our partners, and everyone supporting SRA on Discord and Patreon"
       />
 
-      <div className={`ov-thanks ${headline === 'top' ? 'is-headline-top' : ''}`}>
+      <div className={`ov-thanks ${headline === 'top' ? 'is-headline-top' : headline === 'middle' ? 'is-headline-middle' : ''}`}>
         {lines.length > 0 && (
           <p className="ov-message">
             {lines[0]}

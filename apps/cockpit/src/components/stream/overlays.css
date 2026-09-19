@@ -743,6 +743,10 @@
 /* Sign-off variant: headline up under the lockup, strip stays at the foot. */
 .ov-thanks.is-headline-top { align-content: space-between; }
 .ov-thanks.is-headline-top .ov-message { padding-top: calc(1.2 * var(--u)); }
+/* Offline variant: no clip behind it, so the headline is centred in the open
+   space above the strip. */
+.ov-thanks.is-headline-middle { grid-template-rows: minmax(0, 1fr) auto; align-content: stretch; }
+.ov-thanks.is-headline-middle .ov-message { align-self: center; }
 /* The three tiers stack in one cell and take turns: each fades in over the
    first ~3% of the cycle, holds for its third, fades out, and waits. */
 .ov-partner-cycle { display: grid; }
