@@ -25,7 +25,7 @@ import { SponsorsOverlay } from '@/components/stream/SponsorsOverlay';
 import { PartnersOverlay } from '@/components/stream/PartnersOverlay';
 import { CommentatorsOverlay } from '@/components/stream/CommentatorsOverlay';
 import { SHOW_WINDOWS, ShowOverlay } from '@/components/stream/ShowOverlay';
-import { LIVERY_WINDOWS, LiveryOverlay, SHOW_TITLE } from '@/components/stream/LiveryOverlay';
+import { LIVERY_WINDOWS, LiveryOverlay } from '@/components/stream/LiveryOverlay';
 import { RevealOverlay, parseWeather } from '@/components/stream/RevealOverlay';
 import { TrackListOverlay, parseRoundRange, parseTrackList } from '@/components/stream/TrackListOverlay';
 import { parseCommentators } from '@/components/stream/commentators';
@@ -252,9 +252,9 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
       <OverlayCanvas refresh={refresh} cutouts={LIVERY_WINDOWS}>
         <LiveryOverlay
           championship={championship}
-          title={query.title?.trim() || SHOW_TITLE}
+          // The title row stays empty so the team-name source can sit in it.
+          title={query.title?.trim() || ' '}
           subtitle={query.subtitle?.trim() || undefined}
-          team={query.team?.trim() || undefined}
           hosts={parseCommentators(query.names)}
         />
       </OverlayCanvas>

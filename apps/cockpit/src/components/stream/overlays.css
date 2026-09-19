@@ -862,26 +862,7 @@
   color: var(--ov-txt);
 }
 .ov-cam-name em { font-style: normal; color: var(--ov-gold); }
-/* Livery reveal: the small camera column scales the name plate down; the
-   team plate is a gold-outlined slot above the livery stage. */
-.ov-team-plate {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  border: calc(0.14 * var(--u)) solid var(--ov-gold);
-  background: rgba(8, 9, 12, 0.55);
-  box-shadow: 0 calc(0.4 * var(--u)) calc(1.4 * var(--u)) rgba(0, 0, 0, 0.45);
-}
-.ov-team-plate b {
-  font-family: var(--ov-display);
-  font-weight: 800;
-  font-size: calc(2.6 * var(--u));
-  line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
-  color: var(--ov-txt);
-  white-space: nowrap;
-}
+/* Livery reveal: the small camera column scales the name plate down. */
 .ov-cam-small .ov-cam-name { margin-top: calc(0.7 * var(--u)); }
 .ov-cam-small .ov-cam-name b { font-size: calc(1.35 * var(--u)); }
 .ov-cam-small .ov-cam-name span { margin-top: calc(0.3 * var(--u)); font-size: calc(0.55 * var(--u)); }
