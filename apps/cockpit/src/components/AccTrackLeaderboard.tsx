@@ -49,6 +49,7 @@ function toHotLapEntry(entry: AccBoardEntry): HotLapBoardEntry {
     bestLapMs: entry.bestLapMs,
     bestLap: entry.bestLap,
     sectorsMs: entry.sectorsMs,
+    bestSectorsMs: entry.bestSectorsMs ?? null,
     manufacturerIconName: iconName,
     manufacturerLogoUrl:
       !iconName && entry.carModel != null ? accCarManufacturerLogoUrl(entry.carModel) : null,

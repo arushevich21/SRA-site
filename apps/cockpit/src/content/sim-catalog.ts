@@ -25,6 +25,14 @@ export function accTrackKeyForDisplay(displayName: string): string | null {
   return t?.accTrackKey ?? null;
 }
 
+// The reverse: the catalog's display name for an ACC track_key, or null for a
+// key the catalog doesn't know. Used as the fallback name wherever a DB row
+// only carries the raw key (see lib/acc/tracks.ts resolveAccTrackName).
+export function accTrackDisplayName(trackKey: string): string | null {
+  const t = SIM_CATALOG.ACC.tracks.find((ct) => ct.accTrackKey === trackKey);
+  return t?.displayName ?? null;
+}
+
 export type GameCatalog = {
   tracks: CatalogTrack[];
   cars: string[];

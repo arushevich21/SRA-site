@@ -152,13 +152,16 @@ async function fetchAccTrackHotStint(
 // refresh-acc-leaderboard/route.ts) — so there's no revalidateTag call site
 // to bust this on write. This board relies solely on the 300s time-based
 // revalidate; a stint just posted can take up to that long to appear.
+//
+// `fresh: true` bypasses the Data Cache (see getAccTrackLeaderboard's note).
 export function getAccTrackHotStint(
   trackKey: string,
   board: AccStintBoard = PERSISTENT_STINT,
-  opts: { page?: number; classFilter?: string } = {},
+  opts: { page?: number; classFilter?: string; fresh?: boolean } = {},
 ): Promise<PaginatedLeaderboard<EnrichedStintEntry>> {
   const page = Math.max(1, opts.page ?? 1);
   const classFilter = opts.classFilter ?? null;
+  if (opts.fresh) return fetchAccTrackHotStint(trackKey, board, page, classFilter);
   return unstable_cache(fetchAccTrackHotStint, ['acc-hotstint-leaderboard'], {
     revalidate: 300,
     tags: [`acc-hotstint:${trackKey}`],
@@ -272,6 +275,12 @@ export async function getHotStintSeasons(): Promise<string[]> {
       .select('season')
       .eq('board_scope', 'seasonal')
       .eq('qualifying', false)
+      // Stable page boundaries need an explicit ORDER BY (see fetchHotlapSeasons).
+      .order('track_key')
+      .order('car_model_id')
+      .order('steam_id')
+      .order('season')
+      .order('is_wet')
       .range(from, from + page - 1);
     if (error) {
       console.error('ACC stint season list lookup failed:', error);
@@ -291,7 +300,10 @@ export async function getHotStintSeasons(): Promise<string[]> {
 // (TrackWithTopTimes) so it renders through the same TrackList card component.
 // Top-3 and counts are pinned to (seasonal, season, dry, non-qualifying), with
 // the newest-season reveal gate applied (via seasonalTrackKeys).
-export async function getSeasonStintTrackList(season: string): Promise<TrackWithTopTimes[]> {
+export async function getSeasonStintTrackList(
+  season: string,
+  opts: { uncached?: boolean } = {},
+): Promise<TrackWithTopTimes[]> {
   if (!season) return [];
   const board: AccStintBoard = { scope: 'seasonal', season, qualifying: false };
 
@@ -311,7 +323,7 @@ export async function getSeasonStintTrackList(season: string): Promise<TrackWith
       const [topStints, stats, isWet] = await Promise.all([
         getAccTrackTopStints(key, 3, board),
         getAccStintTrackStats(key, board),
-        hasWetSessionRows('acc_hotstint_leaderboard', key, season, { qualifying: false }),
+        hasWetSessionRows('acc_hotstint_leaderboard', key, season, { qualifying: false }, opts),
       ]);
       const summary = meta
         ? toTrackSummary(meta)

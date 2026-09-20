@@ -209,11 +209,31 @@ body::after {
 
 .marquee-track {
   width: max-content;
-  /* Track is 6 copies of the partner set per half (see SponsorsCarousel) —
-     duration is scaled up to match so the scroll speed stays constant. */
-  animation: marquee 270s linear infinite;
+  /* Track is the partner set rendered exactly twice (see SponsorsCarousel);
+     -50% slides the second copy into the first copy's place, which is what
+     makes the loop seamless. Each copy is at least 100vw wide, so the
+     duration is per viewport-width of travel rather than per logo count. */
+  animation: marquee 45s linear infinite;
+  will-change: transform;
 }
 
 .marquee-track:hover {
   animation-play-state: paused;
+}
+
+/* Reduced motion: no auto-scroll. The duplicate copy is dropped and the strip
+   becomes a plain horizontally scrollable row, so on a narrow screen every
+   partner is still reachable rather than clipped off behind overflow-hidden. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee-viewport {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .marquee-track {
+    animation: none;
+    will-change: auto;
+  }
+  .marquee-half[aria-hidden] {
+    display: none;
+  }
 }

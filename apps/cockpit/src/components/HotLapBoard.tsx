@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import Image from 'next/image';
 import type { HotLapEntry } from '@sra/shared-types';
 import { Icon, type IconName } from '@cardog-icons/react';
@@ -30,6 +30,10 @@ export type HotLapBoardEntry = HotLapEntry & {
   division?: number | null;
   tier?: DriverTier | null;
   lapTier?: LapTier | null;
+  // Per-sector minimum across all the driver's valid laps here (ACC only, from
+  // acc_hotlap_leaderboard.best_sectors_ms). Drives the expandable
+  // "Potential Best (Valid)" detail under a row. null/undefined = not computed.
+  bestSectorsMs?: number[] | null;
 };
 
 // Times under a minute show as plain seconds (e.g. 34.512); anything a minute
@@ -42,6 +46,21 @@ function formatSector(ms: number): string {
   const seconds = totalS % 60;
   const millis = ms % 1000;
   return `${minutes}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
+// Full lap time from ms — m:ss.mmm, same shape as the board's bestLap strings.
+function formatLap(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  const seconds = Math.floor((ms % 60_000) / 1000);
+  const millis = ms % 1000;
+  return `${minutes}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
+// Signed delta in seconds ("-0.412"); potential is never slower than the best
+// lap by construction, but guard the sign anyway for odd/legacy data.
+function formatDelta(ms: number): string {
+  const sign = ms < 0 ? '-' : ms > 0 ? '+' : '';
+  return `${sign}${(Math.abs(ms) / 1000).toFixed(3)}`;
 }
 
 // ACC leaderboard rows carry steamId with a leading "S" (see
@@ -148,6 +167,9 @@ export function HotLapBoard({
   const [uniqueOnly, setUniqueOnly] = useState(false);
   const [mineOnly, setMineOnly] = useState(false);
   const [divisionFilter, setDivisionFilter] = useState<number | null>(null);
+  // Row whose Potential Best detail is open — keyed by the row's React key so
+  // it survives filter toggles (the row index alone doesn't).
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const displayedEntries = useMemo(
     () => applyFilters(entries, uniqueOnly, mineOnly, currentSteamId, divisionFilter),
@@ -271,7 +293,7 @@ export function HotLapBoard({
                     S{i + 1}
                   </th>
                 ))}
-                <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-5 w-28 text-right">
+                <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-5 w-36 text-right whitespace-nowrap">
                   {timeLabel}
                 </th>
               </tr>
@@ -284,6 +306,12 @@ export function HotLapBoard({
                 // the driver's real position in the full, unfiltered field.
                 const relativeRank = i + 1;
                 const isMine = currentSteamId != null && isSameDriver(entry.steamId, currentSteamId);
+                const rowKey = `${entry.steamId}-${entry.carModel ?? ''}-${i}`;
+                // Any row with sector data can expand; rows without best
+                // sectors still open, and say the potential isn't computed.
+                const expandable = (entry.sectorsMs?.length ?? 0) > 0;
+                const expanded = expandable && expandedKey === rowKey;
+                const toggle = () => setExpandedKey((k) => (k === rowKey ? null : rowKey));
                 return (
                   // A driver can have multiple rows here (one per car
                   // they've set a lap in) — steamId alone is no longer
@@ -299,14 +327,33 @@ export function HotLapBoard({
                   // index is unique by construction; the list is fully
                   // re-derived and re-sorted on every filter change anyway,
                   // so there's no positional identity to preserve here.
+                  <Fragment key={rowKey}>
                   <tr
-                    key={`${entry.steamId}-${entry.carModel ?? ''}-${i}`}
-                    className="border-b border-line/30"
+                    className={[
+                      expanded ? 'border-b-0' : 'border-b border-line/30',
+                      expandable ? 'cursor-pointer hover:bg-carbon-2/60 transition-colors' : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                     style={
                       isMine
                         ? { backgroundColor: 'color-mix(in srgb, var(--sim-accent) 12%, transparent)' }
                         : undefined
                     }
+                    onClick={expandable ? toggle : undefined}
+                    onKeyDown={
+                      expandable
+                        ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              toggle();
+                            }
+                          }
+                        : undefined
+                    }
+                    tabIndex={expandable ? 0 : undefined}
+                    aria-expanded={expandable ? expanded : undefined}
+                    title={expandable ? 'Show potential best' : undefined}
                   >
                     <td className="font-mono text-[15px] py-2 pr-3 whitespace-nowrap">
                       <span style={relativeRank <= 3 ? { color: 'var(--sim-accent)' } : undefined}>
@@ -449,16 +496,116 @@ export function HotLapBoard({
                       );
                     })}
                     <td
-                      className="font-mono text-[15px] py-2 pl-5 text-right"
+                      className="font-mono text-[15px] py-2 pl-5 text-right whitespace-nowrap"
                       style={{ color: 'var(--sim-accent)' }}
                     >
                       {entry.bestLap}
+                      {expandable && (
+                        <span
+                          aria-hidden
+                          className={[
+                            'inline-block ml-2 text-[11px] text-txt-3 transition-transform',
+                            expanded ? 'rotate-180' : undefined,
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                        >
+                          ▼
+                        </span>
+                      )}
                     </td>
                   </tr>
+                  {expanded && (
+                    <tr className="border-b border-line/30">
+                      <td colSpan={4 + sectorCount} className="p-0">
+                        <PotentialBestDetail entry={entry} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The expandable panel under a board row: the lap's own sectors against the
+// driver's best sector in each split across ALL their valid laps here, and the
+// lap those best sectors add up to — "Potential Best (Valid)". The gap between
+// the two is how much the driver/car has in hand, which is the number BoP
+// discussions on the seasonal boards want. Purple = the lap already holds the
+// driver's best in that sector.
+function PotentialBestDetail({ entry }: { entry: HotLapBoardEntry }) {
+  const lapSectors = entry.sectorsMs ?? [];
+  const best = entry.bestSectorsMs ?? null;
+  const usable = best != null && best.length === lapSectors.length && best.length > 0;
+  // Potential = this lap minus what each sector could still gain. Derived from
+  // the lap time rather than by summing best sectors: ACC's split sum is often
+  // 1 ms off the lap it belongs to, which otherwise shows a phantom "-0.001 in
+  // hand" on a lap that already holds every best sector.
+  const gainMs = usable ? lapSectors.reduce((acc, t, i) => acc + Math.max(0, t - best[i]), 0) : null;
+  const potentialMs = gainMs != null ? entry.bestLapMs - gainMs : null;
+  const deltaMs = gainMs != null ? -gainMs : null;
+
+  const cell = 'font-mono text-[14px] tabular-nums text-right py-1.5 px-3';
+  const label = 'font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 py-1.5 pr-4 text-left whitespace-nowrap';
+
+  return (
+    <div className="bg-carbon-2/60 border-t border-line/30 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-10">
+      <table className="border-collapse">
+        <thead>
+          <tr>
+            <th className={label} />
+            {lapSectors.map((_, i) => (
+              <th key={i} className={`${label} text-right pr-3`}>
+                S{i + 1}
+              </th>
+            ))}
+            <th className={`${label} text-right pr-3`}>Lap</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className={label}>Best lap</td>
+            {lapSectors.map((t, i) => (
+              <td key={i} className={`${cell} ${usable && t === best![i] ? 'text-purple' : 'text-txt'}`}>
+                {formatSector(t)}
+              </td>
+            ))}
+            <td className={cell} style={{ color: 'var(--sim-accent)' }}>
+              {entry.bestLap}
+            </td>
+          </tr>
+          <tr>
+            <td className={label}>Potential best (valid)</td>
+            {usable ? (
+              <>
+                {best!.map((t, i) => (
+                  <td key={i} className={`${cell} text-purple`}>
+                    {formatSector(t)}
+                  </td>
+                ))}
+                <td className={`${cell} text-purple`}>{formatLap(potentialMs!)}</td>
+              </>
+            ) : (
+              <td colSpan={lapSectors.length + 1} className="font-sans text-[13px] text-txt-3 py-1.5 px-3 text-left">
+                Not computed yet for this lap — filled in as the ingest sees the driver's sessions.
+              </td>
+            )}
+          </tr>
+        </tbody>
+      </table>
+
+      {deltaMs != null && (
+        <div className="flex items-baseline gap-3 sm:ml-auto">
+          <span className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3">In hand</span>
+          <span className="font-mono text-[22px] tabular-nums text-purple leading-none">
+            {formatDelta(deltaMs)}
+          </span>
         </div>
       )}
     </div>

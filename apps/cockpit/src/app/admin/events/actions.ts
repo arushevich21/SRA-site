@@ -1,6 +1,7 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
+import { ACC_LEADERBOARD_SHELL_TAG } from '@/lib/acc/leaderboard-shell';
 import { requireAdmin } from '@/lib/require-admin';
 import { supabase } from '@/lib/supabase';
 import { parseAccsmChampionshipId } from '@/lib/accsm-championship-id';
@@ -442,6 +443,9 @@ export async function saveChampionship(input: ChampionshipInput): Promise<SaveRe
   }
 
   revalidatePath('/', 'layout');
+  // A round's hotlapReleased toggle changes the seasonal leaderboards' tab
+  // row, which is served from a 1h Data Cache entry (lib/acc/leaderboard-shell.ts).
+  revalidateTag(ACC_LEADERBOARD_SHELL_TAG);
   return { ok: true, id: championshipId };
 }
 
@@ -451,6 +455,7 @@ export async function deleteChampionship(id: string): Promise<{ ok: boolean; err
   const { error } = await supabase.from('championships').delete().eq('id', id);
   if (error) return { ok: false, error: error.message };
   revalidatePath('/', 'layout');
+  revalidateTag(ACC_LEADERBOARD_SHELL_TAG);
   return { ok: true };
 }
 

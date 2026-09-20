@@ -217,7 +217,7 @@ async function runServerRefresh(
         const session = parseAccSession(raw);
         const tParse = Date.now();
 
-        await upsertTrackAndLeaderboard(entry.track, session);
+        const boardChanged = await upsertTrackAndLeaderboard(entry.track, session);
         const tHotlap = Date.now();
 
         // Full race-results storage — separate table/concern from the
@@ -240,13 +240,15 @@ async function runServerRefresh(
         if (markErr) throw markErr;
         const tMark = Date.now();
 
-        tracks.add(entry.track);
+        // `tracks` drives the cron's revalidation — only tracks whose board
+        // actually changed, so a practice session with no PB busts nothing.
+        if (boardChanged) tracks.add(entry.track);
         count++;
         // Live-updated for the RUN_DEADLINE_MS race in refreshWithLock — see
         // the comment on `progress` there. Plain Set.add/increment is safe
         // here even with multiple server tasks in flight concurrently: JS
         // never interleaves mid-statement, so there's no lost update.
-        progress.tracks.add(entry.track);
+        if (boardChanged) progress.tracks.add(entry.track);
         progress.count++;
         console.log(
           `ACC hot-lap refresh: processed [${entry.sessionType}] ${entry.track} @ ${entry.date} (${baseUrl}) — ` +
@@ -282,7 +284,12 @@ async function runServerRefresh(
 // goes stale the moment that lookup table is corrected (confirmed: this
 // happened twice to Oulton Park's TCX/GTC cars within the same session).
 // Every consumer derives class fresh from car_model_id instead.
-async function upsertTrackAndLeaderboard(track: string, session: AccSessionResult): Promise<void> {
+// Returns whether any persistent-board row was written (a new entry or an
+// improved best). Unchanged rows are NOT re-upserted: that used to rewrite
+// every row on the track with a fresh updated_at on every new session, which
+// bumped getAccTrackStats().lastUpdated — and so the rendered index page —
+// on every cron run, turning each revalidation into an ISR write.
+async function upsertTrackAndLeaderboard(track: string, session: AccSessionResult): Promise<boolean> {
   const { error: trackErr } = await supabase
     .from('acc_tracks')
     .upsert({ track_key: track, display_name: track }, { onConflict: 'track_key', ignoreDuplicates: true });
@@ -340,11 +347,12 @@ async function upsertTrackAndLeaderboard(track: string, session: AccSessionResul
     ]),
   );
 
+  const changed: NonNullable<ReturnType<typeof bestByKey.get>>[] = [];
   for (const entry of fresh) {
     const key = `${entry.steamId}:${entry.carModel}:${entry.isWetSession}`;
     const prev = bestByKey.get(key);
     if (!prev || entry.bestLapMs < prev.bestLapMs) {
-      bestByKey.set(key, {
+      const next = {
         steamId: entry.steamId,
         driverName: entry.driverName,
         carModel: entry.carModelName,
@@ -352,11 +360,14 @@ async function upsertTrackAndLeaderboard(track: string, session: AccSessionResul
         bestLapMs: entry.bestLapMs,
         sectorsMs: entry.sectorsMs,
         isWet: entry.isWetSession,
-      });
+      };
+      bestByKey.set(key, next);
+      changed.push(next);
     }
   }
+  if (changed.length === 0) return false;
 
-  const rows = [...bestByKey.values()].map((e) => ({
+  const rows = changed.map((e) => ({
     track_key: track,
     steam_id: e.steamId,
     driver_name: e.driverName,
@@ -374,6 +385,7 @@ async function upsertTrackAndLeaderboard(track: string, session: AccSessionResul
     .from('acc_hotlap_leaderboard')
     .upsert(rows, { onConflict: 'track_key,car_model_id,steam_id,board_scope,season,is_wet' });
   if (writeErr) throw writeErr;
+  return true;
 }
 
 export type AccBackfillResult = {

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeAccEventKey } from '@sra/domain';
 import type { AccSessionResult } from '@sra/shared-types';
+import { resolveAccTrackName } from './track-name';
 
 // Deliberately does NOT import '../supabase' (which pulls in 'server-only'
 // and throws outside the Next.js server runtime) — callers that need the
@@ -25,20 +26,25 @@ export async function ingestAccRaceSessionInto(
   session: AccSessionResult,
   sessionKey: string,
 ): Promise<void> {
+  // Seed a never-seen track with a real name, not the raw key — these rows are
+  // insert-only (ignoreDuplicates) and track_layouts' name outranks
+  // acc_tracks' when rendering, so a raw key seeded here used to surface on
+  // the leaderboards as e.g. "brands_hatch" (see resolveAccTrackName).
+  const displayName = resolveAccTrackName(session.track);
   const { error: trackErr } = await supabase
     .from('acc_tracks')
-    .upsert({ track_key: session.track, display_name: session.track }, { onConflict: 'track_key', ignoreDuplicates: true });
+    .upsert({ track_key: session.track, display_name: displayName }, { onConflict: 'track_key', ignoreDuplicates: true });
   if (trackErr) throw trackErr;
 
   try {
     await supabase
       .from('tracks')
-      .upsert({ base_track_key: session.track, display_name: session.track }, { onConflict: 'base_track_key', ignoreDuplicates: true })
+      .upsert({ base_track_key: session.track, display_name: displayName }, { onConflict: 'base_track_key', ignoreDuplicates: true })
       .throwOnError();
     await supabase
       .from('track_layouts')
       .upsert(
-        { layout_key: session.track, base_track_key: session.track, game: 'ACC', layout_name: null, display_name: session.track },
+        { layout_key: session.track, base_track_key: session.track, game: 'ACC', layout_name: null, display_name: displayName },
         { onConflict: 'layout_key', ignoreDuplicates: true },
       )
       .throwOnError();

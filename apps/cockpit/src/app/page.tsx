@@ -27,12 +27,15 @@ export default function HomePage() {
 
         <div className="relative z-10 max-w-[800px] text-center">
           <Image
-            src="/badges/GT3TSAsset_white.png"
+            src="/badges/sra-lockup.webp"
             alt="Sim Racing Alliance"
-            width={480}
-            height={120}
+            width={180}
+            height={48}
             className="mx-auto mb-10 w-[180px] h-auto"
             priority
+            // Pre-sized 2x WebP (see scripts/build-sponsor-marquee-logos.ts);
+            // nothing for the optimizer to do for a fixed 180px render.
+            unoptimized
           />
 
           <h1 className="font-display font-black text-[clamp(36px,5.5vw,64px)] uppercase leading-[.95] tracking-[-1px] text-txt">
