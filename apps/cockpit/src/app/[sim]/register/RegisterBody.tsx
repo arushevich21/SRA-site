@@ -12,6 +12,8 @@ import CurrentTeam, { type NextRoundInfo } from './CurrentTeam';
 import TeamList, { type Team } from './TeamList';
 import { DivisionCapacity } from '@/components/DivisionCapacity';
 import { buildDivisionCapacity } from '@/lib/division-capacity';
+import { UnregisteredDrivers } from '@/components/UnregisteredDrivers';
+import { buildUnregisteredByDivision, type RosterDriver } from '@/lib/unregistered-drivers';
 import { bareDriverName } from '@/lib/driver-display-name';
 
 // Supabase FK join inference — cast via as unknown as
@@ -193,6 +195,42 @@ export async function RegisterBody({
     .eq('championship_key', champ.registrationKey)
     .eq('season', champ.registrationSeason);
   const takenSet = new Set((claimedRows ?? []).map((r) => r.driver_id as string));
+
+  // ── Still to register, per division ───────────────────────────────────────
+  // The graded roster (every driver with a division) minus takenSet. Same
+  // claim set as the teammate picker, so a driver is never both "available"
+  // there and "registered" here. Graded series only — an ungraded event has
+  // no roster to be missing from.
+  const unregisteredByDivision =
+    champ.requiresDivision !== false
+      ? await (async () => {
+          const [{ data: divisions }, { data: graded }] = await Promise.all([
+            adminClient.from('divisions').select('id, name').order('id'),
+            adminClient
+              .from('drivers')
+              .select('id, display_name, division_id, tier, is_sralien')
+              .not('division_id', 'is', null),
+          ]);
+          const roster: RosterDriver[] = ((graded ?? []) as {
+            id: string;
+            display_name: string | null;
+            division_id: number | null;
+            tier: 'gold' | 'silver' | null;
+            is_sralien: boolean | null;
+          }[]).map((d) => ({
+            id: d.id,
+            displayName: d.display_name ? bareDriverName(d.display_name) : null,
+            divisionId: d.division_id,
+            tier: d.tier,
+            isSralien: d.is_sralien ?? false,
+          }));
+          return buildUnregisteredByDivision(
+            roster,
+            takenSet,
+            (divisions ?? []) as { id: number; name: string }[],
+          );
+        })()
+      : [];
 
   // ── Auth ───────────────────────────────────────────────────────────────────
   const supabase = await createSupabaseServerClient();
@@ -398,6 +436,7 @@ export async function RegisterBody({
       <div className="mb-16">{userSection}</div>
       <div className="border-t border-line pt-12">
         <DivisionCapacity rows={divisionCapacity} />
+        <UnregisteredDrivers rows={unregisteredByDivision} />
         <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3 mb-8">
           Entry List
         </p>

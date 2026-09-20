@@ -461,8 +461,16 @@ CREATE TABLE public.acc_hotlap_leaderboard (
     season text DEFAULT ''::text NOT NULL,
     total_laps integer DEFAULT 0 NOT NULL,
     total_valid_laps integer DEFAULT 0 NOT NULL,
-    car_group text
+    car_group text,
+    best_sectors_ms jsonb
 );
+
+
+--
+-- Name: COLUMN acc_hotlap_leaderboard.best_sectors_ms; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.acc_hotlap_leaderboard.best_sectors_ms IS 'Per-sector minimum (ms) across all valid laps for this (track, car, driver, board) — potential best. NULL = not computed.';
 
 
 --

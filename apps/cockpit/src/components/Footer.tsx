@@ -11,11 +11,15 @@ export function Footer() {
       <div className="max-w-[1280px] mx-auto px-7 py-10 flex flex-col sm:flex-row items-center justify-between gap-6">
         <Link href="/" className="flex items-center gap-3 shrink-0">
             <Image
-              src="/badges/GT3TSAsset_white.png"
+              src="/badges/sra-lockup.webp"
               alt="Sim Racing Alliance"
-              width={480}
-              height={120}
+              width={136}
+              height={36}
               className="h-[36px] w-auto object-contain"
+              // Pre-sized 2x WebP (see scripts/build-sponsor-marquee-logos.ts) —
+              // the optimizer was fetching a w=1280 variant of the 6,535px original
+              // for this 136px slot.
+              unoptimized
             />
           </Link>
 

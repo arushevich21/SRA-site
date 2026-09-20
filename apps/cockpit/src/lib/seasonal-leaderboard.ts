@@ -146,14 +146,21 @@ export function compareSeasonsDesc(a: string, b: string): number {
 // scoped to one track) — genuinely expensive, and was the main reason a
 // seasonal track page loaded noticeably slower than the regular hot-lap page:
 // every seasonal track view re-ran this full scan from scratch. Cached below.
-async function fetchHotlapSeasons(): Promise<string[]> {
+export async function fetchHotlapSeasons(): Promise<string[]> {
   const seasons = new Set<string>();
   const page = 1000;
   for (let from = 0; ; from += page) {
+    // Ordered by the full PK: PostgREST paging without ORDER BY is not
+    // stable across requests, so consecutive pages can overlap and skip rows.
     const { data, error } = await supabase
       .from('acc_hotlap_leaderboard')
       .select('season')
       .eq('board_scope', 'seasonal')
+      .order('track_key')
+      .order('car_model_id')
+      .order('steam_id')
+      .order('season')
+      .order('is_wet')
       .range(from, from + page - 1);
     if (error) {
       console.error('ACC seasonal season list lookup failed:', error);
@@ -235,25 +242,54 @@ export async function getSeasonGate(): Promise<SeasonGate> {
 // Track keys that have seasonal rows for `season` on the given table, with the
 // newest-season reveal gate applied. Shared by the hot-lap and hot-stint
 // seasonal track lists.
+//
+// PostgREST has no DISTINCT, so this reads the `track_key` column of every
+// matching row and de-dupes client-side — and it MUST page through them. A
+// single un-ranged request is capped at 1000 rows (Supabase's default
+// max-rows), and a full season is well past that (S16: ~2,100 hot-lap rows,
+// ~1,900 hot-stint rows). With no ORDER BY the capped slice is arbitrary, so
+// whole tracks silently vanished from the season's track list even though
+// their per-track boards loaded fine when hit by URL (S16 lost 6 of 11 hot-lap
+// tracks and 4 of 12 hot-stint tracks this way). Same shape as
+// fetchHotlapSeasons above — including the explicit ORDER BY over the PK,
+// without which PostgREST's page boundaries aren't stable between requests
+// and rows can be skipped or double-counted across pages.
 export async function seasonalTrackKeys(
   table: 'acc_hotlap_leaderboard' | 'acc_hotstint_leaderboard',
   season: string,
   extraEq: Record<string, string | boolean> = {},
 ): Promise<string[]> {
-  let query = supabase
-    .from(table)
-    .select('track_key')
-    .eq('board_scope', 'seasonal');
-  for (const [col, val] of Object.entries(extraEq)) query = query.eq(col, val);
-  query = applySeasonFilter(query, season);
+  const fetchKeys = async (): Promise<string[] | null> => {
+    const keys = new Set<string>();
+    const page = 1000;
+    for (let from = 0; ; from += page) {
+      let query = supabase
+        .from(table)
+        .select('track_key')
+        .eq('board_scope', 'seasonal');
+      for (const [col, val] of Object.entries(extraEq)) query = query.eq(col, val);
+      query = applySeasonFilter(query, season);
+      const { data, error } = await query
+        .order('track_key')
+        .order('car_model_id')
+        .order('steam_id')
+        .order('is_wet')
+        .range(from, from + page - 1);
+      if (error) {
+        console.error(`ACC seasonal track-key lookup failed for "${season}" on ${table}:`, error);
+        return null;
+      }
+      if (!data || data.length === 0) break;
+      for (const r of data) keys.add(r.track_key as string);
+      if (data.length < page) break;
+    }
+    return [...keys];
+  };
 
-  const [{ data, error }, gate] = await Promise.all([query, getSeasonGate()]);
-  if (error) {
-    console.error(`ACC seasonal track-key lookup failed for "${season}" on ${table}:`, error);
-    return [];
-  }
+  const [fetched, gate] = await Promise.all([fetchKeys(), getSeasonGate()]);
+  if (fetched === null) return [];
 
-  let keys = [...new Set((data ?? []).map((r) => r.track_key as string))];
+  let keys = fetched;
   if (season === gate.gatedSeason) keys = keys.filter((k) => gate.releasedTrackKeys.has(k));
   return keys;
 }
@@ -291,12 +327,19 @@ async function fetchWetSessionRows(
 // acc-hotstint:<trackKey> — see tracks.ts/hotstint.ts) so a new lap/stint
 // posted for this track busts this alongside the board itself, rather than
 // this staying stale for up to the 300s window on its own.
+//
+// `uncached: true` reads Supabase directly, for frozen-season renders: those
+// pages are rendered once and cached indefinitely, and a 300s unstable_cache
+// entry encountered during that render would cap the whole route's lifetime
+// at 300s (see isFrozenSeason in acc/seasons.ts).
 export function hasWetSessionRows(
   table: 'acc_hotlap_leaderboard' | 'acc_hotstint_leaderboard',
   trackKey: string,
   season: string,
   extraEq: Record<string, string | boolean> = {},
+  opts: { uncached?: boolean } = {},
 ): Promise<boolean> {
+  if (opts.uncached) return fetchWetSessionRows(table, trackKey, season, extraEq);
   const tag = table === 'acc_hotlap_leaderboard' ? `acc-hotlap:${trackKey}` : `acc-hotstint:${trackKey}`;
   return unstable_cache(fetchWetSessionRows, ['acc-wet-session-rows'], {
     revalidate: 300,
@@ -308,7 +351,10 @@ export function hasWetSessionRows(
 // (TrackWithTopTimes) so it renders through the same TrackList card component.
 // Top-3 and counts are pinned to (seasonal, season); a track run in the wet
 // gets " (Wet)" appended to its displayed name (see hasWetSessionRows).
-export async function getSeasonHotlapTrackList(season: string): Promise<TrackWithTopTimes[]> {
+export async function getSeasonHotlapTrackList(
+  season: string,
+  opts: { uncached?: boolean } = {},
+): Promise<TrackWithTopTimes[]> {
   if (!season) return [];
   const board: AccBoard = { scope: 'seasonal', season };
 
@@ -328,7 +374,7 @@ export async function getSeasonHotlapTrackList(season: string): Promise<TrackWit
       const [topTimes, stats, isWet] = await Promise.all([
         getAccTrackTopTimes(key, 3, board),
         getAccTrackStats(key, board),
-        hasWetSessionRows('acc_hotlap_leaderboard', key, season),
+        hasWetSessionRows('acc_hotlap_leaderboard', key, season, {}, opts),
       ]);
       const summary = meta
         ? toTrackSummary(meta)

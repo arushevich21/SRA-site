@@ -52,10 +52,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // unstable_cache (see tracks.ts), which is what actually serves page-2+ and
   // class-filtered requests via the leaderboards Server Action — those never
   // go through the route cache, so revalidatePath alone wouldn't reach them.
+  // result.tracks only lists tracks whose persistent board actually changed
+  // (see upsertTrackAndLeaderboard) — a run that ingested sessions with no
+  // new PBs revalidates nothing. Per-track pages are keyed by tag; the
+  // [track] route itself is dynamic, so a revalidatePath on it was a no-op.
   if (result.tracks.length > 0) {
     revalidatePath('/acc/leaderboards');
     for (const track of result.tracks) {
-      revalidatePath(`/acc/leaderboards/${track}`);
       revalidateTag(`acc-hotlap:${track}`);
     }
   }

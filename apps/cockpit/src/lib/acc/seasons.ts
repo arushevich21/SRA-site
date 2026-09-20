@@ -5,6 +5,19 @@
 // season. We present and query them merged under the base code: the dropdown
 // shows "S14", and selecting it queries both S14 and S14-2.
 
+// Seasons up to and including this one are finished and their boards will
+// never change (the ingest only writes the current season; see SRA-Bot's
+// build_accsm_config). The seasonal leaderboard routes render these once and
+// cache them indefinitely instead of re-querying Supabase per request — bump
+// this when a season closes. Everything newer is "live" and rendered per
+// request with streamed lap data.
+export const LAST_FROZEN_SEASON = 18;
+
+export function isFrozenSeason(season: string): boolean {
+  const m = season.match(/^S(\d+)(?:-\d+)?$/i);
+  return m != null && Number(m[1]) <= LAST_FROZEN_SEASON;
+}
+
 // dbCode -> the canonical (display) season it belongs to.
 const SEASON_MERGES: Record<string, string> = {
   'S14-2': 'S14',

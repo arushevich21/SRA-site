@@ -63,4 +63,9 @@ export type AccHotLapEntry = {
   bestLap: string;
   sectorsMs: number[] | null;
   isWetSession: boolean;
+  // Per-sector minimum across every valid lap the driver set at this track in
+  // this car (acc_hotlap_leaderboard.best_sectors_ms) — the "potential best".
+  // null/undefined = not computed yet (rows predating the column, or legacy
+  // imports with no per-lap data). Written by the SRA-Bot ingest.
+  bestSectorsMs?: number[] | null;
 };

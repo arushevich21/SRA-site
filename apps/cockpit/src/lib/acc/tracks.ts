@@ -1,4 +1,5 @@
 import { unstable_cache } from 'next/cache';
+import { resolveAccTrackName } from './track-name';
 import { msToLaptime, accCarClassName, accCarManufacturerIconName } from '@sra/domain';
 import { accCarManufacturerLogoUrl } from './manufacturer-logo';
 import { accCarDisplayName } from './car-display-name';
@@ -143,7 +144,7 @@ async function getCuratedTrackNames(): Promise<Map<string, string>> {
 function toAccTrack(row: AccTrackRow, curatedNames: Map<string, string>): AccTrack {
   return {
     trackKey: row.track_key,
-    displayName: curatedNames.get(row.track_key) ?? row.display_name,
+    displayName: resolveAccTrackName(row.track_key, curatedNames.get(row.track_key), row.display_name),
     splashArtUrl: TRACK_PHOTO_OVERRIDES[row.track_key] ?? null,
     country: row.country ?? null,
     location: row.location ?? null,
@@ -258,7 +259,7 @@ async function fetchAccTrackLeaderboard(
   const base = applySeasonFilter(
     supabase
       .from('acc_hotlap_leaderboard')
-      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms, is_wet', {
+      .select('steam_id, driver_name, car_model, car_model_id, best_lap_ms, sectors_ms, best_sectors_ms, is_wet', {
         count: 'exact',
       })
       .eq('track_key', trackKey)
@@ -306,6 +307,7 @@ async function fetchAccTrackLeaderboard(
       bestLapMs,
       bestLap: msToLaptime(bestLapMs)!,
       sectorsMs: row.sectors_ms as number[] | null,
+      bestSectorsMs: (row.best_sectors_ms as number[] | null) ?? null,
       isWetSession: row.is_wet as boolean,
       ...driverInfoFor(driverInfo, stripSteamIdPrefix(row.steam_id as string)),
       // Reference times are GT3-only and dry-only — a wet lap still shows on
@@ -329,13 +331,20 @@ async function fetchAccTrackLeaderboard(
 // the tracks it touched right after writing, so real staleness is bounded by
 // the cron's own cadence (~10min) rather than this window, except if a
 // revalidateTag call is ever missed.
+//
+// `fresh: true` skips the Data Cache entirely and reads Supabase directly —
+// used by the seasonal track page's streamed lap-data component, whose
+// design is "cached shell, uncached lap times" (see
+// [sim]/leaderboards/seasonal/[season]/[track]/page.tsx). Page/class
+// switches from that page still go through the cached path above.
 export function getAccTrackLeaderboard(
   trackKey: string,
   board: AccBoard = PERSISTENT_DRY,
-  opts: { page?: number; classFilter?: string } = {},
+  opts: { page?: number; classFilter?: string; fresh?: boolean } = {},
 ): Promise<PaginatedLeaderboard<EnrichedAccHotLapEntry>> {
   const page = Math.max(1, opts.page ?? 1);
   const classFilter = opts.classFilter ?? null;
+  if (opts.fresh) return fetchAccTrackLeaderboard(trackKey, board, page, classFilter);
   return unstable_cache(fetchAccTrackLeaderboard, ['acc-hotlap-leaderboard'], {
     revalidate: 300,
     tags: [`acc-hotlap:${trackKey}`],

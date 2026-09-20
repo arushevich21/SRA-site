@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { LAST_FROZEN_SEASON } from './src/lib/acc/seasons';
 
 // Admin-uploaded championship logos live in Supabase Storage; allowlist that
 // host (derived from the env URL so it isn't hardcoded per project) so the
@@ -13,7 +14,42 @@ const supabaseHost = (() => {
   }
 })();
 
+// path-to-regexp pattern matching every finished ("frozen") season code —
+// S7 … S<LAST_FROZEN_SEASON>, with an optional split suffix (S14-2). Used by
+// the rewrites below to send those seasons' public leaderboard URLs to the
+// archive routes. Non-capturing groups only: path-to-regexp rejects capturing
+// groups inside a param pattern.
+const frozenSeasonPattern = `S(?:${Array.from({ length: LAST_FROZEN_SEASON }, (_, i) => i + 1).join('|')})(?:-[0-9]+)?`;
+
 const nextConfig: NextConfig = {
+  // Finished seasons' seasonal leaderboards are served by dedicated archive
+  // routes that render once and cache indefinitely, while the live season's
+  // routes render per request; Next 15 can't mix the two on one route (see
+  // app/[sim]/leaderboards/_seasonal/hotlap.tsx). The public URL never
+  // changes — /acc/leaderboards/seasonal/S16/silverstone is rewritten
+  // internally to /acc/leaderboards/seasonal/archive/S16/silverstone.
+  // afterFiles rewrites (this default form) run before dynamic routes, so
+  // the live [season] route never sees a frozen season.
+  async rewrites() {
+    return [
+      {
+        source: `/:sim/leaderboards/seasonal/:season(${frozenSeasonPattern})`,
+        destination: '/:sim/leaderboards/seasonal/archive/:season',
+      },
+      {
+        source: `/:sim/leaderboards/seasonal/:season(${frozenSeasonPattern})/:track`,
+        destination: '/:sim/leaderboards/seasonal/archive/:season/:track',
+      },
+      {
+        source: `/:sim/leaderboards/hotstint/seasonal/:season(${frozenSeasonPattern})`,
+        destination: '/:sim/leaderboards/hotstint/seasonal/archive/:season',
+      },
+      {
+        source: `/:sim/leaderboards/hotstint/seasonal/:season(${frozenSeasonPattern})/:track`,
+        destination: '/:sim/leaderboards/hotstint/seasonal/archive/:season/:track',
+      },
+    ];
+  },
   // Browser sources are broadcast graphics; Next's dev indicator must not be
   // composited into the corner of a stream asset during local testing.
   devIndicators: false,
