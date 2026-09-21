@@ -153,7 +153,10 @@
 .ov-ticker-track {
   display: inline-flex;
   width: max-content;
-  animation: ov-ticker-scroll 150s linear infinite;
+  /* Lead-in past the chip; a margin isn't part of the width the loop
+     translates by, so the wrap stays seamless. */
+  margin-left: 1.2em;
+  animation: ov-ticker-scroll var(--ov-ticker-loop, 150s) linear infinite;
 }
 .ov-ticker-track > span { display: inline-block; padding-right: 3em; }
 .ov-ticker-track i { font-style: normal; color: var(--ov-gold); padding: 0 0.6em; }
@@ -162,14 +165,20 @@
 .ov-ticker .ov-star { margin-left: 0.3em; }
 @keyframes ov-ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
-/* Stand-alone marquee source (sponsors?mode=horizontal_marquee). The ticker
-   fills whatever box OBS gives the source — its height sets the type size —
-   so the crew sizes the browser source to the strip they have room for
-   (e.g. 1100×64 beside the race label) rather than scaling a full canvas
-   down to it. */
-.ov-ticker-only.overlay-root { --u: calc(100vh / 2.4); width: 100vw; min-height: 100vh; }
+/* Stand-alone marquee source (sponsors?mode=horizontal_marquee). The strip
+   sits at the top-left of the source at ?size= times the in-scene ticker's
+   height (default 2, so it reads beside the race label), never taller than
+   the source itself — so a thin source is filled and a full 1920×1080
+   source still gets a strip, not a wall of type. ?speed= scales the scroll. */
+.ov-ticker-only.overlay-root {
+  --ov-marquee-size: 2;
+  --u: min(calc(100vh / 2.4), calc(var(--ov-marquee-size) * 1vw));
+  width: 100vw;
+  min-height: 100vh;
+  place-items: start;
+}
 .ov-ticker-only .overlay-canvas { width: 100vw; height: 100vh; }
-.ov-ticker-only .ov-ticker { position: relative; height: 100vh; }
+.ov-ticker-only .ov-ticker { position: relative; }
 
 /* ── Lockup: series identity + on-air context ────────────────────────────── */
 .ov-lockup {

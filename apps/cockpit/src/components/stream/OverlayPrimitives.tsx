@@ -51,6 +51,7 @@ export function OverlayCanvas({
   transparent = false,
   opacity,
   className = '',
+  style,
   refresh,
   cutouts,
   video,
@@ -59,6 +60,7 @@ export function OverlayCanvas({
   transparent?: boolean;
   opacity?: number;
   className?: string;
+  style?: React.CSSProperties;
   // When this source re-fetches itself; see OverlayRefresh.
   refresh?: OverlayRefreshPlan;
   // Windows cut through the page (canvas units). The body goes transparent
@@ -72,7 +74,7 @@ export function OverlayCanvas({
   return (
     <div
       className={`overlay-root ${transparent ? 'ov-transparent' : ''} ${seeThrough ? 'ov-see-through' : ''} ${video ? 'ov-has-video' : ''} ${className}`}
-      style={opacity === undefined ? undefined : { opacity }}
+      style={{ ...style, ...(opacity === undefined ? {} : { opacity }) }}
     >
       <style>{SITE_CHROME_OFF + (seeThrough ? TRANSPARENT_BODY : '')}</style>
       {refresh && <OverlayRefresh at={refresh.at} every={refresh.every} />}

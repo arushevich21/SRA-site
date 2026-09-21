@@ -53,8 +53,9 @@ import { trackMapKey } from '@/components/stream/track-maps';
 //   /overlay/sponsors?footer_message=STREAM%20STARTING%20SOON|...&opacity=.5
 //   /overlay/sponsors?video=1&footer_message=...   same, over the ACC hero video
 //     (&headline=top puts the message under the lockup instead of over the partners)
-//   /overlay/sponsors?mode=horizontal_marquee   transparent ticker strip that
-//     fills the source — size the browser source to the strip (e.g. 1100×64)
+//   /overlay/sponsors?mode=horizontal_marquee[&size=2&speed=1]   transparent
+//     ticker strip, top-left of the source, size× the in-scene ticker's height
+//     (never taller than the source); speed scales the scroll
 //   /overlay/partners                      transparent logo slideshow
 //   /overlay/show?title=...&names=A,B,C    talk-show bed: three camera windows
 //     cut through the page (cameras go underneath in OBS), names left to right
@@ -85,6 +86,11 @@ type OverlayProps = {
 
 // A browser source shows whatever is true at the moment OBS refreshes it.
 export const dynamic = 'force-dynamic';
+
+function clampParam(raw: string | undefined, min: number, max: number, fallback: number): number {
+  const n = Number(raw);
+  return raw !== undefined && Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
 
 export default async function StreamOverlayPage({ params, searchParams }: OverlayProps) {
   const { path } = await params;
@@ -211,8 +217,17 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
   }
 
   if (scene === 'sponsors' && query.mode === 'horizontal_marquee') {
+    // ?size= is the strip's height as a multiple of the in-scene ticker
+    // (2 = twice as tall); ?speed= scales the scroll (2 = twice as fast).
+    const size = clampParam(query.size, 1, 6, 2);
+    const speed = clampParam(query.speed, 0.25, 4, 1);
     return (
-      <OverlayCanvas refresh={refresh} transparent className="ov-ticker-only">
+      <OverlayCanvas
+        refresh={refresh}
+        transparent
+        className="ov-ticker-only"
+        style={{ '--ov-marquee-size': size, '--ov-ticker-loop': `${Math.round(150 / speed)}s` } as React.CSSProperties}
+      >
         <SponsorTicker />
       </OverlayCanvas>
     );
