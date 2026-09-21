@@ -949,6 +949,20 @@
   color: var(--ov-txt-3);
 }
 
+/* ── Utility sources that fill whatever box OBS gives them ───────────────── */
+.ov-fill.overlay-root { width: 100vw; min-height: 100vh; }
+.ov-fill .overlay-canvas { width: 100vw; height: 100vh; }
+/* The show scene's camera frame (.ov-cam-frame), drawn just inside the edge
+   so none of it is lost to the source bounds. Thickness follows the source's
+   height so it matches .ov-cam-frame's 0.2u on a 768×432 window. */
+.ov-edge-frame {
+  position: absolute;
+  inset: 0;
+  border: calc(1.2 * 1vh) solid var(--ov-gold);
+  box-shadow: inset 0 calc(0.6 * 1vh) calc(2.2 * 1vh) rgba(0, 0, 0, 0.55);
+}
+.ov-logo-fill { display: block; width: 100%; height: 100%; object-fit: contain; }
+
 /* ── Music: a YouTube iframe filling the source ──────────────────────────── */
 .ov-music .overlay-canvas { width: 100vw; height: 100vh; }
 .ov-music iframe { display: block; width: 100%; height: 100%; border: 0; }

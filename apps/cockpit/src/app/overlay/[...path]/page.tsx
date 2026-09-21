@@ -61,6 +61,9 @@ import { trackMapKey } from '@/components/stream/track-maps';
 //     cut through the page (cameras go underneath in OBS), names left to right
 //   /overlay/music?v=VIDEO_ID   a YouTube video looping in an iframe, for a
 //     background-music browser source (YouTube refuses embeds with no referrer)
+//   /overlay/frame    transparent: the gold camera frame around the edge of the
+//     source — size the source to the PiP it sits over (e.g. 1280×720)
+//   /overlay/logo     transparent: the SRA lockup filling the source (watermark)
 //   /overlay/backdrop[?video=1]   the branded bed on its own, nothing on it:
 //     a background for guest clips (?video=1 for the ACC hero clip instead)
 //   /overlay/livery?team=Team Name[&names=A,B,C]   livery reveal bed: three
@@ -285,6 +288,26 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
     return (
       <OverlayCanvas transparent className="ov-music">
         <iframe src={src} title="Background music" allow="autoplay; encrypted-media" />
+      </OverlayCanvas>
+    );
+  }
+
+  // Two transparent utility sources that size to whatever box OBS gives them:
+  // the show scene's gold frame around the edge (over a PiP), and the SRA
+  // lockup on its own (a watermark). Neither needs data.
+  if (scene === 'frame') {
+    return (
+      <OverlayCanvas transparent className="ov-fill">
+        <div className="ov-edge-frame" aria-hidden="true" />
+      </OverlayCanvas>
+    );
+  }
+
+  if (scene === 'logo') {
+    return (
+      <OverlayCanvas transparent className="ov-fill">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static logo */}
+        <img className="ov-logo-fill" src="/badges/sra-lockup.webp" alt="Sim Racing Alliance" />
       </OverlayCanvas>
     );
   }
