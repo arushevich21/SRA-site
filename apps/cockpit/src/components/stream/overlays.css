@@ -395,7 +395,7 @@
 /* Team rows: name over its car(s), then the roster in its own column so
    names never crowd the team name or the points. */
 .ov-row.is-team {
-  grid-template-columns: calc(3 * var(--u)) minmax(0, 1fr) minmax(calc(13 * var(--u)), auto) calc(5 * var(--u));
+  grid-template-columns: calc(3 * var(--u)) minmax(0, 1fr) calc(16.5 * var(--u)) calc(4.5 * var(--u));
   gap: calc(1 * var(--u));
   padding-right: calc(1 * var(--u));
 }
@@ -403,7 +403,7 @@
 .ov-team b {
   font-family: var(--ov-display);
   font-weight: 700;
-  font-size: calc(1.35 * var(--u));
+  font-size: calc(1.3 * var(--u));
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
@@ -426,18 +426,31 @@
 .ov-team-cars > span { display: inline-flex; align-items: center; gap: calc(0.4 * var(--u)); min-width: 0; }
 .ov-team-cars .ov-car { width: calc(1.5 * var(--u)); height: calc(1.5 * var(--u)); color: var(--ov-txt-2); }
 .ov-team-cars .ov-car > span { width: calc(1.4 * var(--u)) !important; height: calc(1.4 * var(--u)) !important; }
-.ov-roster { display: flex; flex-direction: column; gap: calc(0.25 * var(--u)); align-items: flex-end; justify-content: center; min-width: 0; }
-.ov-roster span {
-  display: inline-flex;
+.ov-roster { display: flex; flex-direction: column; gap: calc(0.3 * var(--u)); justify-content: center; min-width: 0; }
+.ov-roster > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(5.2 * var(--u));
   align-items: center;
-  gap: calc(0.5 * var(--u));
+  gap: calc(0.8 * var(--u));
   font-size: calc(0.95 * var(--u));
+  line-height: 1;
   color: var(--ov-txt-2);
   white-space: nowrap;
 }
-/* The driver's D1–D4 Gold/Silver badge is landscape art, so it's sized by height. */
-.ov-tier { display: inline-flex; align-items: center; justify-content: center; width: calc(1.9 * var(--u)); height: calc(1.4 * var(--u)); }
-.ov-tier img { width: 100%; height: 100%; object-fit: contain; }
+.ov-roster-name { overflow: hidden; text-overflow: ellipsis; }
+/* Division + tier as a typed tag, one fixed column so every row lines up. */
+.ov-tier {
+  font-family: var(--ov-mono);
+  font-size: calc(0.6 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-align: right;
+  color: var(--ov-txt-3);
+}
+.ov-tier.is-gold { color: var(--ov-gold); }
+.ov-tier.is-silver { color: var(--ov-silver); }
+.ov-tier.is-alien { color: var(--ov-live); }
 
 .ov-empty {
   display: grid;
