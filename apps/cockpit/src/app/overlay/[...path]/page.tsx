@@ -81,7 +81,7 @@ import { trackMapKey } from '@/components/stream/track-maps';
 // division series), ?division=N (default: the path's division_N segment, else
 // the first division — track_maps has no such segment, so set it there),
 // ?round=N (default: the division's current round),
-// ?refresh=<seconds> (default 900: how often the source re-fetches itself;
+// ?refresh=<seconds> (default 900, booth scenes 3: how often the source re-fetches itself;
 // every source also refreshes an hour before its division's green flag).
 
 type OverlayProps = {
@@ -133,10 +133,11 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
         ? new Date(eventInstant(round.startsAt) - PRE_RACE_LEAD_MS).toISOString()
         : null,
     every: Number.isFinite(everyRequested)
-      ? Math.max(MIN_REFRESH_SECONDS, everyRequested)
+      ? Math.max(isBoothScene ? BOOTH_REFRESH_SECONDS : MIN_REFRESH_SECONDS, everyRequested)
       : isBoothScene
         ? BOOTH_REFRESH_SECONDS
         : DEFAULT_REFRESH_SECONDS,
+    spread: !isBoothScene,
   };
 
   if (scene === 'standings' && (subtype === 'driver' || subtype === 'team')) {

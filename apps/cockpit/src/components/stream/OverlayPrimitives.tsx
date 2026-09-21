@@ -77,7 +77,7 @@ export function OverlayCanvas({
       style={{ ...style, ...(opacity === undefined ? {} : { opacity }) }}
     >
       <style>{SITE_CHROME_OFF + (seeThrough ? TRANSPARENT_BODY : '')}</style>
-      {refresh && <OverlayRefresh at={refresh.at} every={refresh.every} />}
+      {refresh && <OverlayRefresh at={refresh.at} every={refresh.every} spread={refresh.spread} />}
       <div
         className="overlay-canvas"
         style={cutouts?.length ? { clipPath: cutoutClipPath(cutouts) } : undefined}

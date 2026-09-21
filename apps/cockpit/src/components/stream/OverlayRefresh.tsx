@@ -19,11 +19,11 @@ const JITTER_MS = 90 * 1000;
 // problem, and the heartbeat will have re-rendered with a fresh `at` long before.
 const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 
-export function OverlayRefresh({ at, every }: { at: string | null; every: number }) {
+export function OverlayRefresh({ at, every, spread }: { at: string | null; every: number; spread: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
-    const jitter = () => Math.random() * JITTER_MS;
+    const jitter = () => (spread ? Math.random() * JITTER_MS : 0);
     const heartbeat = setInterval(() => router.refresh(), every * 1000 + jitter());
 
     let timed: ReturnType<typeof setTimeout> | undefined;
@@ -36,7 +36,7 @@ export function OverlayRefresh({ at, every }: { at: string | null; every: number
       clearInterval(heartbeat);
       if (timed) clearTimeout(timed);
     };
-  }, [router, at, every]);
+  }, [router, at, every, spread]);
 
   return null;
 }
