@@ -194,23 +194,20 @@ function TeamCars({ members }: { members: TeamMember[] }) {
   );
 }
 
-// Each driver with their own D1–D4 Gold/Silver badge (the car is on the team
-// line now), right-aligned so the names read as a column.
+// Each driver with their division and tier as a typed tag in a fixed
+// column (the badge artwork was too busy at row size and never lined up),
+// names left-aligned so the roster reads as two clean columns.
 function Roster({ members, driverInfo }: { members: TeamMember[]; driverInfo: Record<string, DriverInfo> }) {
   return (
     <div className="ov-roster">
       {members.slice(0, 2).map((m) => {
         const info = driverInfo[stripSteamIdPrefix(m.steamId)];
         const badge = info ? getDriverTierBadge(info) : null;
+        const tierClass = info?.isSralien ? 'is-alien' : info?.tier === 'gold' ? 'is-gold' : info?.tier === 'silver' ? 'is-silver' : '';
         return (
           <span key={m.steamId}>
-            <span className="ov-tier">
-              {badge && (
-                // eslint-disable-next-line @next/next/no-img-element -- static badge art
-                <img src={badge.src} alt={badge.label} title={badge.label} />
-              )}
-            </span>
-            {bareDriverName(info?.displayName ?? m.driverName)}
+            <span className="ov-roster-name">{bareDriverName(info?.displayName ?? m.driverName)}</span>
+            <span className={`ov-tier ${tierClass}`}>{badge?.label ?? ''}</span>
           </span>
         );
       })}
