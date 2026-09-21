@@ -148,14 +148,27 @@ export function OverlayLockup({
               <b>{division}</b>
             </div>
           )}
-          {round && (
+          {/* Without a division the round takes the gold block and the
+              circuit's full name fills the panel beside it. */}
+          {division == null && round && (
+            <div className="ov-context-division">
+              <small>RD</small>
+              <b>{round.round.round}</b>
+            </div>
+          )}
+          {round && division != null && (
             <div className="ov-context-round">
               <b>Round {round.round.round}</b>
               <span>
                 <TrackFlag track={round.round.track} />
-                {/* Alone in the chip there's room for the circuit's full name. */}
-                {division == null ? round.round.track : shortTrackName(round.round.track)}
+                {shortTrackName(round.round.track)}
               </span>
+            </div>
+          )}
+          {round && division == null && (
+            <div className="ov-context-track">
+              <TrackFlag track={round.round.track} />
+              {round.round.track}
             </div>
           )}
         </div>
