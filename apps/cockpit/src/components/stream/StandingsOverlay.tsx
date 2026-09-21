@@ -90,6 +90,15 @@ function splitColumns<T>(rows: T[]): T[][] {
   return columns.filter((c) => c.length > 0);
 }
 
+// Each column reserves this many slots, so rows are as tall as the page
+// allows — a 22-team grid gets 11 slots, not 12 — while a tiny division
+// still doesn't balloon into a handful of giant rows.
+const MIN_SLOTS = 8;
+function slotStyle(columns: unknown[][]): React.CSSProperties {
+  const longest = Math.max(...columns.map((c) => c.length), 0);
+  return { '--ov-slots': Math.max(MIN_SLOTS, longest) } as React.CSSProperties;
+}
+
 function DriverColumns({
   rows,
   driverInfo,
@@ -101,9 +110,10 @@ function DriverColumns({
   leaderPoints: number;
   live: boolean;
 }) {
+  const columns = splitColumns(rows);
   return (
-    <div className="ov-standings">
-      {splitColumns(rows).map((column, i) => (
+    <div className="ov-standings" style={slotStyle(columns)}>
+      {columns.map((column, i) => (
         <div className="ov-standings-col" key={i}>
           {column.map((row) => {
             const info = driverInfo[stripSteamIdPrefix(row.steamId)];
@@ -151,9 +161,10 @@ function TeamColumns({
   leaderPoints: number;
   live: boolean;
 }) {
+  const columns = splitColumns(rows);
   return (
-    <div className="ov-standings">
-      {splitColumns(rows).map((column, i) => (
+    <div className="ov-standings" style={slotStyle(columns)}>
+      {columns.map((column, i) => (
         <div className="ov-standings-col" key={i}>
           {column.map((row) => {
             const members = rosters.get(row.teamName) ?? [];
@@ -194,20 +205,23 @@ function TeamCars({ members }: { members: TeamMember[] }) {
   );
 }
 
-// Each driver with their division and tier as a typed tag in a fixed
-// column (the badge artwork was too busy at row size and never lined up),
-// names left-aligned so the roster reads as two clean columns.
+// Each driver with their D1–D4 Gold/Silver badge in its own fixed column
+// beside a left-aligned name, so the roster reads as two straight columns.
 function Roster({ members, driverInfo }: { members: TeamMember[]; driverInfo: Record<string, DriverInfo> }) {
   return (
     <div className="ov-roster">
       {members.slice(0, 2).map((m) => {
         const info = driverInfo[stripSteamIdPrefix(m.steamId)];
         const badge = info ? getDriverTierBadge(info) : null;
-        const tierClass = info?.isSralien ? 'is-alien' : info?.tier === 'gold' ? 'is-gold' : info?.tier === 'silver' ? 'is-silver' : '';
         return (
           <span key={m.steamId}>
             <span className="ov-roster-name">{bareDriverName(info?.displayName ?? m.driverName)}</span>
-            <span className={`ov-tier ${tierClass}`}>{badge?.label ?? ''}</span>
+            <span className="ov-tier">
+              {badge && (
+                // eslint-disable-next-line @next/next/no-img-element -- static badge art
+                <img src={badge.src} alt={badge.label} title={badge.label} />
+              )}
+            </span>
           </span>
         );
       })}
