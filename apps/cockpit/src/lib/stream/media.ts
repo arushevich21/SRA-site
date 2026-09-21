@@ -10,3 +10,17 @@ const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '');
 export function trackVideoUrl(trackKey: string): string {
   return `${base}/storage/v1/object/public/stream-media/videos/${trackKey}.mp4`;
 }
+
+// Whether a hero clip exists for the track — only the season's circuits get
+// one, so a scene that would rather show the clip has to be able to fall
+// back. One HEAD against the public bucket, cached for an hour; a network
+// failure counts as "no clip" so the scene still renders.
+export async function hasTrackVideo(trackKey: string): Promise<boolean> {
+  if (!base) return false;
+  try {
+    const res = await fetch(trackVideoUrl(trackKey), { method: 'HEAD', next: { revalidate: 3600 } });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

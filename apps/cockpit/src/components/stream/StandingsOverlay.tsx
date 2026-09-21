@@ -63,6 +63,7 @@ export function StandingsOverlay({
         <TeamColumns
           rows={standings.teams.slice(start, start + ROWS_PER_PAGE)}
           rosters={standings.rosters}
+          driverInfo={standings.driverInfo}
           leaderPoints={standings.teams[0]?.points ?? 0}
           live={standings.source === 'live'}
         />
@@ -140,11 +141,13 @@ function DriverColumns({
 function TeamColumns({
   rows,
   rosters,
+  driverInfo,
   leaderPoints,
   live,
 }: {
   rows: EmperorTeamStanding[];
   rosters: Map<string, TeamMember[]>;
+  driverInfo: Record<string, DriverInfo>;
   leaderPoints: number;
   live: boolean;
 }) {
@@ -152,33 +155,65 @@ function TeamColumns({
     <div className="ov-standings">
       {splitColumns(rows).map((column, i) => (
         <div className="ov-standings-col" key={i}>
-          {column.map((row) => (
-            <article className={`ov-row is-team ${podiumClass(row.position, live)}`} key={row.teamName}>
-              <span className="ov-pos">{row.position}</span>
-              <div className="ov-team">
-                <b>{row.teamName}</b>
-                <Roster members={rosters.get(row.teamName) ?? []} />
-              </div>
-              <Points points={row.points} leaderPoints={leaderPoints} position={row.position} live={live} />
-            </article>
-          ))}
+          {column.map((row) => {
+            const members = rosters.get(row.teamName) ?? [];
+            return (
+              <article className={`ov-row is-team ${podiumClass(row.position, live)}`} key={row.teamName}>
+                <span className="ov-pos">{row.position}</span>
+                <div className="ov-team">
+                  <b>{row.teamName}</b>
+                  <TeamCars members={members} />
+                </div>
+                <Roster members={members} driverInfo={driverInfo} />
+                <Points points={row.points} leaderPoints={leaderPoints} position={row.position} live={live} />
+              </article>
+            );
+          })}
         </div>
       ))}
     </div>
   );
 }
 
-function Roster({ members }: { members: TeamMember[] }) {
+// The car(s) a team runs, under its name: logo + model. A two-car team
+// usually shares one model; when it doesn't, both are listed.
+function TeamCars({ members }: { members: TeamMember[] }) {
+  const cars = [...new Set(members.map((m) => m.carModel).filter((c): c is string => !!c))];
+  if (cars.length === 0) return null;
   return (
-    <div className="ov-roster">
-      {members.slice(0, 2).map((m) => (
-        <span key={m.steamId}>
+    <span className="ov-team-cars">
+      {cars.map((car) => (
+        <span key={car}>
           <span className="ov-car">
-            <CarLogo {...resolveCarLogo(accCarModelIdFromName(m.carModel))} alt={m.carModel ?? ''} size={24} />
+            <CarLogo {...resolveCarLogo(accCarModelIdFromName(car))} alt={car} size={24} />
           </span>
-          {bareDriverName(m.driverName)}
+          {car}
         </span>
       ))}
+    </span>
+  );
+}
+
+// Each driver with their own D1–D4 Gold/Silver badge (the car is on the team
+// line now), right-aligned so the names read as a column.
+function Roster({ members, driverInfo }: { members: TeamMember[]; driverInfo: Record<string, DriverInfo> }) {
+  return (
+    <div className="ov-roster">
+      {members.slice(0, 2).map((m) => {
+        const info = driverInfo[stripSteamIdPrefix(m.steamId)];
+        const badge = info ? getDriverTierBadge(info) : null;
+        return (
+          <span key={m.steamId}>
+            <span className="ov-tier">
+              {badge && (
+                // eslint-disable-next-line @next/next/no-img-element -- static badge art
+                <img src={badge.src} alt={badge.label} title={badge.label} />
+              )}
+            </span>
+            {bareDriverName(info?.displayName ?? m.driverName)}
+          </span>
+        );
+      })}
     </div>
   );
 }
