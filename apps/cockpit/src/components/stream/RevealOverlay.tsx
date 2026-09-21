@@ -42,6 +42,53 @@ export function parseWeather(raw: string | undefined): Weather | null {
   return key && key in WEATHER ? (key as Weather) : null;
 }
 
+// The reveal's moving parts, shared with the track-map scene: the clip
+// full-bleed, then scaled and translated into CLIP_FRAME (both rectangles are
+// 16:9, so it's one transform — no reflow, no jank), with the gold frame it
+// lands in. Whatever the scene lays out around it goes in as children.
+export function RevealShell({
+  video,
+  intro,
+  children,
+}: {
+  video: string;
+  intro: boolean;
+  children: React.ReactNode;
+}) {
+  const style = {
+    '--ov-intro-hold': `${intro ? INTRO_HOLD_S : 0}s`,
+    '--ov-intro-move': `${intro ? INTRO_MOVE_S : 0}s`,
+    '--ov-clip-x': `calc(${CLIP_FRAME.x} * var(--u))`,
+    '--ov-clip-y': `calc(${CLIP_FRAME.y} * var(--u))`,
+    '--ov-clip-scale': `${CLIP_FRAME.w / 100}`,
+  } as React.CSSProperties;
+
+  return (
+    <div className={`ov-reveal ${intro ? '' : 'is-settled'}`} style={style}>
+      <div className="ov-reveal-stage">
+        <video src={video} autoPlay muted loop playsInline aria-hidden="true" />
+      </div>
+      <div
+        className="ov-reveal-frame"
+        style={{
+          left: `calc(${CLIP_FRAME.x} * var(--u))`,
+          top: `calc(${CLIP_FRAME.y} * var(--u))`,
+          width: `calc(${CLIP_FRAME.w} * var(--u))`,
+          height: `calc(${CLIP_FRAME.h} * var(--u))`,
+        }}
+      />
+      {children}
+    </div>
+  );
+}
+
+// The facts column beside the clip: positioned against the canvas,
+// top-aligned with the frame and as tall as it.
+export const REVEAL_FACTS_STYLE: React.CSSProperties = {
+  top: `calc(${CLIP_FRAME.y} * var(--u))`,
+  height: `calc(${CLIP_FRAME.h} * var(--u))`,
+};
+
 export function RevealOverlay({
   championship,
   round,
@@ -59,31 +106,9 @@ export function RevealOverlay({
   const facts = trackFacts(track);
   const map = trackMapUrl(track);
   const video = trackVideoUrl(key);
-  const style = {
-    '--ov-intro-hold': `${intro ? INTRO_HOLD_S : 0}s`,
-    '--ov-intro-move': `${intro ? INTRO_MOVE_S : 0}s`,
-    '--ov-clip-x': `calc(${CLIP_FRAME.x} * var(--u))`,
-    '--ov-clip-y': `calc(${CLIP_FRAME.y} * var(--u))`,
-    '--ov-clip-scale': `${CLIP_FRAME.w / 100}`,
-  } as React.CSSProperties;
 
   return (
-    <div className={`ov-reveal ${intro ? '' : 'is-settled'}`} style={style}>
-      {/* The clip: full-bleed at first, then scaled and translated into its frame.
-          Both rectangles are 16:9, so it's one transform — no reflow, no jank. */}
-      <div className="ov-reveal-stage">
-        <video src={video} autoPlay muted loop playsInline aria-hidden="true" />
-      </div>
-      <div
-        className="ov-reveal-frame"
-        style={{
-          left: `calc(${CLIP_FRAME.x} * var(--u))`,
-          top: `calc(${CLIP_FRAME.y} * var(--u))`,
-          width: `calc(${CLIP_FRAME.w} * var(--u))`,
-          height: `calc(${CLIP_FRAME.h} * var(--u))`,
-        }}
-      />
-
+    <RevealShell video={video} intro={intro}>
       <OverlayFrame ticker>
         <OverlayLockup
           championship={championship}
@@ -92,54 +117,46 @@ export function RevealOverlay({
         />
 
         {/* .ov-reveal-body keeps the grid row (so the footer stays put); the
-            facts column inside it is positioned against the canvas, top-aligned
-            with the clip frame and as tall as it. The map fills what the facts
-            leave. */}
+            map fills what the facts leave. */}
         <div className="ov-reveal-body">
-        <div
-          className="ov-reveal-facts"
-          style={{
-            top: `calc(${CLIP_FRAME.y} * var(--u))`,
-            height: `calc(${CLIP_FRAME.h} * var(--u))`,
-          }}
-        >
-          <h2 className="ov-track-name">
-            <small>Round {round}</small>
-            <TrackFlag track={track} large />
-            {track}
-          </h2>
-          {facts?.location && <p className="ov-reveal-location">{facts.location}</p>}
-          <div className="ov-facts">
-            <div className="ov-fact">
-              <span>Length</span>
-              <b>{facts?.length ?? '—'}</b>
+          <div className="ov-reveal-facts" style={REVEAL_FACTS_STYLE}>
+            <h2 className="ov-track-name">
+              <small>Round {round}</small>
+              <TrackFlag track={track} large />
+              {track}
+            </h2>
+            {facts?.location && <p className="ov-reveal-location">{facts.location}</p>}
+            <div className="ov-facts">
+              <div className="ov-fact">
+                <span>Length</span>
+                <b>{facts?.length ?? '—'}</b>
+              </div>
+              <div className="ov-fact">
+                <span>Turns</span>
+                <b>{facts?.turns ?? '—'}</b>
+              </div>
+              {weather && (
+                <div className="ov-fact ov-fact-weather is-wide">
+                  <span>Conditions</span>
+                  <b>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- static badge */}
+                    <img src={WEATHER[weather].badge} alt="" />
+                    {WEATHER[weather].label}
+                  </b>
+                </div>
+              )}
             </div>
-            <div className="ov-fact">
-              <span>Turns</span>
-              <b>{facts?.turns ?? '—'}</b>
-            </div>
-            {weather && (
-              <div className="ov-fact ov-fact-weather is-wide">
-                <span>Conditions</span>
-                <b>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- static badge */}
-                  <img src={WEATHER[weather].badge} alt="" />
-                  {WEATHER[weather].label}
-                </b>
+            {map && (
+              <div className="ov-reveal-map">
+                {/* eslint-disable-next-line @next/next/no-img-element -- static map art */}
+                <img src={map} alt={`${track} circuit map`} />
               </div>
             )}
           </div>
-          {map && (
-            <div className="ov-reveal-map">
-              {/* eslint-disable-next-line @next/next/no-img-element -- static map art */}
-              <img src={map} alt={`${track} circuit map`} />
-            </div>
-          )}
-        </div>
         </div>
 
         <OverlayFoot left={<>{championship.raceFormat}</>} right="simracingalliance.com/acc/calendar" />
       </OverlayFrame>
-    </div>
+    </RevealShell>
   );
 }

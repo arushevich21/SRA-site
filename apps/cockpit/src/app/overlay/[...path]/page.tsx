@@ -23,13 +23,15 @@ import { RaceInformationOverlay } from '@/components/stream/RaceInformationOverl
 import { IntermissionOverlay } from '@/components/stream/IntermissionOverlay';
 import { SponsorsOverlay } from '@/components/stream/SponsorsOverlay';
 import { PartnersOverlay } from '@/components/stream/PartnersOverlay';
-import { CommentatorsOverlay } from '@/components/stream/CommentatorsOverlay';
+import { CommentatorsOverlay, parseLowerThirdCadence } from '@/components/stream/CommentatorsOverlay';
 import { SHOW_WINDOWS, ShowOverlay } from '@/components/stream/ShowOverlay';
 import { LIVERY_WINDOWS, LiveryOverlay } from '@/components/stream/LiveryOverlay';
 import { RevealOverlay, parseWeather } from '@/components/stream/RevealOverlay';
 import { TrackListOverlay, parseRoundRange, parseTrackList } from '@/components/stream/TrackListOverlay';
 import { parseCommentators } from '@/components/stream/commentators';
 import { eventInstant, hasEventTime } from '@/lib/event-time';
+import { hasTrackVideo } from '@/lib/stream/media';
+import { trackMapKey } from '@/components/stream/track-maps';
 
 // OBS browser sources for the race broadcast. URL shapes match the scene
 // collection the crew already runs (scripts/stream-e2e), so swapping the host
@@ -38,15 +40,21 @@ import { eventInstant, hasEventTime } from '@/lib/event-time';
 //   /overlay/standings/division_1/driver?page=2
 //   /overlay/standings/division_1/team
 //   /overlay/season_calendar/1
-//   /overlay/track_maps/current            (or /track_maps/silverstone)
+//   /overlay/track_maps/current            (or /track_maps/silverstone) — opens on
+//     the circuit's hero clip and glides it into frame when one exists
+//     (&video=0 for the still, &intro=0 to skip the move; refresh on scene
+//     switch in OBS so the intro plays from the top)
 //   /overlay/race_information/1            transparent — label only
 //   /overlay/intermission/1                the division's booth voice channel, live
-//   /overlay/commentators/1                transparent lower-third, same source
+//   /overlay/commentators/1                transparent lower-third, same source;
+//     on air 10 s every 5 min, fading in and out (?every=300&hold=10 to tune,
+//     ?every=0 to keep it up permanently)
 //     (…?names=A|Lead,B|Analyst on either overrides the channel with a typed list)
 //   /overlay/sponsors?footer_message=STREAM%20STARTING%20SOON|...&opacity=.5
 //   /overlay/sponsors?video=1&footer_message=...   same, over the ACC hero video
 //     (&headline=top puts the message under the lockup instead of over the partners)
-//   /overlay/sponsors?mode=horizontal_marquee   transparent ticker strip
+//   /overlay/sponsors?mode=horizontal_marquee   transparent ticker strip that
+//     fills the source — size the browser source to the strip (e.g. 1100×64)
 //   /overlay/partners                      transparent logo slideshow
 //   /overlay/show?title=...&names=A,B,C    talk-show bed: three camera windows
 //     cut through the page (cameras go underneath in OBS), names left to right
@@ -152,9 +160,20 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
       !value || value === 'current'
         ? (round?.round.track ?? 'Track TBA')
         : value.replaceAll(/[-_]/g, ' ');
+    // The season's circuits have a hero clip: the scene opens on it and glides
+    // it into frame, the way the schedule reveal did. ?video=0 forces the
+    // still; ?intro=0 skips the move.
+    const video = query.video !== '0' && (await hasTrackVideo(trackMapKey(track)));
     return (
       <OverlayCanvas refresh={refresh}>
-        <TrackOverlay championship={championship} division={division} track={track} round={round} />
+        <TrackOverlay
+          championship={championship}
+          division={division}
+          track={track}
+          round={round}
+          video={video}
+          intro={query.intro !== '0'}
+        />
       </OverlayCanvas>
     );
   }
@@ -178,7 +197,7 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
   if (scene === 'commentators') {
     return (
       <OverlayCanvas refresh={refresh} transparent>
-        <CommentatorsOverlay commentators={booth} />
+        <CommentatorsOverlay commentators={booth} cadence={parseLowerThirdCadence(query)} />
       </OverlayCanvas>
     );
   }

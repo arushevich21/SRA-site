@@ -16,7 +16,9 @@ export function RaceInformationOverlay({
 }) {
   return (
     <div className="ov-race-label" role="status">
-      <span className="is-gold">{seasonShort(championship)}</span>
+      <span className="is-gold">
+        <span>{seasonShort(championship)}</span>
+      </span>
       {division != null && <span>D{division}</span>}
       <span className="is-round">R{round?.round.round ?? '–'}</span>
       <span className="is-track">{round ? shortTrackName(round.round.track) : 'Track TBA'}</span>

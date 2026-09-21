@@ -162,8 +162,14 @@
 .ov-ticker .ov-star { margin-left: 0.3em; }
 @keyframes ov-ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
-/* Stand-alone marquee source (sponsors?mode=horizontal_marquee). */
-.ov-ticker-only .ov-ticker { position: relative; }
+/* Stand-alone marquee source (sponsors?mode=horizontal_marquee). The ticker
+   fills whatever box OBS gives the source — its height sets the type size —
+   so the crew sizes the browser source to the strip they have room for
+   (e.g. 1100×64 beside the race label) rather than scaling a full canvas
+   down to it. */
+.ov-ticker-only.overlay-root { --u: calc(100vh / 2.4); width: 100vw; min-height: 100vh; }
+.ov-ticker-only .overlay-canvas { width: 100vw; height: 100vh; }
+.ov-ticker-only .ov-ticker { position: relative; height: 100vh; }
 
 /* ── Lockup: series identity + on-air context ────────────────────────────── */
 .ov-lockup {
@@ -386,30 +392,52 @@
 }
 .ov-points small.is-leader { color: var(--ov-gold); }
 
-/* Team rows: name + stacked roster */
-.ov-row.is-team { grid-template-columns: calc(3 * var(--u)) minmax(0, 1fr) calc(5 * var(--u)); }
-.ov-team { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: calc(1 * var(--u)); }
+/* Team rows: name over its car(s), then the roster in its own column so
+   names never crowd the team name or the points. */
+.ov-row.is-team {
+  grid-template-columns: calc(3 * var(--u)) minmax(0, 1fr) minmax(calc(13 * var(--u)), auto) calc(5 * var(--u));
+  gap: calc(1 * var(--u));
+  padding-right: calc(1 * var(--u));
+}
+.ov-team { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: calc(0.3 * var(--u)); line-height: 1; }
 .ov-team b {
   font-family: var(--ov-display);
   font-weight: 700;
-  font-size: calc(1.45 * var(--u));
+  font-size: calc(1.35 * var(--u));
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ov-roster { display: flex; flex-direction: column; gap: calc(0.1 * var(--u)); align-items: flex-end; }
+.ov-team-cars {
+  display: flex;
+  align-items: center;
+  gap: calc(0.9 * var(--u));
+  min-width: 0;
+  font-family: var(--ov-mono);
+  font-size: calc(0.7 * var(--u));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ov-txt-3);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ov-team-cars > span { display: inline-flex; align-items: center; gap: calc(0.4 * var(--u)); min-width: 0; }
+.ov-team-cars .ov-car { width: calc(1.5 * var(--u)); height: calc(1.5 * var(--u)); color: var(--ov-txt-2); }
+.ov-team-cars .ov-car > span { width: calc(1.4 * var(--u)) !important; height: calc(1.4 * var(--u)) !important; }
+.ov-roster { display: flex; flex-direction: column; gap: calc(0.25 * var(--u)); align-items: flex-end; justify-content: center; min-width: 0; }
 .ov-roster span {
   display: inline-flex;
   align-items: center;
-  gap: calc(0.4 * var(--u));
-  font-size: calc(0.92 * var(--u));
+  gap: calc(0.5 * var(--u));
+  font-size: calc(0.95 * var(--u));
   color: var(--ov-txt-2);
   white-space: nowrap;
 }
-.ov-roster .ov-car { width: calc(1.7 * var(--u)); height: calc(1.7 * var(--u)); }
-.ov-roster .ov-car > span { width: calc(1.6 * var(--u)) !important; height: calc(1.6 * var(--u)) !important; }
+/* The driver's D1–D4 Gold/Silver badge is landscape art, so it's sized by height. */
+.ov-tier { display: inline-flex; align-items: center; justify-content: center; width: calc(1.9 * var(--u)); height: calc(1.4 * var(--u)); }
+.ov-tier img { width: 100%; height: 100%; object-fit: contain; }
 
 .ov-empty {
   display: grid;
@@ -621,13 +649,18 @@
   transform: translateX(-50%) var(--ov-skew);
   display: flex;
   align-items: stretch;
+  overflow: hidden;
   border: calc(0.12 * var(--u)) solid var(--ov-line-2);
   background: rgba(8, 9, 12, 0.92);
   box-shadow: 0 calc(0.3 * var(--u)) calc(1 * var(--u)) rgba(0,0,0,0.5);
 }
 .ov-race-label > span { transform: skewX(9deg); display: flex; align-items: center; padding: calc(0.35 * var(--u)) calc(0.9 * var(--u)); font-family: var(--ov-display); font-weight: 800; font-size: calc(1.25 * var(--u)); line-height: 1; text-transform: uppercase; letter-spacing: 0.02em; }
 .ov-race-label > span + span { border-left: calc(0.12 * var(--u)) solid var(--ov-line-2); }
-.ov-race-label .is-gold { background: var(--ov-gold); color: #08090c; }
+/* Same construction as .ov-context-division: the gold season block keeps
+   the container's slant so both of its edges run diagonal and it reads as
+   one parallelogram; only its text is un-skewed. */
+.ov-race-label .is-gold { transform: none; padding-left: calc(1.1 * var(--u)); background: var(--ov-gold); color: #08090c; }
+.ov-race-label .is-gold > span { display: block; transform: skewX(9deg); }
 .ov-race-label .is-track { color: var(--ov-txt); }
 .ov-race-label .is-round { color: var(--ov-gold); }
 
@@ -708,6 +741,9 @@
   gap: calc(0.35 * var(--u));
   filter: drop-shadow(0 calc(0.3 * var(--u)) calc(1 * var(--u)) rgba(0,0,0,0.55));
 }
+/* Timed showings: CommentatorsOverlay emits the keyframes (the period and
+   hold come off the URL) and sets the duration inline. */
+.ov-lower-third.is-timed { animation: ov-lower-third-cadence 300s ease-in-out infinite both; }
 .ov-lower-third-kicker {
   align-self: flex-start;
   display: inline-flex;
@@ -904,8 +940,11 @@
 .ov-music iframe { display: block; width: 100%; height: 100%; border: 0; }
 
 /* ── Partners slideshow (transparent, corner source) ─────────────────────── */
-.ov-slideshow { position: absolute; inset: 0; display: grid; place-items: center; }
-.ov-slideshow img { grid-area: 1 / 1; width: 70%; height: 70%; object-fit: contain; opacity: 0; animation: ov-slide var(--ov-slide-total) infinite both; animation-delay: var(--ov-slide-delay); }
+/* Every logo gets the same definite box (absolute + inset) — stacking them
+   in one auto-sized grid cell let the tallest portrait logo set the row, so
+   every other logo was centred in a box taller than the source and cut off. */
+.ov-slideshow { position: absolute; inset: 0; }
+.ov-slideshow img { position: absolute; inset: 15%; width: 70%; height: 70%; object-fit: contain; opacity: 0; animation: ov-slide var(--ov-slide-total) infinite both; animation-delay: var(--ov-slide-delay); }
 @keyframes ov-slide { 0% { opacity: 0; } 1% { opacity: 1; } 7.5% { opacity: 1; } 9% { opacity: 0; } 100% { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
