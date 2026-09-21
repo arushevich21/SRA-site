@@ -40,7 +40,7 @@ import { trackMapKey } from '@/components/stream/track-maps';
 //   /overlay/standings/division_1/driver?page=2
 //   /overlay/standings/division_1/team
 //   /overlay/season_calendar/1
-//   /overlay/track_maps/current            (or /track_maps/silverstone) — opens on
+//   /overlay/track_maps/current?division=2 (or /track_maps/silverstone) — opens on
 //     the circuit's hero clip and glides it into frame when one exists
 //     (&video=0 for the still, &intro=0 to skip the move; refresh on scene
 //     switch in OBS so the intro plays from the top)
@@ -78,7 +78,9 @@ import { trackMapKey } from '@/components/stream/track-maps';
 // pointing a 1920×1080 source at these URLs gives up resolution for nothing.
 //
 // Global query params: ?championship=<slug> (default: the running ACC
-// division series), ?round=N (default: the division's current round),
+// division series), ?division=N (default: the path's division_N segment, else
+// the first division — track_maps has no such segment, so set it there),
+// ?round=N (default: the division's current round),
 // ?refresh=<seconds> (default 900: how often the source re-fetches itself;
 // every source also refreshes an hour before its division's green flag).
 
@@ -104,9 +106,11 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
   if (!championship) notFound();
 
   const divisionIds = streamDivisionIds(championship);
-  const requested = Number.parseInt(value?.replace(/^division_/, '') ?? '', 10);
-  // A division segment that isn't one this series runs falls back to the
-  // first, never 404s — a scene collection outlives a season's grid.
+  // ?division=N for scenes whose path segment names something else (the
+  // track map's circuit), else the division_N / N segment.
+  const requested = Number.parseInt(query.division ?? value?.replace(/^division_/, '') ?? '', 10);
+  // A division that isn't one this series runs falls back to the first,
+  // never 404s — a scene collection outlives a season's grid.
   const division = divisionIds.includes(requested) ? requested : (divisionIds[0] ?? null);
 
   const roundOverride = query.round ? Number.parseInt(query.round, 10) : undefined;
@@ -177,7 +181,6 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
       <OverlayCanvas refresh={refresh}>
         <TrackOverlay
           championship={championship}
-          division={division}
           track={track}
           round={round}
           video={video}
