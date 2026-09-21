@@ -153,7 +153,8 @@ export function OverlayLockup({
               <b>Round {round.round.round}</b>
               <span>
                 <TrackFlag track={round.round.track} />
-                {shortTrackName(round.round.track)}
+                {/* Alone in the chip there's room for the circuit's full name. */}
+                {division == null ? round.round.track : shortTrackName(round.round.track)}
               </span>
             </div>
           )}

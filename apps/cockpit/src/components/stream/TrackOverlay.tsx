@@ -13,14 +13,12 @@ import { trackFacts, trackMapKey, trackMapUrl, trackPhotoUrl } from './track-map
 // Circuits with no clip get the still: map and facts over the darkened photo.
 export function TrackOverlay({
   championship,
-  division,
   track,
   round,
   video = false,
   intro = true,
 }: {
   championship: ChampionshipContent;
-  division: number | null;
   track: string;
   round: StreamRound | null;
   video?: boolean;
@@ -31,12 +29,15 @@ export function TrackOverlay({
   const facts = trackFacts(track);
   const when = round ? eventDateTimeParts(round.startsAt, 'America/New_York') : null;
 
+  // No division block up top: the round and circuit take the whole chip. The
+  // division already did its job upstream, picking which race night the
+  // round (and its green-flag time) belongs to.
   const lockup = (
     <OverlayLockup
       championship={championship}
       title="Track Map"
       subtitle={facts?.location}
-      division={division}
+      division={null}
       round={round}
     />
   );

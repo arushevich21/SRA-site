@@ -287,6 +287,14 @@
   color: var(--ov-txt-3);
   margin-top: calc(0.25 * var(--u));
 }
+/* Without a division block the round is the chip: gold, bigger, with the
+   circuit's full name under it at reading size. */
+.ov-context-round:only-child {
+  padding: calc(0.55 * var(--u)) calc(1.5 * var(--u)) calc(0.55 * var(--u)) calc(1.4 * var(--u));
+  border-left: calc(0.35 * var(--u)) solid var(--ov-gold);
+}
+.ov-context-round:only-child b { font-size: calc(1.7 * var(--u)); color: var(--ov-gold); }
+.ov-context-round:only-child span { font-size: calc(0.86 * var(--u)); color: var(--ov-txt); letter-spacing: 0.14em; }
 
 /* Circuit country flag — inline with whatever names the track. */
 .ov-flag { display: inline-block; height: 1em; width: auto; margin-right: 0.45em; vertical-align: -0.1em; border-radius: 0.1em; box-shadow: 0 0 0 calc(0.06 * var(--u)) rgba(255,255,255,0.18); }
