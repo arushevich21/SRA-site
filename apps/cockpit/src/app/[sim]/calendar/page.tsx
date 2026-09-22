@@ -6,6 +6,7 @@ import { getSimBySlug } from '@/content/sims';
 import { formatScheduleDateTime } from '@/lib/schedule-format';
 import { getChampionships } from '@/lib/championships-store';
 import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid';
+import { practiceRaceHref } from '@/lib/acc/practice-race';
 import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
 import { AccServerStatus } from '@/components/AccServerStatus';
@@ -74,11 +75,13 @@ export default async function SimCalendarPage({
 
   // Admin-managed, non-race entries scoped to this sim (game must match
   // exactly — null-game events are cumulative-calendar-only, see /calendar).
+  // A "R<N> Practice Race" entry with no href of its own links to the
+  // practice-race results picker (lib/acc/practice-race.ts).
   for (const e of calendarEvents.filter((e) => e.game === sim.game)) {
     gridEvents.push({
       iso: e.eventDate,
       title: e.title,
-      href: e.href ?? `/${slug}/calendar`,
+      href: e.href ?? practiceRaceHref(e) ?? `/${slug}/calendar`,
       color: e.color ?? sim.accentColor,
     });
   }
