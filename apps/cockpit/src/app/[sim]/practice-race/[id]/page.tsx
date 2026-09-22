@@ -66,9 +66,6 @@ export default async function PracticeRacePickerPage({ params }: PageProps) {
                   <DivisionBadge key={d} division={d} height={44} />
                 ))}
               </span>
-              <span className="font-display font-black text-[28px] uppercase leading-none text-txt">
-                ({group.label})
-              </span>
               <span className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3">
                 {race ? 'View results →' : 'No results posted yet'}
               </span>
