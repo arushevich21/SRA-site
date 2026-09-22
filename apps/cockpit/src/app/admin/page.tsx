@@ -23,6 +23,18 @@ const ADMIN_SECTIONS: {
     ],
   },
   {
+    title: 'Stream',
+    description: 'Broadcast assets generated from the championship schedule.',
+    tools: [
+      {
+        label: 'Race Thumbnails',
+        href: '/admin/thumbnails',
+        description:
+          'YouTube/Twitch thumbnail for every round × division of the series on air — division badge, circuit map, weather, partner strip. Preview and download; nothing is uploaded automatically.',
+      },
+    ],
+  },
+  {
     title: 'Calendar Events',
     description: 'Manage non-race calendar entries — deadlines, streams, announcements.',
     tools: [
