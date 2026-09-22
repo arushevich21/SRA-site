@@ -5,6 +5,7 @@ import { formatScheduleDateTime } from '@/lib/schedule-format';
 import { getChampionships } from '@/lib/championships-store';
 import { SIMS } from '@/content/sims';
 import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid';
+import { practiceRaceHref } from '@/lib/acc/practice-race';
 import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
 import { getCalendarEvents } from '@/lib/calendar-events-store';
@@ -70,7 +71,7 @@ export default async function CalendarPage() {
     gridEvents.push({
       iso: e.eventDate,
       title: e.title,
-      href: e.href ?? '/calendar',
+      href: e.href ?? practiceRaceHref(e) ?? '/calendar',
       color: e.color ?? sim?.accentColor,
     });
   }
