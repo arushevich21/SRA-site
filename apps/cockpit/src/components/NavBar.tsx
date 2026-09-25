@@ -39,6 +39,7 @@ const MAIN_NAV: NavItem[] = [
       { label: 'Drivers & Stats', href: '/about/drivers' },
       { label: 'Statistics', href: '/about/stats' },
       { label: 'Accolades', href: '/about/accolades' },
+      { label: 'Broadcasts', href: '/about/broadcasts' },
       { label: 'Partners', href: '/about/partners' },
       { label: 'Support SRA', href: '/about/sponsor' },
       { label: 'Discord', href: '/about/discord' },
