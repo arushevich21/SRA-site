@@ -8,7 +8,7 @@ import {
   clampBallast,
   clampRestrictor,
 } from '@/content/bop';
-import { saveBop, type BopEntry } from './actions';
+import { saveBop, pushBopToAccsm, type BopEntry } from './actions';
 
 export type BopCell = {
   track: string;
@@ -95,6 +95,31 @@ export default function BopEditor({
     startTransition(async () => {
       const res = await saveBop(collectEntries());
       setMsg(res.ok ? 'Saved.' : `Save failed: ${res.error}`);
+    });
+  }
+
+  // Save-then-push. The bot writes whatever is in the DB at consume time, so
+  // pushing an unsaved grid would publish the *previous* values while the screen
+  // showed the new ones — the one failure mode worth designing out of a control
+  // that changes every car on track.
+  function onPush() {
+    setMsg(null);
+    startTransition(async () => {
+      const saved = await saveBop(collectEntries());
+      if (!saved.ok) {
+        setMsg(`Save failed, nothing pushed: ${saved.error}`);
+        return;
+      }
+      const res = await pushBopToAccsm();
+      if (!res.ok) {
+        setMsg(`Saved, but push failed: ${res.error}`);
+        return;
+      }
+      setMsg(
+        res.queued
+          ? 'Saved + queued — the bot writes it to accsm1 + accsm2 within ~30s.'
+          : 'Saved — a push was already queued, and it will pick up these values.',
+      );
     });
   }
 
@@ -188,6 +213,25 @@ export default function BopEditor({
             className="font-mono text-[11px] tracking-[.2em] uppercase px-5 py-2 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors disabled:opacity-50"
           >
             {pending ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              // Live-server write, and a BoP applies to every car on track — so
+              // it takes a deliberate confirm, not just a click.
+              if (
+                window.confirm(
+                  'Save this grid and push it to the live ACCSM BoP on accsm1 + accsm2?\n\n' +
+                    'It applies to every car in every session launched after the write.',
+                )
+              ) {
+                onPush();
+              }
+            }}
+            disabled={pending}
+            className="font-mono text-[11px] tracking-[.2em] uppercase px-5 py-2 border border-gold text-gold font-bold hover:bg-gold hover:text-carbon transition-colors disabled:opacity-50"
+          >
+            {pending ? 'Working…' : 'Push to ACCSM →'}
           </button>
         </div>
       </div>

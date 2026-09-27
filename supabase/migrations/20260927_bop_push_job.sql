@@ -1,0 +1,34 @@
+-- Custom BoP -> ACCSM sync: the job type that carries a BoP publish to the bot.
+--
+-- Until now /admin/bop was a dead end with respect to the live servers: the
+-- editor produced a byte-correct ACCSM bop file, someone downloaded it, and
+-- someone uploaded it by hand into each manager. This is the same outbox
+-- pattern the entrylist sync already uses (20260825d), so the moving parts are
+-- identical: cockpit INSERTs a typed job, SRA-Bot's bot_jobs cog claims it and
+-- does the CIFS write, because only the bot can reach the ACCSM store.
+--
+-- ── Payload is empty, deliberately ───────────────────────────────────────
+--
+-- There is exactly ONE BoP (bop_config holds a single 'default' row, matching
+-- the old site's one Custom BoP page), so there is nothing to name. The bot
+-- reads bop_config + bop_entries at consume time — same reasoning as
+-- entrylist_push carrying only championship_key and rebuilding from current DB
+-- state: anything stashed in the payload could only go stale, never help.
+--
+-- ── Dedup on `type` ──────────────────────────────────────────────────────
+--
+-- entrylist_push dedups on payload->>'championship_key' because it has one job
+-- per championship. With an empty payload the equivalent here is `type`
+-- itself: unique on (type) under the pending predicate means at most one
+-- pending bop_push can exist, and a second click while one is queued is a
+-- no-op insert rather than a second full rewrite of the BoP file on both
+-- managers. The consumer always writes current DB state, so collapsing two
+-- requests into one loses nothing.
+--
+-- No trigger, and no enqueue from saveBop(): a BoP change alters every car on
+-- track, so publishing is an explicit button in the editor, not a side effect
+-- of saving a draft grid. That is the one intentional difference from the
+-- entrylist sync, which fires automatically on registration.
+create unique index bot_jobs_bop_push_pending_dedup
+  on public.bot_jobs (type)
+  where ((type = 'bop_push') and (status = 'pending'));

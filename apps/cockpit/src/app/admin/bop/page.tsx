@@ -36,9 +36,13 @@ export default async function AdminBopPage() {
       </h1>
       <p className="font-sans text-[14px] text-txt-3 mb-10 max-w-[720px]">
         Balance of Performance ballast &amp; restrictor per track and car. Edit
-        the grid, <span className="text-txt-2">Save</span>, then{' '}
-        <span className="text-txt-2">Download bop.json</span> and upload it to
-        each championship in ACCSM. Blank/0 cells are omitted from the file.
+        the grid, then <span className="text-txt-2">Push to ACCSM</span> to
+        publish it into the live BoP on both managers — it applies to every
+        session launched after the write.{' '}
+        <span className="text-txt-2">Save</span> keeps a draft here without
+        touching the servers, and{' '}
+        <span className="text-txt-2">Download bop.json</span> still produces the
+        file for a manual upload. Blank/0 cells are omitted.
       </p>
 
       <BopEditor
