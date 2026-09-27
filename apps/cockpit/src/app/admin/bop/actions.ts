@@ -53,3 +53,37 @@ export async function saveBop(entries: BopEntry[]): Promise<SaveBopResult> {
   revalidatePath('/about/custom-bop');
   return { ok: true };
 }
+
+export type PushBopResult =
+  | { ok: true; queued: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Publish the saved BoP to the live ACCSM managers.
+ *
+ * Cockpit cannot write the ACCSM store itself — it lives on a CIFS mount only
+ * the bot host has. So this enqueues a `bop_push` job on the `bot_jobs` outbox
+ * (migration 20260927) and SRA-Bot's consumer does the write, the same path the
+ * entrylist sync takes. Pickup is immediate via Realtime, with a 30s poll as
+ * the safety net.
+ *
+ * Deliberately separate from saveBop(): a BoP change alters every car on track,
+ * so it publishes on an explicit click, never as a side effect of saving.
+ *
+ * `queued: false` means a push was already pending (the pending-dedup index) —
+ * that is success, not failure. The consumer writes current DB state whenever
+ * it runs, so one job covers both clicks.
+ */
+export async function pushBopToAccsm(): Promise<PushBopResult> {
+  await requirePermission(ADMIN_PERMISSIONS.BOP);
+
+  const { error } = await supabase
+    .from('bot_jobs')
+    .insert({ type: 'bop_push', payload: {} });
+
+  if (error) {
+    if (error.code === '23505') return { ok: true, queued: false };
+    return { ok: false, error: error.message };
+  }
+  return { ok: true, queued: true };
+}
