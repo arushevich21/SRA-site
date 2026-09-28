@@ -318,6 +318,56 @@ function CarLabel({
   );
 }
 
+// Sort state for the breakdown: a division number, the grand total, or the
+// car name. Total-descending is the default because "which car is most
+// popular" is the question this table exists to answer — alphabetical put the
+// answer nowhere in particular.
+type BreakdownSort = { key: 'car' | 'total' | number; dir: 'asc' | 'desc' };
+
+function SortableHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  align = 'center',
+}: {
+  label: React.ReactNode;
+  sortKey: BreakdownSort['key'];
+  sort: BreakdownSort;
+  onSort: (key: BreakdownSort['key']) => void;
+  align?: 'left' | 'center';
+}) {
+  const active = sort.key === sortKey;
+  return (
+    <th
+      scope="col"
+      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      className={[
+        align === 'left' ? 'text-left px-5' : 'text-center px-4',
+        'py-3 font-mono text-[10px] tracking-[.25em] uppercase font-normal',
+        active ? 'text-txt' : 'text-txt-3',
+      ].join(' ')}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={[
+          'inline-flex items-center gap-1.5 uppercase tracking-[.25em] hover:text-gold-soft transition-colors',
+          align === 'left' ? '' : 'mx-auto',
+        ].join(' ')}
+      >
+        {label}
+        {/* Caret only reads as gold on the active column. A neutral one still
+            shows on the rest so the whole row looks sortable — a header that
+            gives no hint until you click it is a feature nobody finds. */}
+        <span aria-hidden="true" className={active ? 'text-gold' : 'text-txt-3/30'}>
+          {active ? (sort.dir === 'asc' ? '▲' : '▼') : '▾'}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 function BreakdownTable({
   teams,
   showDivisions,
@@ -325,18 +375,31 @@ function BreakdownTable({
   teams: Team[];
   showDivisions: boolean;
 }) {
-  // Keyed by division on a graded championship. Ungraded entries have a NULL
-  // division_id, which would land in a column no header renders and total to
-  // zero — so those get the car-only table below instead.
+  const [sort, setSort] = useState<BreakdownSort>({ key: 'total', dir: 'desc' });
+
+  // Clicking a new column starts from the most useful direction for it:
+  // biggest-first for a count, A–Z for the car name. Clicking the active
+  // column flips it.
+  const onSort = (key: BreakdownSort['key']) =>
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: key === 'car' ? 'asc' : 'desc' },
+    );
+
+  // COUNTS ARE CARS, NOT TEAMS. A team fields one car per driver, so a full
+  // two-driver team is two cars on the grid — but a team that hasn't found a
+  // teammate yet is one. Multiplying teams by max_team_size would invent a car
+  // for every unfilled seat (at time of writing, 17 of 95 teams are
+  // half-empty), so this counts members instead. That also stays correct on a
+  // solo championship, where members.length is 1 and cars equals teams.
   const counts: Record<string, Partial<Record<number, number>>> = {};
   for (const team of teams) {
     if (team.division_id == null) continue;
     counts[team.car] = counts[team.car] ?? {};
     counts[team.car][team.division_id] =
-      (counts[team.car][team.division_id] ?? 0) + 1;
+      (counts[team.car][team.division_id] ?? 0) + team.members.length;
   }
-
-  const cars = [...new Set(teams.map((t) => t.car))].sort();
 
   // Logo per car name — every team on the same car resolved the same
   // icon/logo server-side, so the first one seen is as good as any.
@@ -359,35 +422,44 @@ function BreakdownTable({
     />
   );
 
-  if (cars.length === 0) {
-    return (
-      <div className="border border-line border-t-0 px-5 py-6">
-        <p className="font-mono text-[12px] text-txt-3">No entries yet.</p>
-      </div>
-    );
-  }
+  const emptyState = (
+    <div className="border border-line border-t-0 px-5 py-6">
+      <p className="font-mono text-[12px] text-txt-3">No entries yet.</p>
+    </div>
+  );
+
+  if (teams.length === 0) return emptyState;
 
   // Single-grid championship: car counts are the whole breakdown.
   if (!showDivisions) {
-    const carCounts = cars
-      .map((car) => ({ car, n: teams.filter((t) => t.car === car).length }))
-      .sort((a, b) => b.n - a.n || a.car.localeCompare(b.car));
+    const rows = [...new Set(teams.map((t) => t.car))].map((car) => ({
+      car,
+      total: teams
+        .filter((t) => t.car === car)
+        .reduce((s, t) => s + t.members.length, 0),
+    }));
+    // Only 'car' and 'total' exist here, so a division key left over from the
+    // graded table falls through to the total comparison.
+    const sorted = [...rows].sort((a, b) => {
+      const d =
+        sort.key === 'car'
+          ? a.car.localeCompare(b.car)
+          : a.total - b.total || a.car.localeCompare(b.car);
+      return sort.dir === 'asc' ? d : -d;
+    });
+    const grand = rows.reduce((s, r) => s + r.total, 0);
 
     return (
       <div className="border border-line border-t-0 overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-line">
-              <th className="text-left px-5 py-3 font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 font-normal">
-                Car
-              </th>
-              <th className="text-center px-4 py-3 font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 font-normal">
-                Entries
-              </th>
+              <SortableHeader label="Car" sortKey="car" sort={sort} onSort={onSort} align="left" />
+              <SortableHeader label="Cars" sortKey="total" sort={sort} onSort={onSort} />
             </tr>
           </thead>
           <tbody>
-            {carCounts.map(({ car, n }, i) => (
+            {sorted.map(({ car, total }, i) => (
               <tr
                 key={car}
                 className={[
@@ -395,11 +467,9 @@ function BreakdownTable({
                   i % 2 === 1 ? 'bg-panel-2/20' : '',
                 ].join(' ')}
               >
-                <td className="px-5 py-2.5">
-                  {carCell(car)}
-                </td>
+                <td className="px-5 py-2.5">{carCell(car)}</td>
                 <td className="text-center px-4 py-2.5 font-mono text-[12px] font-bold text-txt">
-                  {n}
+                  {total}
                 </td>
               </tr>
             ))}
@@ -408,7 +478,7 @@ function BreakdownTable({
                 Total
               </td>
               <td className="text-center px-4 py-2.5 font-mono text-[12px] font-bold text-gold">
-                {teams.length}
+                {grand}
               </td>
             </tr>
           </tbody>
@@ -417,58 +487,78 @@ function BreakdownTable({
     );
   }
 
+  // Rows come from `counts`, not from every car seen: an ungraded entry (NULL
+  // division_id) contributes to no column, so building rows from all cars
+  // would render a line of nothing but dashes.
+  const rows = Object.keys(counts).map((car) => ({
+    car,
+    perDiv: counts[car] ?? {},
+    total: DIVISIONS.reduce((s, d) => s + (counts[car]?.[d] ?? 0), 0),
+  }));
+
+  if (rows.length === 0) return emptyState;
+
+  const sorted = [...rows].sort((a, b) => {
+    let d: number;
+    if (sort.key === 'car') {
+      d = a.car.localeCompare(b.car);
+    } else if (sort.key === 'total') {
+      d = a.total - b.total || a.car.localeCompare(b.car);
+    } else {
+      // Within a division, ties fall back to the overall total and then the
+      // name, so the order stays stable instead of following key order.
+      const an = a.perDiv[sort.key as number] ?? 0;
+      const bn = b.perDiv[sort.key as number] ?? 0;
+      d = an - bn || a.total - b.total || a.car.localeCompare(b.car);
+    }
+    return sort.dir === 'asc' ? d : -d;
+  });
+
+  const divTotal = (d: number) => rows.reduce((s, r) => s + (r.perDiv[d] ?? 0), 0);
+  // Sum of the rows, not teams.length — the footer has to agree with the
+  // column above it, and ungraded entries never made it into one.
+  const grand = rows.reduce((s, r) => s + r.total, 0);
+
   return (
     <div className="border border-line border-t-0 overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-line">
-            <th className="text-left px-5 py-3 font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 font-normal">
-              Car
-            </th>
+            <SortableHeader label="Car" sortKey="car" sort={sort} onSort={onSort} align="left" />
             {DIVISIONS.map((d) => (
-              <th
-                key={d}
-                className="text-center px-4 py-3 font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 font-normal"
-              >
-                Div {d}
-              </th>
+              <SortableHeader key={d} label={`Div ${d}`} sortKey={d} sort={sort} onSort={onSort} />
             ))}
-            <th className="text-center px-4 py-3 font-mono text-[10px] tracking-[.25em] uppercase text-txt-3 font-normal">
-              Total
-            </th>
+            <SortableHeader label="Total" sortKey="total" sort={sort} onSort={onSort} />
           </tr>
         </thead>
         <tbody>
-          {cars.map((car, i) => {
-            const total = DIVISIONS.reduce(
-              (s, d) => s + (counts[car]?.[d] ?? 0),
-              0,
-            );
-            return (
-              <tr
-                key={car}
-                className={[
-                  'border-b border-line/30 last:border-b-0',
-                  i % 2 === 1 ? 'bg-panel-2/20' : '',
-                ].join(' ')}
-              >
-                <td className="px-5 py-2.5">
-                  {carCell(car)}
+          {sorted.map(({ car, perDiv, total }, i) => (
+            <tr
+              key={car}
+              className={[
+                'border-b border-line/30 last:border-b-0',
+                i % 2 === 1 ? 'bg-panel-2/20' : '',
+              ].join(' ')}
+            >
+              <td className="px-5 py-2.5">{carCell(car)}</td>
+              {DIVISIONS.map((d) => (
+                <td
+                  key={d}
+                  className={[
+                    'text-center px-4 py-2.5 font-mono text-[12px]',
+                    // The sorted column reads brighter, so it's obvious which
+                    // one the order is following.
+                    sort.key === d ? 'text-txt' : 'text-txt-2',
+                  ].join(' ')}
+                >
+                  {perDiv[d] ?? '—'}
                 </td>
-                {DIVISIONS.map((d) => (
-                  <td
-                    key={d}
-                    className="text-center px-4 py-2.5 font-mono text-[12px] text-txt-2"
-                  >
-                    {counts[car]?.[d] ?? '—'}
-                  </td>
-                ))}
-                <td className="text-center px-4 py-2.5 font-mono text-[12px] font-bold text-txt">
-                  {total}
-                </td>
-              </tr>
-            );
-          })}
+              ))}
+              <td className="text-center px-4 py-2.5 font-mono text-[12px] font-bold text-txt">
+                {total}
+              </td>
+            </tr>
+          ))}
           <tr className="border-t border-line">
             <td className="px-5 py-2.5 font-mono text-[10px] tracking-[.25em] uppercase text-txt-3">
               Total
@@ -478,14 +568,11 @@ function BreakdownTable({
                 key={d}
                 className="text-center px-4 py-2.5 font-mono text-[12px] font-bold text-txt"
               >
-                {Object.values(counts).reduce(
-                  (s, dc) => s + (dc?.[d] ?? 0),
-                  0,
-                )}
+                {divTotal(d)}
               </td>
             ))}
             <td className="text-center px-4 py-2.5 font-mono text-[12px] font-bold text-gold">
-              {teams.length}
+              {grand}
             </td>
           </tr>
         </tbody>
