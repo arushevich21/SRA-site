@@ -41,6 +41,7 @@ const MAIN_NAV: NavItem[] = [
       { label: 'Accolades', href: '/about/accolades' },
       { label: 'Partners', href: '/about/partners' },
       { label: 'Support SRA', href: '/about/sponsor' },
+      { label: 'Server Info', href: '/about/servers' },
       { label: 'Discord', href: '/about/discord' },
     ],
   },

@@ -3,7 +3,7 @@ import type { SraqServerStatus } from '@/lib/acc/server-status';
 
 // Text only, deliberately no status dot — this is a staleness signal (when
 // did the bot's loop last see this server produce a session), not a live
-// healthcheck the way AccServerStatus.tsx's SRAM1-7 panel is. A green dot
+// healthcheck the way ServerStatusPanel.tsx's SRAM fleet panel is. A green dot
 // here would claim a kind of freshness this data structurally can't back up
 // (see lib/acc/server-status.ts's header comment).
 export function SraqServerStatus({ servers }: { servers: SraqServerStatus[] }) {

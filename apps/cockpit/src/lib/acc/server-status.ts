@@ -6,7 +6,7 @@ import { supabase } from '../supabase';
 // loop that already reads each server's results directory every 5 minutes
 // (update_leaderboards.py), not from any live server query cockpit could
 // make itself (there's no public healthcheck API for these 5 servers the
-// way there is for the general SRAM1-7 fleet — see AccServerStatus.tsx for
+// way there is for the general SRAM fleet — see lib/server-fleet.ts for
 // that one, a genuinely different mechanism). If the bot's cron stops
 // running, this table just goes stale; render that honestly (age of
 // updated_at/last_seen_at), never a green/red dot implying a live check
