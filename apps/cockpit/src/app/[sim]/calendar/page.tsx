@@ -9,7 +9,7 @@ import { CalendarGrid, type CalendarGridEvent } from '@/components/CalendarGrid'
 import { practiceRaceHref } from '@/lib/acc/practice-race';
 import { GameLabel } from '@/components/GameLabel';
 import { LocalScheduleDate, LocalScheduleTime } from '@/components/LocalScheduleDateTime';
-import { AccServerStatus } from '@/components/AccServerStatus';
+import { ServerStatusPanel } from '@/components/ServerStatusPanel';
 import { getCalendarEvents } from '@/lib/calendar-events-store';
 import { getAccRaceEvents, matchAccRoundsToResultEventsFrom } from '@/lib/acc/race-results-store';
 import { accsmChampionshipIds, type ChampionshipContent, roundNights } from '@/content/championships';
@@ -227,7 +227,9 @@ export default async function SimCalendarPage({
       ) : null}
       </section>
 
-      {sim.game === 'ACC' && <AccServerStatus accentColor={sim.accentColor} />}
+      {sim.game === 'ACC' && (
+        <ServerStatusPanel game={sim.game} accentColor={sim.accentColor} />
+      )}
     </>
   );
 }

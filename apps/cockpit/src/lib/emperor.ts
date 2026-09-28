@@ -2,16 +2,19 @@ export const EMPEROR_ACEVO_BASE_URL = (
   process.env.EMPEROR_ACEVO_BASE_URL ?? 'https://sram1acevo.emperorservers.com'
 ).replace(/\/+$/, '');
 
-// SRA runs multiple ACCSM (ACC Server Manager) instances at
-// accsm1-7.simracingalliance.com. All are wired in here so no code change is
-// needed as servers come online or host one-off events (e.g. quick races) —
-// the cron isolates per-server failures, so any that are idle or unreachable
-// at a given moment fail harmlessly (see runIncrementalRefresh). As of 2026-07
-// accsm1/4/5 are live and accsm6 is unreachable. Production can pin a subset
-// via EMPEROR_ACC_BASE_URLS; leave it unset to poll all seven.
+// SRA runs its ACC fleet on two ACCSM (ACC Server Manager) instances at
+// accsm1-2.simracingalliance.com. Each one hosts SEVERAL race servers —
+// accsm1 carries SRAM1/3/5/7, accsm2 carries SRAM2/4/6 — enumerated in the
+// healthcheck's `Servers` map (see lib/server-fleet.ts).
+//
+// This used to default to accsm1-7. Confirmed 2026-09-28 that only 1 and 2
+// are in use now; 3/4/5/7 no longer resolve and 6 returns 404,
+// so every cron run was paying a full fetch timeout apiece for five hosts
+// that will never answer. Production can still pin a different subset via
+// EMPEROR_ACC_BASE_URLS if a host comes back.
 export const EMPEROR_ACC_BASE_URLS: string[] = (
   process.env.EMPEROR_ACC_BASE_URLS ??
-  [1, 2, 3, 4, 5, 6, 7].map((n) => `https://accsm${n}.simracingalliance.com`).join(',')
+  [1, 2].map((n) => `https://accsm${n}.simracingalliance.com`).join(',')
 )
   .split(',')
   .map((u) => u.trim().replace(/\/+$/, ''))
