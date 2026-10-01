@@ -72,6 +72,9 @@ export async function getEventRegistrationSummary(
 
 export type RegistrationDriverInput = {
   driverId: string;
+  // Omit it. register_entry() derives the ACC category from drivers.tier
+  // (gold -> 2, silver/unassigned -> 1). Only pass a value to override that
+  // for a single entry — it wins over the derivation.
   driverCategory?: number;
   slot?: number;
 };
@@ -158,7 +161,11 @@ export async function createRegistration(
     p_registrant_driver_id: input.registrantDriverId,
     p_drivers: input.drivers.map((d) => ({
       driver_id: d.driverId,
-      driver_category: d.driverCategory ?? 1,
+      // null, NOT a default of 1: register_entry() reads a null here as "no
+      // opinion" and derives the category from drivers.tier (20260922).
+      // Sending 1 for every driver is exactly what put the whole S19 grid on
+      // the grey Silver badge — golds included.
+      driver_category: d.driverCategory ?? null,
       slot: d.slot ?? 0,
     })),
   });
