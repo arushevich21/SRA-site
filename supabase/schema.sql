@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict aaknUchPMys4gMIHziGavxQf7OuT9RXu2dTyU9RCeVEeBTENxLqlHr6WrysMp4x
+\restrict CsA9NIZvFdmur6otyJv8UMhlb3X5qFXYotfsVmE2Y3EWzSfSBxhmny6rtfBB2KA
 
 -- Dumped from database version 17.6
--- Dumped by pg_dump version 17.6
+-- Dumped by pg_dump version 17.10
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -41,6 +41,24 @@ CREATE TYPE public.driver_tier AS ENUM (
     'gold',
     'silver'
 );
+
+
+--
+-- Name: acc_driver_category(public.driver_tier); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.acc_driver_category(p_tier public.driver_tier) RETURNS integer
+    LANGUAGE sql IMMUTABLE
+    AS $$
+  SELECT CASE p_tier WHEN 'gold' THEN 2 ELSE 1 END;
+$$;
+
+
+--
+-- Name: FUNCTION acc_driver_category(p_tier public.driver_tier); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.acc_driver_category(p_tier public.driver_tier) IS 'SRA driver tier -> ACC entrylist driverCategory. gold=2 (Gold, white plate), silver=1 (Silver, grey badge), NULL=1. Single source of the mapping: register_entry() and the S19 backfill both call it.';
 
 
 --
@@ -288,7 +306,12 @@ BEGIN
         VALUES (
           v_row.id,
           (v_driver->>'driver_id')::uuid,
-          coalesce((v_driver->>'driver_category')::integer, 1),
+          -- Explicit value wins (admin override); otherwise derive from tier.
+          coalesce(
+            (v_driver->>'driver_category')::integer,
+            public.acc_driver_category(
+              (SELECT tier FROM drivers WHERE id = (v_driver->>'driver_id')::uuid))
+          ),
           coalesce((v_driver->>'slot')::integer, 0)
         );
       EXCEPTION WHEN unique_violation THEN
@@ -323,7 +346,11 @@ BEGIN
         VALUES (
           v_row.id,
           v_driver_id,
-          coalesce((v_driver->>'driver_category')::integer, 1),
+          -- Explicit value wins (admin override); otherwise derive from tier.
+          coalesce(
+            (v_driver->>'driver_category')::integer,
+            public.acc_driver_category((SELECT tier FROM drivers WHERE id = v_driver_id))
+          ),
           0
         );
       EXCEPTION WHEN unique_violation THEN
@@ -341,6 +368,22 @@ BEGIN
   END IF;
 
   RETURN v_registrant_row;
+END;
+$$;
+
+
+--
+-- Name: registration_drivers_derive_category(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.registration_drivers_derive_category() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+BEGIN
+  NEW.driver_category := public.acc_driver_category(
+    (SELECT tier FROM drivers WHERE id = NEW.driver_id));
+  RETURN NEW;
 END;
 $$;
 
@@ -407,6 +450,612 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END $$;
+
+
+--
+-- Name: stw_can_manage(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_can_manage() RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (
+    select 1 from stw_stewards s
+     where s.driver_id = stw_current_driver_id()
+       and s.is_active
+       and s.role in ('manager', 'head_steward', 'admin')
+  )
+$$;
+
+
+--
+-- Name: stw_ticket_votes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_ticket_votes (
+    ticket_id uuid NOT NULL,
+    voter_id uuid NOT NULL,
+    code text,
+    note text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    entered_by uuid,
+    phase text DEFAULT 'ruling'::text NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    CONSTRAINT stw_ticket_votes_phase_check CHECK ((phase = ANY (ARRAY['ruling'::text, 'appeal'::text])))
+);
+
+
+--
+-- Name: stw_cast_vote(uuid, text[], text, uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_cast_vote(p_ticket_id uuid, p_codes text[] DEFAULT ARRAY[]::text[], p_note text DEFAULT NULL::text, p_voter_id uuid DEFAULT NULL::uuid, p_phase text DEFAULT 'ruling'::text) RETURNS SETOF public.stw_ticket_votes
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_voter uuid;
+  v_note  text;
+  v_code  text;
+begin
+  if not stw_is_steward() then
+    raise exception 'Only stewards may record a recommendation'
+      using errcode = 'PT403';
+  end if;
+
+  if p_phase not in ('ruling', 'appeal') then
+    raise exception 'A recommendation is on the ruling or on the appeal, not %',
+      p_phase using errcode = 'PT400';
+  end if;
+
+  v_voter := coalesce(p_voter_id, stw_current_driver_id());
+  v_note  := nullif(btrim(coalesce(p_note, '')), '');
+
+  if not exists (select 1 from stw_stewards where driver_id = v_voter) then
+    raise exception 'A recommendation can only be recorded for a steward'
+      using errcode = 'PT400';
+  end if;
+
+  if not exists (select 1 from stw_tickets where id = p_ticket_id) then
+    raise exception 'That ticket no longer exists' using errcode = 'PT404';
+  end if;
+
+  if p_phase = 'appeal' and not exists (
+       select 1 from stw_tickets
+        where id = p_ticket_id and appeal_ref is not null) then
+    raise exception 'That ticket has no appeal to recommend on'
+      using errcode = 'PT409';
+  end if;
+
+  -- Replace, not merge. Done inside one function so a steward is never seen
+  -- holding no recommendation at all between the delete and the insert.
+  delete from stw_ticket_votes
+   where ticket_id = p_ticket_id and voter_id = v_voter and phase = p_phase;
+
+  foreach v_code in array coalesce(p_codes, array[]::text[]) loop
+    insert into stw_ticket_votes
+      (ticket_id, voter_id, phase, code, note, entered_by,
+       created_at, updated_at)
+    values
+      (p_ticket_id, v_voter, p_phase, nullif(v_code, '__nfa__'), v_note,
+       stw_current_driver_id(), now(), now());
+  end loop;
+
+  return query
+    select * from stw_ticket_votes
+     where ticket_id = p_ticket_id and voter_id = v_voter and phase = p_phase;
+end;
+$$;
+
+
+--
+-- Name: stw_tickets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_tickets (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    round_id uuid NOT NULL,
+    ref text NOT NULL,
+    origin text DEFAULT 'driver'::text NOT NULL,
+    reporter_id uuid,
+    offender_id uuid,
+    offender_car_number integer,
+    division integer,
+    lap integer,
+    turn integer,
+    content text,
+    thread_id bigint,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    code text,
+    is_lap1 boolean DEFAULT false NOT NULL,
+    official_comment text,
+    notes_private text,
+    flag text,
+    decided_by uuid,
+    decided_at timestamp with time zone,
+    appeal_ref text,
+    appeal_content text,
+    appeal_outcome text,
+    appeal_code text,
+    appeal_comment text,
+    appeal_notes_private text,
+    appeal_decided_by uuid,
+    appeal_decided_at timestamp with time zone,
+    status text DEFAULT 'open'::text NOT NULL,
+    thread_message_id bigint,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by uuid,
+    appeal_thread_id bigint,
+    appeal_thread_message_id bigint,
+    appeal_filed_at timestamp with time zone,
+    CONSTRAINT stw_tickets_appeal_outcome_check CHECK ((appeal_outcome = ANY (ARRAY['pending'::text, 'accepted'::text, 'denied'::text, 'withdrawn'::text]))),
+    CONSTRAINT stw_tickets_flag_check CHECK (((flag IS NULL) OR (flag = 'needs_more'::text))),
+    CONSTRAINT stw_tickets_origin_check CHECK ((origin = ANY (ARRAY['driver'::text, 'lap1'::text, 'steward'::text]))),
+    CONSTRAINT stw_tickets_status_check CHECK ((status = ANY (ARRAY['open'::text, 'under_review'::text, 'decided'::text, 'appealed'::text, 'final'::text, 'invalid'::text, 'withdrawn'::text])))
+);
+
+ALTER TABLE ONLY public.stw_tickets REPLICA IDENTITY FULL;
+
+
+--
+-- Name: stw_create_steward_ticket(uuid, text, integer, uuid, integer, integer, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_create_steward_ticket(p_round_id uuid, p_origin text, p_division integer, p_offender_id uuid, p_lap integer DEFAULT NULL::integer, p_turn integer DEFAULT NULL::integer, p_content text DEFAULT NULL::text) RETURNS public.stw_tickets
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+declare
+  v_round  stw_rounds;
+  v_ref    text;
+  v_prefix text;
+  v_next   int;
+  v_row    stw_tickets;
+begin
+  -- Same gate as every other write from the page. Not stw_is_steward_admin():
+  -- raising a ticket is ordinary stewarding, unlike changing what a tier means.
+  if not stw_is_steward() then
+    raise exception 'Only stewards may raise a ticket'
+      using errcode = 'PT403';
+  end if;
+
+  if p_origin not in ('lap1', 'steward') then
+    raise exception 'A steward-raised ticket is lap1 or steward, not %', p_origin
+      using errcode = 'PT400';
+  end if;
+
+  select * into v_round from stw_rounds where id = p_round_id;
+  if not found then
+    raise exception 'That round no longer exists' using errcode = 'PT404';
+  end if;
+
+  -- Published is the line. Before it, the report has not gone out and a ticket
+  -- added now is simply part of the round. After it, drivers have been told
+  -- what their penalties are and 6.6's appeal clock is running against a
+  -- report that would no longer match the ledger.
+  if v_round.status in ('published', 'appeals', 'final') then
+    raise exception 'R% is already published - a ticket added now would not be in the report drivers were given', v_round.round
+      using errcode = 'PT409';
+  end if;
+
+  if p_offender_id is null then
+    raise exception 'A ticket needs the driver it is about'
+      using errcode = 'PT400';
+  end if;
+
+  v_prefix := v_round.series || '-S' || v_round.season || 'R' || v_round.round || '-';
+
+  -- One sequence per round shared with driver reports, so a round's tickets
+  -- read in the order they arrived however they arrived. Locked against the
+  -- round so two stewards pressing at once cannot take the same number; the
+  -- unique (round_id, ref) would catch it either way, but with an error at the
+  -- steward rather than a retry.
+  perform 1 from stw_rounds where id = p_round_id for update;
+
+  select coalesce(max(substring(ref from '[0-9]+$')::int), 0) + 1
+    into v_next
+    from stw_tickets
+   where round_id = p_round_id
+     and ref like v_prefix || '%'
+     and substring(ref from '[0-9]+$') is not null;
+
+  v_ref := v_prefix || lpad(v_next::text, 3, '0');
+
+  insert into stw_tickets (
+    round_id, ref, origin, reporter_id, offender_id, offender_car_number,
+    division, lap, turn, content, is_lap1, status)
+  values (
+    p_round_id, v_ref, p_origin,
+    null,                        -- no reporter: that is what makes it ours
+    p_offender_id,
+    (select driver_number from drivers where id = p_offender_id),
+    p_division, p_lap, p_turn, p_content,
+    p_origin = 'lap1',           -- recorded, not an engine input
+    'under_review')              -- it arrives already in front of the stewards
+  returning * into v_row;
+
+  return v_row;
+end;
+$_$;
+
+
+--
+-- Name: stw_current_discord_id(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_current_discord_id() RETURNS text
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'auth', 'public'
+    AS $$
+  select i.provider_id
+    from auth.identities i
+   where i.user_id = auth.uid()
+     and i.provider = 'discord'
+   limit 1
+$$;
+
+
+--
+-- Name: stw_current_driver_id(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_current_driver_id() RETURNS uuid
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select d.id
+    from drivers d
+   where d.discord_id = stw_current_discord_id()
+   limit 1
+$$;
+
+
+--
+-- Name: stw_enqueue(text, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_enqueue(p_kind text, p_target uuid) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_type     text;
+  v_recent   int;
+  v_cooldown interval;
+  v_id       uuid;
+begin
+  if not stw_is_steward() then
+    raise exception 'not a steward' using errcode = '42501';
+  end if;
+
+  v_type := case p_kind
+    when 'publish'         then 'stw_publish'
+    when 'publish_appeals' then 'stw_publish'
+    when 'accsm_plan'      then 'stw_accsm_plan'
+    when 'accsm_apply'     then 'stw_accsm_apply'
+    when 'repaint_round'   then 'stw_repaint_round'
+    when 'repaint_ticket'  then 'stw_repaint_ticket'
+    when 'acknowledge'     then 'stw_acknowledge'
+    when 'recreate_thread' then 'stw_recreate_thread'
+    when 'remind'          then 'stw_remind'
+  end;
+  if v_type is null then
+    raise exception 'unknown stewarding job %', p_kind using errcode = '22023';
+  end if;
+
+  -- PT403: PostgREST answers HTTP 403, which is what this is.
+  if p_kind in ('publish', 'publish_appeals', 'repaint_round',
+                'accsm_plan', 'accsm_apply')
+     and not stw_can_manage() then
+    raise exception 'publishing, updating the round''s threads and applying penalties to ACCSM need the Manager or Admin role'
+      using errcode = 'PT403';
+  end if;
+
+  v_cooldown := case v_type when 'stw_remind' then interval '30 minutes'
+                            else interval '60 seconds' end;
+
+  select count(*) into v_recent
+    from bot_jobs
+   where type = v_type
+     and payload->>'target' = p_target::text
+     and created_at > now() - v_cooldown;
+  if v_recent > 0 then
+    -- PT429 -> HTTP 429 through PostgREST, so the page reads "you just did
+    -- that" rather than a server error.
+    raise exception '%', case v_type
+        when 'stw_remind' then 'the driver was reminded less than 30 minutes ago'
+        else 'that was just requested — give it a minute' end
+      using errcode = 'PT429';
+  end if;
+
+  insert into bot_jobs (type, payload)
+  values (v_type, jsonb_build_object(
+            'target', p_target,
+            'requested_by', stw_current_driver_id(),
+            -- publish_appeals: the same publish, plus the appeal results post
+            'appeal_results', p_kind = 'publish_appeals'))
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+
+--
+-- Name: stw_guard_account_edit(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_guard_account_edit() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  if new.content is distinct from old.content
+     and old.origin = 'driver'
+     and coalesce(auth.role(), '') = 'authenticated' then
+    raise exception 'a driver''s report cannot be edited -- only lap-1 and steward tickets'
+      using errcode = 'PT403';
+  end if;
+  return new;
+end;
+$$;
+
+
+--
+-- Name: stw_is_steward(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_is_steward() RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (
+    select 1 from stw_stewards s
+     where s.driver_id = stw_current_driver_id()
+       and s.is_active
+  )
+$$;
+
+
+--
+-- Name: stw_is_steward_admin(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_is_steward_admin() RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (
+    select 1 from stw_stewards s
+     where s.driver_id = stw_current_driver_id()
+       and s.is_active
+       and s.role in ('head_steward', 'admin')
+  )
+$$;
+
+
+--
+-- Name: stw_job_status(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_job_status(p_id uuid) RETURNS TABLE(status text, error text, created_at timestamp with time zone, processed_at timestamp with time zone)
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select j.status, j.error, j.created_at, j.processed_at
+    from bot_jobs j
+   where j.id = p_id
+     and j.type like 'stw\_%'
+     and stw_is_steward();
+$$;
+
+
+--
+-- Name: stw_public_driver_name(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_public_driver_name(p_driver_id uuid) RETURNS text
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select nullif(btrim(coalesce(d.first_name, '') || ' ' ||
+                      coalesce(d.last_name, '')), '')
+    from drivers d
+   where d.id = p_driver_id
+     -- THE GATE. Without it this is a name lookup for any driver id, and the
+     -- ids are enumerable from the published tickets' offender_id column.
+     and exists (select 1
+                   from stw_tickets t
+                   join stw_rounds r on r.id = t.round_id
+                  where t.offender_id = p_driver_id
+                    and r.status in ('published', 'appeals', 'final'));
+$$;
+
+
+--
+-- Name: stw_stamp_appeal_filed(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_stamp_appeal_filed() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+begin
+  if new.appeal_ref is not null
+     and new.appeal_ref is distinct from old.appeal_ref then
+    new.appeal_filed_at := now();
+  end if;
+  return new;
+end $$;
+
+
+--
+-- Name: stw_stamp_comment(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_stamp_comment() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  -- Only for a real user session. The bot writes as the service role, where
+  -- auth.uid() is null, and keeps whatever it set itself.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    new.author_id  := stw_current_driver_id();
+    new.created_at := now();
+  else
+    -- An edit cannot move a comment to another author or backdate it, and it
+    -- leaves a mark: a silently edited deliberation is worse than none.
+    new.author_id  := old.author_id;
+    new.created_at := old.created_at;
+    if new.body is distinct from old.body then
+      new.edited_at := now();
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+
+--
+-- Name: stw_stamp_decider(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_stamp_decider() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  new.updated_at := now();
+
+  -- Only for a real user session. The bot writes as the service role, where
+  -- auth.uid() is null, and must keep whatever it set itself.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  new.updated_by := stw_current_driver_id();
+
+  if new.code is distinct from old.code then
+    new.decided_by := stw_current_driver_id();
+    new.decided_at := now();
+  end if;
+
+  if new.appeal_outcome is distinct from old.appeal_outcome
+     or new.appeal_code is distinct from old.appeal_code then
+    new.appeal_decided_by := stw_current_driver_id();
+    new.appeal_decided_at := now();
+  end if;
+
+  return new;
+end;
+$$;
+
+
+--
+-- Name: stw_stamp_driver_season(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_stamp_driver_season() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  new.updated_by := stw_current_driver_id();
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+
+--
+-- Name: stw_stamp_setting(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_stamp_setting() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if auth.uid() is null then
+    return new;           -- the bot writes as the service role
+  end if;
+  new.key := old.key;     -- the contract, not editable
+  new.updated_by := stw_current_driver_id();
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+
+--
+-- Name: stw_stamp_vote(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_stamp_vote() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if auth.uid() is null then
+    return new;               -- the bot writes as the service role
+  end if;
+
+  if tg_op = 'INSERT' then
+    -- Supplied when voting for someone else; defaulted when voting for
+    -- yourself, so the ordinary case sends nothing and cannot get it wrong.
+    new.voter_id := coalesce(new.voter_id, stw_current_driver_id());
+    if not exists (select 1 from stw_stewards
+                    where driver_id = new.voter_id) then
+      raise exception 'A recommendation can only be recorded for a steward'
+        using errcode = 'PT400';
+    end if;
+    new.created_at := now();
+  else
+    -- A vote cannot be MOVED to another steward. Changing whose it is means
+    -- deleting it and recording a new one, so the created_at and entered_by on
+    -- a row always describe the vote that is actually in it.
+    new.voter_id   := old.voter_id;
+    new.created_at := old.created_at;
+  end if;
+
+  -- Always the person at the keyboard, never what the client sent.
+  new.entered_by := stw_current_driver_id();
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+
+--
+-- Name: sync_driver_category_on_tier_change(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.sync_driver_category_on_tier_change() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+BEGIN
+  UPDATE registration_drivers rd
+     SET driver_category = public.acc_driver_category(NEW.tier)
+   WHERE rd.driver_id = NEW.id
+     AND rd.driver_category = public.acc_driver_category(OLD.tier)
+     AND rd.driver_category IS DISTINCT FROM public.acc_driver_category(NEW.tier)
+     AND EXISTS (
+       SELECT 1 FROM championships c
+        WHERE c.registration_key = rd.championship_key
+          AND NOT c.concluded
+     );
+  RETURN NULL;
+END;
+$$;
 
 
 --
@@ -960,8 +1609,16 @@ CREATE TABLE public.driver_ratings (
     computed_at timestamp with time zone DEFAULT now() NOT NULL,
     composite numeric,
     pace_pct numeric,
-    os_pct numeric
+    os_pct numeric,
+    cons_pct real
 );
+
+
+--
+-- Name: COLUMN driver_ratings.cons_pct; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.driver_ratings.cons_pct IS 'Career steadiness beyond pace, recency-weighted, pool percentile 0-1, higher = steadier.';
 
 
 --
@@ -1240,8 +1897,24 @@ CREATE TABLE public.srating_history (
     composite numeric,
     excluded boolean DEFAULT false NOT NULL,
     exclude_reason text,
-    computed_at timestamp with time zone DEFAULT now() NOT NULL
+    computed_at timestamp with time zone DEFAULT now() NOT NULL,
+    consistency real,
+    os_pct real
 );
+
+
+--
+-- Name: COLUMN srating_history.consistency; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.srating_history.consistency IS 'Steadiness beyond pace, rolling (same window as pace), pool percentile 0-1, higher = steadier.';
+
+
+--
+-- Name: COLUMN srating_history.os_pct; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.srating_history.os_pct IS 'Head-to-head (OpenSkill mu -- what the composite uses, not the ordinal in `openskill`) as-of that week, pool percentile 0-1, higher = better.';
 
 
 --
@@ -1255,6 +1928,20 @@ ALTER TABLE public.srating_history ALTER COLUMN id ADD GENERATED ALWAYS AS IDENT
     NO MINVALUE
     NO MAXVALUE
     CACHE 1
+);
+
+
+--
+-- Name: srating_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.srating_settings (
+    key text NOT NULL,
+    value jsonb NOT NULL,
+    label text,
+    hint text,
+    updated_by text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1299,6 +1986,454 @@ COMMENT ON COLUMN public.stream_booth.channel_id IS 'Discord voice channel id.';
 --
 
 COMMENT ON COLUMN public.stream_booth.members IS 'Current members in join order: [{ discord_id, joined_at }]. Bots excluded.';
+
+
+--
+-- Name: stw_accsm_sync; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_accsm_sync (
+    round_id uuid NOT NULL,
+    plan jsonb,
+    planned_at timestamp with time zone,
+    applied jsonb,
+    applied_at timestamp with time zone,
+    requested_by uuid
+);
+
+
+--
+-- Name: stw_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_codes (
+    code text NOT NULL,
+    label text NOT NULL,
+    pp integer DEFAULT 0 NOT NULL,
+    warnings integer DEFAULT 0 NOT NULL,
+    q_warnings integer DEFAULT 0 NOT NULL,
+    issues_obligation text,
+    downgrade_of text,
+    escalates_to text,
+    escalation_only boolean DEFAULT false NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    sort_order integer,
+    description text,
+    time_penalty_s integer DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: stw_driver_names; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.stw_driver_names WITH (security_invoker='false') AS
+ SELECT id,
+    discord_id,
+    first_name,
+    last_name,
+    driver_number,
+    division_id
+   FROM public.drivers d;
+
+
+--
+-- Name: stw_driver_season; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_driver_season (
+    driver_id uuid NOT NULL,
+    series text DEFAULT 'GT3'::text NOT NULL,
+    season integer NOT NULL,
+    fpp integer DEFAULT 0 NOT NULL,
+    fpp_reason text,
+    opp integer DEFAULT 0 NOT NULL,
+    opp_reason text,
+    on_probation boolean DEFAULT false NOT NULL,
+    probation_reason text,
+    probation_from_round integer,
+    updated_by uuid,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT stw_driver_season_fpp_check CHECK ((fpp <= 0)),
+    CONSTRAINT stw_driver_season_opp_check CHECK ((opp >= 0))
+);
+
+
+--
+-- Name: stw_ledger; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_ledger (
+    driver_id uuid NOT NULL,
+    series text DEFAULT 'GT3'::text NOT NULL,
+    season integer NOT NULL,
+    round integer NOT NULL,
+    participated boolean DEFAULT false NOT NULL,
+    attend_source text,
+    pp integer DEFAULT 0 NOT NULL,
+    warnings integer DEFAULT 0 NOT NULL,
+    q_warnings integer DEFAULT 0 NOT NULL,
+    carry_in integer DEFAULT 0 NOT NULL,
+    carry_out integer DEFAULT 0 NOT NULL,
+    pp_effective integer DEFAULT 0 NOT NULL,
+    computed_at timestamp with time zone DEFAULT now() NOT NULL,
+    race_laps integer
+);
+
+
+--
+-- Name: stw_media; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_media (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    ticket_id uuid NOT NULL,
+    url text NOT NULL,
+    channel_id bigint,
+    message_id bigint,
+    attachment_id bigint,
+    posted_by uuid,
+    posted_at timestamp with time zone DEFAULT now() NOT NULL,
+    filename text,
+    content_type text,
+    url_fetched_at timestamp with time zone,
+    proxy_url text,
+    "position" integer DEFAULT 0 NOT NULL
+);
+
+
+--
+-- Name: stw_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_messages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    kind text NOT NULL,
+    series text DEFAULT 'GT3'::text NOT NULL,
+    season integer NOT NULL,
+    round integer NOT NULL,
+    division integer,
+    channel_id bigint NOT NULL,
+    message_id bigint NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    part integer DEFAULT 0 NOT NULL,
+    CONSTRAINT stw_messages_kind_check CHECK ((kind = ANY (ARRAY['submission'::text, 'review_index'::text, 'report'::text, 'serving'::text])))
+);
+
+
+--
+-- Name: stw_obligations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_obligations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    driver_id uuid NOT NULL,
+    series text DEFAULT 'GT3'::text NOT NULL,
+    season integer NOT NULL,
+    kind text NOT NULL,
+    source text,
+    issued_round integer NOT NULL,
+    serves_from_round integer NOT NULL,
+    expires_after_round integer,
+    served_round integer,
+    discharged_reason text,
+    discharged_by uuid,
+    discharged_at timestamp with time zone,
+    ticket_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT stw_obligations_discharged_reason_check CHECK ((discharged_reason = ANY (ARRAY['served'::text, 'expired_two_skips'::text, 'season_end'::text, 'admin'::text, 'superseded'::text]))),
+    CONSTRAINT stw_obligations_kind_check CHECK ((kind = ANY (ARRAY['q_ban'::text, 'q_ban_seasonal'::text, 'pit_start'::text, 'race_ban'::text, 'season_ban'::text, 'sg30'::text]))),
+    CONSTRAINT stw_obligations_source_check CHECK ((source = ANY (ARRAY['threshold'::text, 'q_warning_pair'::text, 'direct'::text, 'admin'::text])))
+);
+
+
+--
+-- Name: stw_rounds; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_rounds (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    series text DEFAULT 'GT3'::text NOT NULL,
+    season integer NOT NULL,
+    round integer NOT NULL,
+    track_key text,
+    event_start timestamp with time zone,
+    ticket_deadline timestamp with time zone,
+    appeal_deadline timestamp with time zone,
+    status text DEFAULT 'pending'::text NOT NULL,
+    published_at timestamp with time zone,
+    threads_painted_at timestamp with time zone,
+    divisions integer[],
+    from_schedule boolean DEFAULT false NOT NULL,
+    division_deadlines jsonb,
+    CONSTRAINT stw_rounds_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'open'::text, 'deliberating'::text, 'published'::text, 'appeals'::text, 'final'::text])))
+);
+
+
+--
+-- Name: stw_tickets_public; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.stw_tickets_public WITH (security_invoker='true') AS
+ SELECT t.id,
+    t.round_id,
+    t.ref,
+    t.origin,
+    t.division,
+    t.offender_id,
+    t.offender_car_number,
+    t.lap,
+    t.turn,
+    t.code,
+    t.official_comment,
+    t.appeal_ref,
+    t.appeal_outcome,
+    t.appeal_code,
+    t.appeal_comment,
+    t.status
+   FROM (public.stw_tickets t
+     JOIN public.stw_rounds r ON ((r.id = t.round_id)))
+  WHERE (r.status = ANY (ARRAY['published'::text, 'appeals'::text, 'final'::text]));
+
+
+--
+-- Name: stw_public; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.stw_public WITH (security_invoker='true') AS
+ SELECT r.series,
+    r.season,
+    r.round,
+    r.track_key,
+    p.ref,
+    p.origin,
+    p.division,
+    p.lap,
+    p.turn,
+    p.offender_car_number,
+    p.code AS decision_code,
+    c.label AS decision_label,
+    c.pp,
+    c.warnings,
+    c.q_warnings,
+    p.official_comment,
+    p.appeal_ref,
+    p.appeal_outcome,
+    p.appeal_comment,
+    p.appeal_code,
+        CASE
+            WHEN ((p.appeal_outcome = 'accepted'::text) AND (p.appeal_code IS NOT NULL)) THEN p.appeal_code
+            ELSE p.code
+        END AS eff_code,
+        CASE
+            WHEN ((p.appeal_outcome = 'accepted'::text) AND (p.appeal_code IS NOT NULL)) THEN e.label
+            ELSE c.label
+        END AS eff_label,
+        CASE
+            WHEN ((p.appeal_outcome = 'accepted'::text) AND (p.appeal_code IS NOT NULL)) THEN COALESCE(e.pp, 0)
+            ELSE COALESCE(c.pp, 0)
+        END AS eff_pp,
+        CASE
+            WHEN ((p.appeal_outcome = 'accepted'::text) AND (p.appeal_code IS NOT NULL)) THEN COALESCE(e.warnings, 0)
+            ELSE COALESCE(c.warnings, 0)
+        END AS eff_warnings,
+        CASE
+            WHEN ((p.appeal_outcome = 'accepted'::text) AND (p.appeal_code IS NOT NULL)) THEN COALESCE(e.q_warnings, 0)
+            ELSE COALESCE(c.q_warnings, 0)
+        END AS eff_q_warnings,
+    public.stw_public_driver_name(p.offender_id) AS offender_name
+   FROM (((public.stw_tickets_public p
+     JOIN public.stw_rounds r ON ((r.id = p.round_id)))
+     LEFT JOIN public.stw_codes c ON ((c.code = p.code)))
+     LEFT JOIN public.stw_codes e ON ((e.code = p.appeal_code)))
+  WHERE (p.status <> ALL (ARRAY['invalid'::text, 'withdrawn'::text]));
+
+
+--
+-- Name: stw_public_ledger; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.stw_public_ledger WITH (security_invoker='false') AS
+ WITH snap AS (
+         SELECT t.offender_id AS driver_id,
+            r_1.series,
+            r_1.season,
+            mode() WITHIN GROUP (ORDER BY t.offender_car_number) AS car_number,
+            mode() WITHIN GROUP (ORDER BY t.division) AS division
+           FROM (public.stw_tickets t
+             JOIN public.stw_rounds r_1 ON ((r_1.id = t.round_id)))
+          WHERE ((t.offender_id IS NOT NULL) AND (r_1.status = ANY (ARRAY['published'::text, 'appeals'::text, 'final'::text])))
+          GROUP BY t.offender_id, r_1.series, r_1.season
+        )
+ SELECT l.series,
+    l.season,
+    l.round,
+    COALESCE(s.car_number, d.driver_number) AS car_number,
+    COALESCE(s.division, d.division_id) AS division,
+    NULLIF(btrim(((COALESCE(d.first_name, ''::text) || ' '::text) || COALESCE(d.last_name, ''::text))), ''::text) AS name,
+    l.pp,
+    l.warnings,
+    l.carry_in,
+    l.carry_out,
+    l.pp_effective,
+    ( SELECT COALESCE(array_agg(DISTINCT (SUBSTRING(rg.season FROM 2))::integer), '{}'::integer[]) AS "coalesce"
+           FROM (public.registration_drivers rd
+             JOIN public.registrations rg ON ((rg.id = rd.registration_id)))
+          WHERE ((rd.driver_id = l.driver_id) AND (COALESCE(rg.status, 'confirmed'::text) = 'confirmed'::text) AND (rg.season ~* '^s[0-9]+$'::text))) AS roster_seasons,
+    ( SELECT COALESCE(jsonb_object_agg(x.season, x.division), '{}'::jsonb) AS "coalesce"
+           FROM ( SELECT DISTINCT ON (rg.season) SUBSTRING(rg.season FROM 2) AS season,
+                    rg.division_id AS division
+                   FROM (public.registration_drivers rd
+                     JOIN public.registrations rg ON ((rg.id = rd.registration_id)))
+                  WHERE ((rd.driver_id = l.driver_id) AND (COALESCE(rg.status, 'confirmed'::text) = 'confirmed'::text) AND (rg.season ~* '^s[0-9]+$'::text) AND (rg.division_id IS NOT NULL))
+                  ORDER BY rg.season) x) AS roster_divisions
+   FROM (((public.stw_ledger l
+     JOIN public.stw_rounds r ON (((r.series = l.series) AND (r.season = l.season) AND (r.round = l.round))))
+     JOIN public.drivers d ON ((d.id = l.driver_id)))
+     LEFT JOIN snap s ON (((s.driver_id = l.driver_id) AND (s.series = l.series) AND (s.season = l.season))))
+  WHERE ((r.status = ANY (ARRAY['published'::text, 'appeals'::text, 'final'::text])) AND ((l.pp_effective > 0) OR (l.warnings > 0) OR (l.carry_in > 0) OR (l.carry_out > 0)));
+
+
+--
+-- Name: stw_public_roster; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.stw_public_roster WITH (security_invoker='false') AS
+ SELECT DISTINCT ON (rd.driver_id, rg.season) 'GT3'::text AS series,
+    (SUBSTRING(rg.season FROM 2))::integer AS season,
+    COALESCE(d.driver_number, rg.race_number) AS car_number,
+    rg.division_id AS division,
+    NULLIF(btrim(((COALESCE(d.first_name, ''::text) || ' '::text) || COALESCE(d.last_name, ''::text))), ''::text) AS name
+   FROM ((public.registration_drivers rd
+     JOIN public.registrations rg ON ((rg.id = rd.registration_id)))
+     JOIN public.drivers d ON ((d.id = rd.driver_id)))
+  WHERE ((COALESCE(rg.status, 'confirmed'::text) = 'confirmed'::text) AND (rg.season ~* '^s[0-9]+$'::text))
+  ORDER BY rd.driver_id, rg.season, rg.division_id;
+
+
+--
+-- Name: stw_routine_comments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_routine_comments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    text text NOT NULL,
+    category text,
+    sort_order integer,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: stw_season_pp; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.stw_season_pp WITH (security_invoker='false') AS
+ WITH snap AS (
+         SELECT t.offender_id AS driver_id,
+            r.series,
+            r.season,
+            mode() WITHIN GROUP (ORDER BY t.offender_car_number) AS car_number,
+            mode() WITHIN GROUP (ORDER BY t.division) AS division
+           FROM (public.stw_tickets t
+             JOIN public.stw_rounds r ON ((r.id = t.round_id)))
+          WHERE (t.offender_id IS NOT NULL)
+          GROUP BY t.offender_id, r.series, r.season
+        ), byseason AS (
+         SELECT l.driver_id,
+            l.series,
+            l.season,
+            jsonb_object_agg((l.round)::text, l.pp_effective) AS pp_by_round,
+            jsonb_object_agg((l.round)::text, l.warnings) AS w_by_round,
+            (sum(l.pp_effective))::integer AS pp_total,
+            (sum(l.q_warnings))::integer AS q_warnings
+           FROM public.stw_ledger l
+          GROUP BY l.driver_id, l.series, l.season
+        ), roster AS (
+         SELECT DISTINCT rd.driver_id,
+            'GT3'::text AS series,
+            (SUBSTRING(rg.season FROM 2))::integer AS season,
+            rg.division_id AS division,
+            rg.race_number AS car_number
+           FROM (public.registrations rg
+             JOIN public.registration_drivers rd ON ((rd.registration_id = rg.id)))
+          WHERE ((COALESCE(rg.status, 'confirmed'::text) = 'confirmed'::text) AND (rg.season ~* '^s[0-9]+$'::text))
+        ), people AS (
+         SELECT byseason.driver_id,
+            byseason.series,
+            byseason.season
+           FROM byseason
+        UNION
+         SELECT roster.driver_id,
+            roster.series,
+            roster.season
+           FROM roster
+          WHERE (roster.season IS NOT NULL)
+        )
+ SELECT p.series,
+    p.season,
+    p.driver_id,
+    COALESCE(s.car_number, ro.car_number, d.driver_number) AS driver_number,
+    COALESCE(s.division, ro.division) AS division,
+    d.first_name,
+    d.last_name,
+    COALESCE(b.pp_by_round, '{}'::jsonb) AS pp_by_round,
+    COALESCE(b.w_by_round, '{}'::jsonb) AS w_by_round,
+    COALESCE(b.pp_total, 0) AS pp_total,
+    COALESCE(b.q_warnings, 0) AS q_warnings,
+    prev.pp_by_round AS prev_by_round
+   FROM (((((people p
+     JOIN public.drivers d ON ((d.id = p.driver_id)))
+     LEFT JOIN byseason b ON (((b.driver_id = p.driver_id) AND (b.series = p.series) AND (b.season = p.season))))
+     LEFT JOIN byseason prev ON (((prev.driver_id = p.driver_id) AND (prev.series = p.series) AND (prev.season = (p.season - 1)))))
+     LEFT JOIN snap s ON (((s.driver_id = p.driver_id) AND (s.series = p.series) AND (s.season = p.season))))
+     LEFT JOIN roster ro ON (((ro.driver_id = p.driver_id) AND (ro.series = p.series) AND (ro.season = p.season))))
+  WHERE public.stw_is_steward();
+
+
+--
+-- Name: stw_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_settings (
+    key text NOT NULL,
+    value jsonb NOT NULL,
+    label text,
+    hint text,
+    updated_by uuid,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    round_hour boolean DEFAULT true NOT NULL
+);
+
+
+--
+-- Name: stw_stewards; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_stewards (
+    driver_id uuid NOT NULL,
+    role text DEFAULT 'steward'::text NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    added_by uuid,
+    added_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT stw_stewards_role_check CHECK ((role = ANY (ARRAY['steward'::text, 'manager'::text, 'head_steward'::text, 'admin'::text])))
+);
+
+
+--
+-- Name: stw_ticket_comments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stw_ticket_comments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    ticket_id uuid NOT NULL,
+    author_id uuid,
+    body text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    edited_at timestamp with time zone,
+    CONSTRAINT stw_ticket_comments_body_check CHECK ((length(btrim(body)) > 0))
+);
 
 
 --
@@ -1783,6 +2918,14 @@ ALTER TABLE ONLY public.srating_history
 
 
 --
+-- Name: srating_settings srating_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.srating_settings
+    ADD CONSTRAINT srating_settings_pkey PRIMARY KEY (key);
+
+
+--
 -- Name: standings standings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1796,6 +2939,142 @@ ALTER TABLE ONLY public.standings
 
 ALTER TABLE ONLY public.stream_booth
     ADD CONSTRAINT stream_booth_pkey PRIMARY KEY (channel_id);
+
+
+--
+-- Name: stw_accsm_sync stw_accsm_sync_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_accsm_sync
+    ADD CONSTRAINT stw_accsm_sync_pkey PRIMARY KEY (round_id);
+
+
+--
+-- Name: stw_codes stw_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_codes
+    ADD CONSTRAINT stw_codes_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: stw_driver_season stw_driver_season_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_driver_season
+    ADD CONSTRAINT stw_driver_season_pkey PRIMARY KEY (driver_id, series, season);
+
+
+--
+-- Name: stw_ledger stw_ledger_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ledger
+    ADD CONSTRAINT stw_ledger_pkey PRIMARY KEY (driver_id, series, season, round);
+
+
+--
+-- Name: stw_media stw_media_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_media
+    ADD CONSTRAINT stw_media_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stw_messages stw_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_messages
+    ADD CONSTRAINT stw_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stw_messages stw_messages_slot_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_messages
+    ADD CONSTRAINT stw_messages_slot_key UNIQUE (kind, series, season, round, division, part);
+
+
+--
+-- Name: stw_obligations stw_obligations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_obligations
+    ADD CONSTRAINT stw_obligations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stw_rounds stw_rounds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_rounds
+    ADD CONSTRAINT stw_rounds_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stw_rounds stw_rounds_series_season_round_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_rounds
+    ADD CONSTRAINT stw_rounds_series_season_round_key UNIQUE (series, season, round);
+
+
+--
+-- Name: stw_routine_comments stw_routine_comments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_routine_comments
+    ADD CONSTRAINT stw_routine_comments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stw_settings stw_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_settings
+    ADD CONSTRAINT stw_settings_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: stw_stewards stw_stewards_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_stewards
+    ADD CONSTRAINT stw_stewards_pkey PRIMARY KEY (driver_id);
+
+
+--
+-- Name: stw_ticket_comments stw_ticket_comments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ticket_comments
+    ADD CONSTRAINT stw_ticket_comments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ticket_votes
+    ADD CONSTRAINT stw_ticket_votes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stw_tickets stw_tickets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stw_tickets stw_tickets_round_id_ref_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_round_id_ref_key UNIQUE (round_id, ref);
 
 
 --
@@ -1900,6 +3179,13 @@ CREATE INDEX acc_race_sessions_staging_event_key_idx ON public.acc_race_sessions
 --
 
 CREATE INDEX acc_race_sessions_staging_session_date_idx ON public.acc_race_sessions_staging USING btree (session_date DESC);
+
+
+--
+-- Name: bot_jobs_bop_push_pending_dedup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX bot_jobs_bop_push_pending_dedup ON public.bot_jobs USING btree (type) WHERE ((type = 'bop_push'::text) AND (status = 'pending'::text));
 
 
 --
@@ -2036,6 +3322,97 @@ CREATE INDEX srating_history_season_idx ON public.srating_history USING btree (s
 
 
 --
+-- Name: stw_media_ticket_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_media_ticket_idx ON public.stw_media USING btree (ticket_id);
+
+
+--
+-- Name: stw_messages_round_wide_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX stw_messages_round_wide_idx ON public.stw_messages USING btree (kind, series, season, round, part) WHERE (division IS NULL);
+
+
+--
+-- Name: stw_obligations_once_per_season_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX stw_obligations_once_per_season_idx ON public.stw_obligations USING btree (driver_id, series, season, kind) WHERE (kind = ANY (ARRAY['q_ban_seasonal'::text, 'pit_start'::text, 'race_ban'::text, 'season_ban'::text]));
+
+
+--
+-- Name: stw_obligations_open_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_obligations_open_idx ON public.stw_obligations USING btree (series, season, driver_id) WHERE (discharged_reason IS NULL);
+
+
+--
+-- Name: stw_routine_comments_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_routine_comments_active_idx ON public.stw_routine_comments USING btree (is_active, sort_order);
+
+
+--
+-- Name: stw_ticket_comments_ticket_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_ticket_comments_ticket_idx ON public.stw_ticket_comments USING btree (ticket_id, created_at);
+
+
+--
+-- Name: stw_ticket_votes_one_per_code; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX stw_ticket_votes_one_per_code ON public.stw_ticket_votes USING btree (ticket_id, voter_id, phase, code) NULLS NOT DISTINCT;
+
+
+--
+-- Name: stw_ticket_votes_ticket_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_ticket_votes_ticket_idx ON public.stw_ticket_votes USING btree (ticket_id);
+
+
+--
+-- Name: stw_tickets_needs_more_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_tickets_needs_more_idx ON public.stw_tickets USING btree (round_id) WHERE (flag = 'needs_more'::text);
+
+
+--
+-- Name: stw_tickets_offender_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_tickets_offender_idx ON public.stw_tickets USING btree (offender_id);
+
+
+--
+-- Name: stw_tickets_reporter_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_tickets_reporter_idx ON public.stw_tickets USING btree (reporter_id);
+
+
+--
+-- Name: stw_tickets_round_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_tickets_round_idx ON public.stw_tickets USING btree (round_id);
+
+
+--
+-- Name: stw_tickets_thread_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stw_tickets_thread_idx ON public.stw_tickets USING btree (thread_id);
+
+
+--
 -- Name: team_reg_name_unique; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2106,10 +3483,24 @@ CREATE TRIGGER championships_updated_at BEFORE UPDATE ON public.championships FO
 
 
 --
+-- Name: drivers drivers_sync_driver_category; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER drivers_sync_driver_category AFTER UPDATE OF tier ON public.drivers FOR EACH ROW WHEN ((old.tier IS DISTINCT FROM new.tier)) EXECUTE FUNCTION public.sync_driver_category_on_tier_change();
+
+
+--
 -- Name: drivers drivers_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER drivers_updated_at BEFORE UPDATE ON public.drivers FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: registration_drivers registration_drivers_derive_category; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER registration_drivers_derive_category BEFORE INSERT ON public.registration_drivers FOR EACH ROW EXECUTE FUNCTION public.registration_drivers_derive_category();
 
 
 --
@@ -2173,6 +3564,55 @@ CREATE TRIGGER registrations_updated_at BEFORE UPDATE ON public.registrations FO
 --
 
 CREATE TRIGGER settings_updated_at BEFORE UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: stw_driver_season stw_driver_season_stamp; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stw_driver_season_stamp BEFORE INSERT OR UPDATE ON public.stw_driver_season FOR EACH ROW EXECUTE FUNCTION public.stw_stamp_driver_season();
+
+
+--
+-- Name: stw_tickets stw_guard_account_edit; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stw_guard_account_edit BEFORE UPDATE OF content ON public.stw_tickets FOR EACH ROW EXECUTE FUNCTION public.stw_guard_account_edit();
+
+
+--
+-- Name: stw_settings stw_settings_stamp; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stw_settings_stamp BEFORE UPDATE ON public.stw_settings FOR EACH ROW EXECUTE FUNCTION public.stw_stamp_setting();
+
+
+--
+-- Name: stw_tickets stw_stamp_appeal_filed; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stw_stamp_appeal_filed BEFORE UPDATE ON public.stw_tickets FOR EACH ROW EXECUTE FUNCTION public.stw_stamp_appeal_filed();
+
+
+--
+-- Name: stw_ticket_comments stw_ticket_comments_stamp; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stw_ticket_comments_stamp BEFORE INSERT OR UPDATE ON public.stw_ticket_comments FOR EACH ROW EXECUTE FUNCTION public.stw_stamp_comment();
+
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_stamp; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stw_ticket_votes_stamp BEFORE INSERT OR UPDATE ON public.stw_ticket_votes FOR EACH ROW EXECUTE FUNCTION public.stw_stamp_vote();
+
+
+--
+-- Name: stw_tickets stw_tickets_stamp_decider; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER stw_tickets_stamp_decider BEFORE UPDATE ON public.stw_tickets FOR EACH ROW EXECUTE FUNCTION public.stw_stamp_decider();
 
 
 --
@@ -2402,6 +3842,238 @@ ALTER TABLE ONLY public.registrations
 
 ALTER TABLE ONLY public.srating_history
     ADD CONSTRAINT srating_history_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_accsm_sync stw_accsm_sync_requested_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_accsm_sync
+    ADD CONSTRAINT stw_accsm_sync_requested_by_fkey FOREIGN KEY (requested_by) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_accsm_sync stw_accsm_sync_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_accsm_sync
+    ADD CONSTRAINT stw_accsm_sync_round_id_fkey FOREIGN KEY (round_id) REFERENCES public.stw_rounds(id) ON DELETE CASCADE;
+
+
+--
+-- Name: stw_codes stw_codes_downgrade_of_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_codes
+    ADD CONSTRAINT stw_codes_downgrade_of_fkey FOREIGN KEY (downgrade_of) REFERENCES public.stw_codes(code);
+
+
+--
+-- Name: stw_codes stw_codes_escalates_to_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_codes
+    ADD CONSTRAINT stw_codes_escalates_to_fkey FOREIGN KEY (escalates_to) REFERENCES public.stw_codes(code);
+
+
+--
+-- Name: stw_driver_season stw_driver_season_driver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_driver_season
+    ADD CONSTRAINT stw_driver_season_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_driver_season stw_driver_season_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_driver_season
+    ADD CONSTRAINT stw_driver_season_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_ledger stw_ledger_driver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ledger
+    ADD CONSTRAINT stw_ledger_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_media stw_media_posted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_media
+    ADD CONSTRAINT stw_media_posted_by_fkey FOREIGN KEY (posted_by) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_media stw_media_ticket_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_media
+    ADD CONSTRAINT stw_media_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.stw_tickets(id) ON DELETE CASCADE;
+
+
+--
+-- Name: stw_obligations stw_obligations_discharged_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_obligations
+    ADD CONSTRAINT stw_obligations_discharged_by_fkey FOREIGN KEY (discharged_by) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_obligations stw_obligations_driver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_obligations
+    ADD CONSTRAINT stw_obligations_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_obligations stw_obligations_ticket_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_obligations
+    ADD CONSTRAINT stw_obligations_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.stw_tickets(id);
+
+
+--
+-- Name: stw_settings stw_settings_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_settings
+    ADD CONSTRAINT stw_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_stewards stw_stewards_added_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_stewards
+    ADD CONSTRAINT stw_stewards_added_by_fkey FOREIGN KEY (added_by) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_stewards stw_stewards_driver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_stewards
+    ADD CONSTRAINT stw_stewards_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_ticket_comments stw_ticket_comments_author_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ticket_comments
+    ADD CONSTRAINT stw_ticket_comments_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_ticket_comments stw_ticket_comments_ticket_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ticket_comments
+    ADD CONSTRAINT stw_ticket_comments_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.stw_tickets(id) ON DELETE CASCADE;
+
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_code_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ticket_votes
+    ADD CONSTRAINT stw_ticket_votes_code_fkey FOREIGN KEY (code) REFERENCES public.stw_codes(code);
+
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_entered_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ticket_votes
+    ADD CONSTRAINT stw_ticket_votes_entered_by_fkey FOREIGN KEY (entered_by) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_ticket_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ticket_votes
+    ADD CONSTRAINT stw_ticket_votes_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES public.stw_tickets(id) ON DELETE CASCADE;
+
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_voter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_ticket_votes
+    ADD CONSTRAINT stw_ticket_votes_voter_id_fkey FOREIGN KEY (voter_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_tickets stw_tickets_appeal_code_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_appeal_code_fkey FOREIGN KEY (appeal_code) REFERENCES public.stw_codes(code);
+
+
+--
+-- Name: stw_tickets stw_tickets_appeal_decided_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_appeal_decided_by_fkey FOREIGN KEY (appeal_decided_by) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_tickets stw_tickets_code_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_code_fkey FOREIGN KEY (code) REFERENCES public.stw_codes(code);
+
+
+--
+-- Name: stw_tickets stw_tickets_decided_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_decided_by_fkey FOREIGN KEY (decided_by) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_tickets stw_tickets_offender_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_offender_id_fkey FOREIGN KEY (offender_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_tickets stw_tickets_reporter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: stw_tickets stw_tickets_round_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_round_id_fkey FOREIGN KEY (round_id) REFERENCES public.stw_rounds(id) ON DELETE CASCADE;
+
+
+--
+-- Name: stw_tickets stw_tickets_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stw_tickets
+    ADD CONSTRAINT stw_tickets_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.drivers(id);
 
 
 --
@@ -2850,6 +4522,12 @@ CREATE POLICY settings_select_all ON public.settings FOR SELECT USING (true);
 ALTER TABLE public.srating_history ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: srating_settings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.srating_settings ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: standings; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -2860,6 +4538,281 @@ ALTER TABLE public.standings ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.stream_booth ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_accsm_sync; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_accsm_sync ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_accsm_sync stw_accsm_sync_steward_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_accsm_sync_steward_read ON public.stw_accsm_sync FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_codes; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_codes ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_codes stw_codes_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_codes_read ON public.stw_codes FOR SELECT TO authenticated, anon USING (true);
+
+
+--
+-- Name: stw_codes stw_codes_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_codes_write ON public.stw_codes TO authenticated USING (public.stw_can_manage()) WITH CHECK (public.stw_can_manage());
+
+
+--
+-- Name: stw_driver_season; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_driver_season ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_driver_season stw_driver_season_admin_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_driver_season_admin_write ON public.stw_driver_season TO authenticated USING (public.stw_is_steward_admin()) WITH CHECK (public.stw_is_steward_admin());
+
+
+--
+-- Name: stw_driver_season stw_driver_season_steward_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_driver_season_steward_read ON public.stw_driver_season FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_ledger; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_ledger ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_ledger stw_ledger_steward_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_ledger_steward_read ON public.stw_ledger FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_media; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_media ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_media stw_media_steward_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_media_steward_read ON public.stw_media FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_messages; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_messages ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_messages stw_messages_steward_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_messages_steward_read ON public.stw_messages FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_obligations; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_obligations ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_obligations stw_obligations_steward_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_obligations_steward_read ON public.stw_obligations FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_rounds; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_rounds ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_rounds stw_rounds_public_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_rounds_public_read ON public.stw_rounds FOR SELECT TO anon USING ((status = ANY (ARRAY['published'::text, 'appeals'::text, 'final'::text])));
+
+
+--
+-- Name: stw_rounds stw_rounds_steward_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_rounds_steward_read ON public.stw_rounds FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_routine_comments; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_routine_comments ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_routine_comments stw_routine_comments_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_routine_comments_read ON public.stw_routine_comments FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_routine_comments stw_routine_comments_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_routine_comments_write ON public.stw_routine_comments TO authenticated USING (public.stw_can_manage()) WITH CHECK (public.stw_can_manage());
+
+
+--
+-- Name: stw_settings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_settings ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_settings stw_settings_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_settings_read ON public.stw_settings FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_settings stw_settings_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_settings_write ON public.stw_settings FOR UPDATE TO authenticated USING (public.stw_can_manage()) WITH CHECK (public.stw_can_manage());
+
+
+--
+-- Name: stw_stewards; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_stewards ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_stewards stw_stewards_self_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_stewards_self_read ON public.stw_stewards FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_ticket_comments; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_ticket_comments ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_ticket_comments stw_ticket_comments_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_ticket_comments_insert ON public.stw_ticket_comments FOR INSERT TO authenticated WITH CHECK (public.stw_is_steward());
+
+
+--
+-- Name: stw_ticket_comments stw_ticket_comments_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_ticket_comments_own ON public.stw_ticket_comments FOR UPDATE TO authenticated USING ((author_id = public.stw_current_driver_id())) WITH CHECK ((author_id = public.stw_current_driver_id()));
+
+
+--
+-- Name: stw_ticket_comments stw_ticket_comments_own_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_ticket_comments_own_delete ON public.stw_ticket_comments FOR DELETE TO authenticated USING ((author_id = public.stw_current_driver_id()));
+
+
+--
+-- Name: stw_ticket_comments stw_ticket_comments_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_ticket_comments_read ON public.stw_ticket_comments FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_ticket_votes; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_ticket_votes ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_any; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_ticket_votes_any ON public.stw_ticket_votes FOR UPDATE TO authenticated USING (public.stw_is_steward()) WITH CHECK (public.stw_is_steward());
+
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_any_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_ticket_votes_any_delete ON public.stw_ticket_votes FOR DELETE TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_ticket_votes_insert ON public.stw_ticket_votes FOR INSERT TO authenticated WITH CHECK (public.stw_is_steward());
+
+
+--
+-- Name: stw_ticket_votes stw_ticket_votes_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_ticket_votes_read ON public.stw_ticket_votes FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_tickets; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.stw_tickets ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: stw_tickets stw_tickets_anon_published; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_tickets_anon_published ON public.stw_tickets FOR SELECT TO anon USING ((EXISTS ( SELECT 1
+   FROM public.stw_rounds r
+  WHERE ((r.id = stw_tickets.round_id) AND (r.status = ANY (ARRAY['published'::text, 'appeals'::text, 'final'::text]))))));
+
+
+--
+-- Name: stw_tickets stw_tickets_steward_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_tickets_steward_read ON public.stw_tickets FOR SELECT TO authenticated USING (public.stw_is_steward());
+
+
+--
+-- Name: stw_tickets stw_tickets_steward_write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY stw_tickets_steward_write ON public.stw_tickets FOR UPDATE TO authenticated USING (public.stw_is_steward()) WITH CHECK (public.stw_is_steward());
+
 
 --
 -- Name: team_members; Type: ROW SECURITY; Schema: public; Owner: -
@@ -2915,5 +4868,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aaknUchPMys4gMIHziGavxQf7OuT9RXu2dTyU9RCeVEeBTENxLqlHr6WrysMp4x
+\unrestrict CsA9NIZvFdmur6otyJv8UMhlb3X5qFXYotfsVmE2Y3EWzSfSBxhmny6rtfBB2KA
 

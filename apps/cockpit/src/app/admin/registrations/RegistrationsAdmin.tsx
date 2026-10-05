@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { deleteRegistration, removeMember, setEntryClass } from './actions';
+import { addTeamDriver, deleteRegistration, removeMember, setEntryClass } from './actions';
 
 export type AdminMember = {
   // The registrations row (car) this driver sits in — on a car-per-driver
@@ -34,6 +34,15 @@ export type AdminTeam = {
   members: AdminMember[];
 };
 
+// A driver not yet on any entry for this event — the "Add driver" pool.
+export type AdminCandidate = {
+  id: string;
+  display_name: string | null;
+  steam_id: string | null;
+  division_id: number | null;
+  tier: 'gold' | 'silver' | null;
+};
+
 export type AdminChampionship = {
   key: string;
   season: string;
@@ -44,6 +53,8 @@ export type AdminChampionship = {
   // to bucket by and every entry shows in one list.
   grouping: 'division' | 'class' | 'none';
   teams: AdminTeam[];
+  // Empty when no team has a spot open (not loaded then).
+  candidates: AdminCandidate[];
 };
 
 const DIVISION_GROUPS = [
@@ -125,6 +136,15 @@ export default function RegistrationsAdmin({
     )
       return;
     run(`${team.id}:${m.driver_id}`, () => removeMember(m.registration_id, m.driver_id));
+  }
+
+  function onAddDriver(team: AdminTeam, c: AdminCandidate) {
+    if (!confirm(`Add ${c.display_name ?? 'this driver'} to "${team.team_name}"?`)) return;
+    run(`add:${team.id}`, async () => {
+      // registrationIds[0]: any car of the team — the function finds the rest.
+      const { error } = await addTeamDriver(team.registrationIds[0], c.id);
+      if (error) throw new Error(error);
+    });
   }
 
   function onSetClass(team: AdminTeam, value: string) {
@@ -256,6 +276,7 @@ export default function RegistrationsAdmin({
               busyId={busyId}
               onDeleteTeam={onDeleteTeam}
               onRemoveMember={onRemoveMember}
+              onAddDriver={onAddDriver}
               onSetClass={onSetClass}
             />
           ))
@@ -276,7 +297,7 @@ function StatBox({ label, value, sub }: { label: string; value: string; sub?: st
 }
 
 function TeamRow({
-  champ, team, stripe, busyId, onDeleteTeam, onRemoveMember, onSetClass,
+  champ, team, stripe, busyId, onDeleteTeam, onRemoveMember, onAddDriver, onSetClass,
 }: {
   champ: AdminChampionship;
   team: AdminTeam;
@@ -284,6 +305,7 @@ function TeamRow({
   busyId: string | null;
   onDeleteTeam: (t: AdminTeam) => void;
   onRemoveMember: (t: AdminTeam, m: AdminMember) => void;
+  onAddDriver: (t: AdminTeam, c: AdminCandidate) => void;
   onSetClass: (t: AdminTeam, value: string) => void;
 }) {
   const spotsOpen = champ.maxTeamSize - team.members.length;
@@ -359,9 +381,17 @@ function TeamRow({
           );
         })}
         {spotsOpen > 0 && (
-          <span className="font-mono text-[10px] text-txt-3/40 italic">
-            {spotsOpen} spot{spotsOpen === 1 ? '' : 's'} open
-          </span>
+          <div className="flex items-start gap-3 flex-wrap">
+            <span className="font-mono text-[10px] text-txt-3/40 italic py-1">
+              {spotsOpen} spot{spotsOpen === 1 ? '' : 's'} open
+            </span>
+            <AddDriverPicker
+              champ={champ}
+              team={team}
+              busy={busyId === `add:${team.id}`}
+              onPick={(c) => onAddDriver(team, c)}
+            />
+          </div>
         )}
       </div>
 
@@ -374,6 +404,110 @@ function TeamRow({
           {busyId === team.id ? 'Deleting…' : 'Delete Team'}
         </button>
       </div>
+    </div>
+  );
+}
+
+// "Add driver" for a team with a spot open: a search box over the drivers
+// not yet entered in this event. On a division-grouped championship only the
+// team's own division is offered (admin_add_team_driver() enforces the same
+// rule); Endurance and ungraded championships offer everyone.
+function AddDriverPicker({
+  champ, team, busy, onPick,
+}: {
+  champ: AdminChampionship;
+  team: AdminTeam;
+  busy: boolean;
+  onPick: (c: AdminCandidate) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const pool =
+    champ.grouping === 'division'
+      ? champ.candidates.filter((c) => team.division_id != null && c.division_id === team.division_id)
+      : champ.candidates;
+  const q = query.trim().toLowerCase();
+  const matches = (q
+    ? pool.filter(
+        (c) => (c.display_name ?? '').toLowerCase().includes(q) || (c.steam_id ?? '').includes(q),
+      )
+    : pool
+  ).slice(0, 8);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        disabled={busy}
+        className="font-mono text-[10px] tracking-[.1em] uppercase px-2.5 py-1 border border-line text-txt-3 hover:border-gold/50 hover:text-gold transition-colors disabled:opacity-40"
+      >
+        {busy ? 'Adding…' : '+ Add driver'}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 min-w-[260px]">
+      <div className="flex items-center gap-2">
+        <input
+          id={`add-driver-${team.id}`}
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+          placeholder={
+            champ.grouping === 'division'
+              ? `Search ${team.division_name ?? 'division'} drivers…`
+              : 'Search drivers…'
+          }
+          aria-label={`Add a driver to ${team.team_name}`}
+          className="flex-1 bg-carbon-2 border border-line text-txt font-mono text-[11px] px-2 py-1 focus:border-gold focus:outline-none"
+        />
+        <button
+          onClick={() => { setOpen(false); setQuery(''); }}
+          className="font-mono text-[10px] tracking-[.1em] uppercase text-txt-3/60 hover:text-txt transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+      {pool.length === 0 ? (
+        <p className="font-mono text-[10px] text-txt-3/60">
+          {champ.grouping === 'division' && team.division_id == null
+            ? 'This team has no division, so no driver can be matched to it.'
+            : 'No unregistered drivers in this division.'}
+        </p>
+      ) : matches.length === 0 ? (
+        <p className="font-mono text-[10px] text-txt-3/60">No match.</p>
+      ) : (
+        <ul className="border border-line divide-y divide-line/40">
+          {matches.map((c) => (
+            <li key={c.id}>
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  setQuery('');
+                  onPick(c);
+                }}
+                className="w-full flex items-center gap-3 px-2 py-1.5 text-left hover:bg-panel-2 transition-colors"
+              >
+                <span className="font-mono text-[11px] text-txt-2 flex-1 min-w-0 truncate">
+                  {c.display_name ?? '—'}
+                  {c.tier && <span className="text-txt-3/50"> · {c.tier}</span>}
+                </span>
+                <span className="font-mono text-[10px] text-txt-3/60 shrink-0">
+                  {c.steam_id ? `Steam ${c.steam_id}` : 'No Steam ID'}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {pool.length > matches.length && !q && (
+        <p className="font-mono text-[10px] text-txt-3/40">
+          Showing 8 of {pool.length}. Type to search by name or Steam ID.
+        </p>
+      )}
     </div>
   );
 }

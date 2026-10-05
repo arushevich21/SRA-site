@@ -90,6 +90,54 @@ export async function removeMember(
   revalidatePath('/admin/registrations');
 }
 
+// admin_add_team_driver()'s RAISE codes (20261005) → what the admin sees.
+const ADD_DRIVER_ERRORS: Record<string, string> = {
+  REGISTRATION_NOT_FOUND: 'That team no longer exists — reload the page.',
+  CHAMPIONSHIP_KEY_INVALID: 'This entry points at a championship that no longer exists.',
+  DRIVER_NOT_FOUND: 'That driver no longer exists — reload the page.',
+  TEAM_FULL: 'That team is already full.',
+  DIVISION_UNASSIGNED: 'That driver has no division yet — assign one first.',
+  DIVISION_MISMATCH: 'That driver is in a different division from the team.',
+  DRIVER_ALREADY_CLAIMED: 'That driver is already on an entry for this event.',
+};
+
+/**
+ * Add a driver to an existing team that has a spot open.
+ *
+ * All the rules live in admin_add_team_driver() (see
+ * supabase/migrations/20261005_admin_add_team_driver.sql), under the same
+ * per-event lock as register_entry(): team size, same division on
+ * division-grouped championships, and one entry per driver per event. On a
+ * car-per-driver championship it adds a car for the new driver; on a
+ * shared-car one it seats them in the team's car. The grid cap
+ * (max_registrations) is deliberately not applied — an admin completing a
+ * team is an override.
+ *
+ * `registrationId` is any car of the team — the function finds the rest by
+ * team_id. Returns the reason on failure (see ADD_DRIVER_ERRORS).
+ */
+export async function addTeamDriver(
+  registrationId: string,
+  driverId: string,
+): Promise<{ error: string | null }> {
+  await requireAdmin();
+  if (!registrationId || !driverId) return { error: 'Pick a driver first.' };
+
+  const { error } = await supabase.rpc('admin_add_team_driver', {
+    p_registration_id: registrationId,
+    p_driver_id: driverId,
+  });
+
+  if (error) {
+    // Returned, not thrown: Next.js replaces a thrown server-action error's
+    // message with a generic one in production builds.
+    const code = error.message.split(':')[0]?.trim();
+    return { error: ADD_DRIVER_ERRORS[code] ?? error.message };
+  }
+  revalidatePath('/admin/registrations');
+  return { error: null };
+}
+
 /**
  * Assign an endurance entry's class (Open / Silver / Bronze), or clear it
  * (null). Endurance championships group by this admin-set class instead of
