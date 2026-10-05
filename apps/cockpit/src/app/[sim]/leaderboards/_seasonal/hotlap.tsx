@@ -15,7 +15,7 @@ import {
   toTrackTopEntry as toAccTrackTopEntry,
   type AccBoard,
 } from '@/lib/acc/tracks';
-import { getSeasonHotlapTrackList, hasWetSessionRows } from '@/lib/seasonal-leaderboard';
+import { getSeasonHotlapTrackList, hasWetSessionRows, seasonTrackAllowList } from '@/lib/seasonal-leaderboard';
 import type { TrackSummary } from '@/lib/track-summary';
 import { BoardSkeleton, TrackListSkeleton } from './skeletons';
 
@@ -111,9 +111,16 @@ export async function HotlapTrackBody({
   // Both cached — the rare invalid-season/track 404 is decided here, in the
   // shell, so it can still set a real 404 status rather than surfacing
   // mid-stream from inside the Suspense boundary.
-  const [shell, track] = await Promise.all([getAccLeaderboardShell({ frozen }), getAccTrackMeta(trackKey, { frozen })]);
+  const [shell, track, allowed] = await Promise.all([
+    getAccLeaderboardShell({ frozen }),
+    getAccTrackMeta(trackKey, { frozen }),
+    seasonTrackAllowList(season),
+  ]);
   if (!track) notFound();
   if (!shell.seasons.includes(season)) notFound();
+  // Not one of this season's tracks (or an unreleased round of the live
+  // season): the season's track list doesn't link it, so neither does a URL.
+  if (allowed && !allowed.has(trackKey)) notFound();
   const trackSummary = toAccTrackSummary(track);
 
   const board = <TrackBoard trackKey={trackKey} season={season} trackSummary={trackSummary} frozen={frozen} />;

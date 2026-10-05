@@ -4,6 +4,7 @@ import type { AccHotLapEntry } from '@sra/shared-types';
 import type { ChampionshipContent } from '@/content/championships';
 import { getChampionships } from './championships-store';
 import { accTrackKeyForDisplay } from '@/content/sim-catalog';
+import { ACC_PAST_SEASON_TRACKS } from '@/content/acc-past-season-tracks';
 import {
   getAccTrackLeaderboard,
   getAccTracks,
@@ -239,8 +240,42 @@ export async function getSeasonGate(): Promise<SeasonGate> {
   return { gatedSeason, releasedTrackKeys };
 }
 
-// Track keys that have seasonal rows for `season` on the given table, with the
-// newest-season reveal gate applied. Shared by the hot-lap and hot-stint
+// A season's calendar, from the (non-endurance) ACC championship pinned to it,
+// in round order. Only seasons run since the DB-backed championships landed
+// have one (S19 onward); older seasons get null — see seasonTrackAllowList.
+export async function getAccSeasonCalendar(season: string) {
+  const champs = await getChampionships();
+  const champ = champs.find(
+    (c) =>
+      c.game === 'ACC' &&
+      !isEnduranceChampionship(c) &&
+      (c.registrationSeason ?? '').toUpperCase() === season.toUpperCase() &&
+      c.schedule.length > 0,
+  );
+  return champ ? [...champ.schedule].sort((a, b) => a.round - b.round) : null;
+}
+
+// The tracks a season's seasonal boards may show. Every other track that
+// season (pre-season qualifying servers like S19's Zandvoort, a stray layout
+// like S18's Nürburgring 24h) has rows on the board but was never a round:
+//   • the live (gated) season: only rounds an admin has released;
+//   • a season with a DB calendar: its rounds;
+//   • S7–S18: content/acc-past-season-tracks.ts.
+// null = no list known for this season, so show every track with rows.
+export async function seasonTrackAllowList(season: string): Promise<Set<string> | null> {
+  const s = season.toUpperCase();
+  const gate = await getSeasonGate();
+  if (s === gate.gatedSeason) return gate.releasedTrackKeys;
+  const calendar = await getAccSeasonCalendar(s);
+  if (calendar) {
+    return new Set(calendar.map((r) => accTrackKeyForDisplay(r.track)).filter((k): k is string => k != null));
+  }
+  const past = ACC_PAST_SEASON_TRACKS[s];
+  return past ? new Set(past) : null;
+}
+
+// Track keys that have seasonal rows for `season` on the given table, limited
+// to the season's own tracks (seasonTrackAllowList). Shared by the hot-lap and hot-stint
 // seasonal track lists.
 //
 // PostgREST has no DISTINCT, so this reads the `track_key` column of every
@@ -286,12 +321,9 @@ export async function seasonalTrackKeys(
     return [...keys];
   };
 
-  const [fetched, gate] = await Promise.all([fetchKeys(), getSeasonGate()]);
+  const [fetched, allowed] = await Promise.all([fetchKeys(), seasonTrackAllowList(season)]);
   if (fetched === null) return [];
-
-  let keys = fetched;
-  if (season === gate.gatedSeason) keys = keys.filter((k) => gate.releasedTrackKeys.has(k));
-  return keys;
+  return allowed ? fetched.filter((k) => allowed.has(k)) : fetched;
 }
 
 // Whether any row exists for this track/season (on the given table) with

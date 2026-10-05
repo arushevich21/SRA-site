@@ -45,8 +45,15 @@ export function LeaderboardTabs({
   const onEndurance = pathname.includes('/leaderboards/endurance');
   const onHotStintQualifying = pathname.includes('/leaderboards/hotstint-qualifying');
   const onJagoff = pathname.includes('/leaderboards/jagoff');
+  const onSweatshop = pathname.includes('/leaderboards/sweatshop');
   const onHotLap =
-    !onStint && !onStintSeasonal && !onHotlapSeasonal && !onEndurance && !onHotStintQualifying && !onJagoff;
+    !onStint &&
+    !onStintSeasonal &&
+    !onHotlapSeasonal &&
+    !onEndurance &&
+    !onHotStintQualifying &&
+    !onJagoff &&
+    !onSweatshop;
 
   const tabs = [
     { label: 'Hot Lap', href: `/${simSlug}/leaderboards`, active: onHotLap, show: true },
@@ -56,16 +63,17 @@ export function LeaderboardTabs({
     { label: 'Hot Lap (Endurance)', href: `/${simSlug}/leaderboards/endurance`, active: onEndurance, show: showEndurance },
     { label: 'Hot Stint Qualifying', href: `/${simSlug}/leaderboards/hotstint-qualifying`, active: onHotStintQualifying, show: showHotStintQualifying },
     { label: '#Jagoff', href: `/${simSlug}/leaderboards/jagoff`, active: onJagoff, show: showJagoff },
+    { label: 'Sweatshop 💦', href: `/${simSlug}/leaderboards/sweatshop`, active: onSweatshop, show: true },
   ].filter((t) => t.show);
 
   return (
-    <div className="flex border-b border-line mb-10 -mt-6">
+    <div className="flex border-b border-line mb-10 -mt-6 overflow-x-auto">
       {tabs.map((t) => (
         <Link
           key={t.href}
           href={t.href}
           className={[
-            'font-mono text-[11px] tracking-[.2em] uppercase px-5 py-3 border-b-2 -mb-px transition-colors',
+            'font-mono text-[11px] tracking-[.2em] uppercase px-5 py-3 border-b-2 -mb-px whitespace-nowrap transition-colors',
             t.active
               ? 'border-gold text-gold'
               : 'border-transparent text-txt-3 hover:text-txt',

@@ -91,6 +91,15 @@ export {
 } from './acc/hot-stint.js';
 
 export {
+  aggregateSweatshop,
+  validPercent,
+  validityTier,
+  type ValidityTier,
+  type SweatshopLapRow,
+  type SweatshopDriverTotal,
+} from './acc/sweatshop.js';
+
+export {
   buildDriverRounds,
   buildTeamRounds,
   pairOrphanEvents,
