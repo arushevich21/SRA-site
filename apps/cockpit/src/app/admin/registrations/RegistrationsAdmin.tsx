@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { addTeamDriver, deleteRegistration, removeMember, setEntryClass } from './actions';
+import { addTeamDriver, deleteRegistration, mergeIntoTeam, removeMember, setEntryClass } from './actions';
 
 export type AdminMember = {
   // The registrations row (car) this driver sits in — on a car-per-driver
@@ -20,6 +20,9 @@ export type AdminTeam = {
   // Display/grouping key (teams.id + status) — see page.tsx. NOT something
   // the actions key off; they take registrationIds.
   id: string;
+  // teams.id (or the lone row's id when it has none). Shared by the two
+  // halves of a team split across confirmed/waitlisted.
+  teamId: string;
   // Every `registrations` row (car) in this team for this event: one per
   // driver on a car-per-driver championship, exactly one on a shared-car
   // one. Team-level actions apply to all of them.
@@ -143,6 +146,24 @@ export default function RegistrationsAdmin({
     run(`add:${team.id}`, async () => {
       // registrationIds[0]: any car of the team — the function finds the rest.
       const { error } = await addTeamDriver(team.registrationIds[0], c.id);
+      if (error) throw new Error(error);
+    });
+  }
+
+  function onMergeEntry(team: AdminTeam, source: AdminTeam) {
+    const names = source.members.map((m) => m.display_name ?? 'unnamed driver').join(', ');
+    const statusNote =
+      source.status !== team.status ? ` They become ${team.status}, like the team.` : '';
+    if (
+      !confirm(
+        `Merge "${source.team_name}" (${names}) into "${team.team_name}"?\n\n` +
+          `"${source.team_name}" and its ${source.car} entry are deleted; ` +
+          `${names} join${source.members.length === 1 ? 's' : ''} "${team.team_name}" in the ${team.car}.${statusNote}`,
+      )
+    )
+      return;
+    run(`add:${team.id}`, async () => {
+      const { error } = await mergeIntoTeam(team.registrationIds[0], source.registrationIds[0]);
       if (error) throw new Error(error);
     });
   }
@@ -277,6 +298,7 @@ export default function RegistrationsAdmin({
               onDeleteTeam={onDeleteTeam}
               onRemoveMember={onRemoveMember}
               onAddDriver={onAddDriver}
+              onMergeEntry={onMergeEntry}
               onSetClass={onSetClass}
             />
           ))
@@ -297,7 +319,7 @@ function StatBox({ label, value, sub }: { label: string; value: string; sub?: st
 }
 
 function TeamRow({
-  champ, team, stripe, busyId, onDeleteTeam, onRemoveMember, onAddDriver, onSetClass,
+  champ, team, stripe, busyId, onDeleteTeam, onRemoveMember, onAddDriver, onMergeEntry, onSetClass,
 }: {
   champ: AdminChampionship;
   team: AdminTeam;
@@ -306,6 +328,7 @@ function TeamRow({
   onDeleteTeam: (t: AdminTeam) => void;
   onRemoveMember: (t: AdminTeam, m: AdminMember) => void;
   onAddDriver: (t: AdminTeam, c: AdminCandidate) => void;
+  onMergeEntry: (t: AdminTeam, source: AdminTeam) => void;
   onSetClass: (t: AdminTeam, value: string) => void;
 }) {
   const spotsOpen = champ.maxTeamSize - team.members.length;
@@ -390,6 +413,7 @@ function TeamRow({
               team={team}
               busy={busyId === `add:${team.id}`}
               onPick={(c) => onAddDriver(team, c)}
+              onPickEntry={(source) => onMergeEntry(team, source)}
             />
           </div>
         )}
@@ -412,21 +436,35 @@ function TeamRow({
 // not yet entered in this event. On a division-grouped championship only the
 // team's own division is offered (admin_add_team_driver() enforces the same
 // rule); Endurance and ungraded championships offer everyone.
+//
+// Below them, other entries already registered that would fit in the open
+// spots — picking one merges it in (mergeIntoTeam): for two drivers who each
+// registered solo but share a car.
 function AddDriverPicker({
-  champ, team, busy, onPick,
+  champ, team, busy, onPick, onPickEntry,
 }: {
   champ: AdminChampionship;
   team: AdminTeam;
   busy: boolean;
   onPick: (c: AdminCandidate) => void;
+  onPickEntry: (source: AdminTeam) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
-  const pool =
-    champ.grouping === 'division'
-      ? champ.candidates.filter((c) => team.division_id != null && c.division_id === team.division_id)
-      : champ.candidates;
+  const spotsOpen = champ.maxTeamSize - team.members.length;
+  const sameDivision = (divisionId: number | null) =>
+    champ.grouping !== 'division' || (team.division_id != null && divisionId === team.division_id);
+
+  const pool = champ.candidates.filter((c) => sameDivision(c.division_id));
+  const entryPool = champ.teams.filter(
+    (t) =>
+      t.teamId !== team.teamId &&
+      t.members.length > 0 &&
+      t.members.length <= spotsOpen &&
+      sameDivision(t.division_id),
+  );
+
   const q = query.trim().toLowerCase();
   const matches = (q
     ? pool.filter(
@@ -434,6 +472,21 @@ function AddDriverPicker({
       )
     : pool
   ).slice(0, 8);
+  const entryMatches = (q
+    ? entryPool.filter(
+        (t) =>
+          t.team_name.toLowerCase().includes(q) ||
+          t.members.some(
+            (m) => (m.display_name ?? '').toLowerCase().includes(q) || (m.steam_id ?? '').includes(q),
+          ),
+      )
+    : entryPool
+  ).slice(0, 5);
+
+  function close() {
+    setOpen(false);
+    setQuery('');
+  }
 
   if (!open) {
     return (
@@ -465,7 +518,7 @@ function AddDriverPicker({
           className="flex-1 bg-carbon-2 border border-line text-txt font-mono text-[11px] px-2 py-1 focus:border-gold focus:outline-none"
         />
         <button
-          onClick={() => { setOpen(false); setQuery(''); }}
+          onClick={close}
           className="font-mono text-[10px] tracking-[.1em] uppercase text-txt-3/60 hover:text-txt transition-colors"
         >
           Cancel
@@ -478,15 +531,14 @@ function AddDriverPicker({
             : 'No unregistered drivers in this division.'}
         </p>
       ) : matches.length === 0 ? (
-        <p className="font-mono text-[10px] text-txt-3/60">No match.</p>
+        <p className="font-mono text-[10px] text-txt-3/60">No unregistered driver matches.</p>
       ) : (
         <ul className="border border-line divide-y divide-line/40">
           {matches.map((c) => (
             <li key={c.id}>
               <button
                 onClick={() => {
-                  setOpen(false);
-                  setQuery('');
+                  close();
                   onPick(c);
                 }}
                 className="w-full flex items-center gap-3 px-2 py-1.5 text-left hover:bg-panel-2 transition-colors"
@@ -506,6 +558,40 @@ function AddDriverPicker({
       {pool.length > matches.length && !q && (
         <p className="font-mono text-[10px] text-txt-3/40">
           Showing 8 of {pool.length}. Type to search by name or Steam ID.
+        </p>
+      )}
+      {entryMatches.length > 0 && (
+        <>
+          <p className="font-mono text-[9px] tracking-[.2em] uppercase text-txt-3/60 mt-1">
+            Already registered — merge into this team
+          </p>
+          <ul className="border border-line divide-y divide-line/40">
+            {entryMatches.map((t) => (
+              <li key={t.id}>
+                <button
+                  onClick={() => {
+                    close();
+                    onPickEntry(t);
+                  }}
+                  className="w-full flex items-center gap-3 px-2 py-1.5 text-left hover:bg-panel-2 transition-colors"
+                >
+                  <span className="font-mono text-[11px] text-txt-2 flex-1 min-w-0 truncate">
+                    {t.members.map((m) => m.display_name ?? '—').join(', ')}
+                    <span className="text-txt-3/50"> · {t.team_name}</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-txt-3/60 shrink-0">
+                    {t.car}
+                    {t.status === 'waitlisted' ? ' · waitlisted' : ''}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {entryPool.length > entryMatches.length && !q && (
+        <p className="font-mono text-[10px] text-txt-3/40">
+          Showing 5 of {entryPool.length} registered entries. Type to search.
         </p>
       )}
     </div>

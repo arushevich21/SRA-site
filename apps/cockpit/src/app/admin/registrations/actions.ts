@@ -138,6 +138,47 @@ export async function addTeamDriver(
   return { error: null };
 }
 
+// admin_merge_into_team()'s own RAISE codes (20261005b); the rest come from
+// the admin_add_team_driver() calls it makes for each moved driver.
+const MERGE_ERRORS: Record<string, string> = {
+  ...ADD_DRIVER_ERRORS,
+  TEAM_FULL: 'Not enough open spots on the team for every driver on that entry.',
+  DIVISION_MISMATCH: 'A driver on that entry is in a different division from the team.',
+  MERGE_DIFFERENT_EVENT: 'Those entries are in different championships.',
+  MERGE_SAME_TEAM: 'That entry is already part of this team.',
+  MERGE_SOURCE_EMPTY: 'That entry has no drivers to move.',
+};
+
+/**
+ * Merge another entry into a team: for two drivers who each registered solo
+ * but share a car. The source entry (its whole team) is deleted and each of
+ * its drivers is added to the target team exactly as addTeamDriver() would —
+ * they take the target's car, division, class and status. Atomic: a failure
+ * leaves both entries as they were. See
+ * supabase/migrations/20261005b_admin_merge_into_team.sql.
+ *
+ * Both ids are any car of their team.
+ */
+export async function mergeIntoTeam(
+  targetRegistrationId: string,
+  sourceRegistrationId: string,
+): Promise<{ error: string | null }> {
+  await requireAdmin();
+  if (!targetRegistrationId || !sourceRegistrationId) return { error: 'Pick an entry first.' };
+
+  const { error } = await supabase.rpc('admin_merge_into_team', {
+    p_target_registration_id: targetRegistrationId,
+    p_source_registration_id: sourceRegistrationId,
+  });
+
+  if (error) {
+    const code = error.message.split(':')[0]?.trim();
+    return { error: MERGE_ERRORS[code] ?? error.message };
+  }
+  revalidatePath('/admin/registrations');
+  return { error: null };
+}
+
 /**
  * Assign an endurance entry's class (Open / Silver / Bronze), or clear it
  * (null). Endurance championships group by this admin-set class instead of

@@ -153,6 +153,7 @@ export default async function AdminRegistrationsPage() {
       }
       teamsByKey.set(key, {
         id: key,
+        teamId: r.team_id ?? r.id,
         registrationIds: [r.id],
         team_name: one(r.teams)?.name ?? 'Unnamed Team',
         car:
