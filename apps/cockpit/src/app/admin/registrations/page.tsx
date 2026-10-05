@@ -4,6 +4,7 @@ import { accCarModelName } from '@sra/domain';
 import { supabase } from '@/lib/supabase';
 import { getChampionships } from '@/lib/championships-store';
 import RegistrationsAdmin, {
+  type AdminCandidate,
   type AdminChampionship,
   type AdminTeam,
 } from './RegistrationsAdmin';
@@ -47,6 +48,31 @@ function one<T>(rel: T | T[] | null): T | null {
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
 }
 
+// Reads every row of a query, a page at a time: PostgREST caps one request
+// at 1000 rows, and drivers alone is past that. `order` must be a unique key
+// so page boundaries are stable between requests.
+async function selectAll<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  const page = 1000;
+  for (let from = 0; ; from += page) {
+    const { data, error } = await build(from, from + page - 1);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+    if (!data || data.length < page) break;
+  }
+  return out;
+}
+
+type RawDriver = {
+  id: string;
+  display_name: string | null;
+  steam_id: string | null;
+  division_id: number | null;
+  tier: string | null;
+};
+
 export default async function AdminRegistrationsPage() {
   // Defense in depth: gate at page render AND every server action.
   await requireAdmin();
@@ -56,6 +82,18 @@ export default async function AdminRegistrationsPage() {
   const champs = (await getChampionships()).filter(
     (c) => c.registrationKey && c.registrationSeason && c.maxTeamSize,
   );
+
+  // Every driver, loaded once and only if some team has a spot to fill —
+  // the "Add driver" picker's pool (see candidatesFor below).
+  let allDrivers: RawDriver[] | null = null;
+  const loadDrivers = async () =>
+    (allDrivers ??= await selectAll<RawDriver>((from, to) =>
+      supabase
+        .from('drivers')
+        .select('id, display_name, steam_id, division_id, tier')
+        .order('id')
+        .range(from, to),
+    ));
 
   const championships: AdminChampionship[] = [];
   for (const champ of champs) {
@@ -132,6 +170,33 @@ export default async function AdminRegistrationsPage() {
     }
     const teams: AdminTeam[] = [...teamsByKey.values()];
 
+    // "Add driver" pool: drivers not already on an entry for this event
+    // (registration_drivers_one_claim_per_event). Division filtering happens
+    // per team in the picker; admin_add_team_driver() re-checks everything.
+    let candidates: AdminCandidate[] = [];
+    if (teams.some((t) => t.members.length < champ.maxTeamSize!)) {
+      const claimed = await selectAll<{ driver_id: string }>((from, to) =>
+        supabase
+          .from('registration_drivers')
+          .select('driver_id')
+          .eq('championship_key', champ.registrationKey!)
+          .eq('season', champ.registrationSeason!)
+          .order('driver_id')
+          .range(from, to),
+      );
+      const claimedIds = new Set(claimed.map((c) => c.driver_id));
+      candidates = (await loadDrivers())
+        .filter((d) => !claimedIds.has(d.id))
+        .map((d) => ({
+          id: d.id,
+          display_name: d.display_name,
+          steam_id: d.steam_id,
+          division_id: d.division_id,
+          tier: (d.tier ?? null) as 'gold' | 'silver' | null,
+        }))
+        .sort((a, b) => (a.display_name ?? '').localeCompare(b.display_name ?? ''));
+    }
+
     championships.push({
       key: champ.registrationKey!,
       season: champ.registrationSeason!,
@@ -146,6 +211,7 @@ export default async function AdminRegistrationsPage() {
           ? 'none'
           : 'division',
       teams,
+      candidates,
     });
   }
 
