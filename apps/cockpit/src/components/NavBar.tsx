@@ -123,8 +123,9 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
     (c) => c.registrationKey && c.registrationOpen,
   );
 
-  // ACC leaderboards split into six boards: Hot Lap, Hot Lap (Seasonal),
-  // Hot Stint, Hot Stint (Seasonal), Hot Stint Qualifying, #Jagoff. The
+  // ACC leaderboards split into seven boards: Hot Lap, Hot Lap (Seasonal),
+  // Hot Stint, Hot Stint (Seasonal), Hot Stint Qualifying, #Jagoff,
+  // Sweatshop (lap counts — always has data, every season back to S7). The
   // "Leaderboards" word opens the always-on Hot Lap board. The Seasonal/
   // Qualifying/Jagoff entries are always present for ACC (there's a deep
   // history of seasonal boards, S7–S18; each of those pages shows a
@@ -158,6 +159,7 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
             ...(hasEndurance
               ? [{ label: 'Hot Lap (Endurance)', href: `/${sim.slug}/leaderboards/endurance` }]
               : []),
+            { label: 'Sweatshop 💦', href: `/${sim.slug}/leaderboards/sweatshop` },
           ],
         }
       : tabNavItem(sim, 'Leaderboards', 'leaderboards', leaderboardChamps);
