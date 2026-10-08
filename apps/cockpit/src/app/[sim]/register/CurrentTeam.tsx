@@ -4,7 +4,7 @@ import { DivisionBadge } from '@/components/DivisionBadge';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState, useTransition } from 'react';
-import { Icon, type IconName } from '@cardog-icons/react';
+import { CarIcon } from '@/components/CarIcon';
 import { allowedCarNameForModelId } from '@/content/acc-car-model-map';
 import { FallbackLogoImage } from '@/components/FallbackLogoImage';
 import { DriverTierBadge } from '@/components/DriverTierBadge';
@@ -181,7 +181,7 @@ export default function CurrentTeam({
                 <p className="flex items-center gap-1.5 font-mono text-[12px] text-txt-3 mt-2">
                   {manufacturerIconName ? (
                     <span className="relative w-4 h-4 shrink-0 flex items-center justify-center">
-                      <Icon name={manufacturerIconName as IconName} size={16} />
+                      <CarIcon name={manufacturerIconName} size={16} />
                     </span>
                   ) : (
                     manufacturerLogoUrl && (

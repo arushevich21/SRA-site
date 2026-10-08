@@ -102,21 +102,63 @@ export async function RegisterBody({
     );
   }
 
-  // ── Public: fetch the confirmed entry list (no auth needed) ────────────────
-  // registrations/registration_drivers, not team_registrations/team_members —
-  // registration_drivers is authoritative for "who is in this car for this
-  // event" (see supabase/migrations/20260814d-f). Waitlisted entries are
-  // excluded from the public entry list (they aren't "in" the event yet),
-  // but see takenSet below — a waitlisted claim still counts as taken.
-  const { data: rawRegistrations } = await adminClient
-    .from('registrations')
-    .select(
-      'id, team_id, car_model_id, division_id, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, tier, is_sralien))',
-    )
-    .eq('championship_key', champ.registrationKey)
-    .eq('season', champ.registrationSeason)
-    .eq('status', 'confirmed')
-    .order('id');
+  // ── Fetch everything that doesn't depend on anything else, in parallel ────
+  // These used to run one after another — six Supabase round trips stacked
+  // before the first byte of the page. None needs another's result, so they
+  // go out together. `divisions` is one query shared by the capacity and
+  // still-to-register sections (it used to be fetched twice).
+  //
+  // Only a graded series has divisions or a roster to be missing from; a
+  // single-grid event (LIAW) skips both queries.
+  const graded = champ.requiresDivision !== false;
+  const [
+    { data: rawRegistrations },
+    { data: claimedRows },
+    { data: divisionRows },
+    { data: gradedRows },
+    {
+      data: { user },
+    },
+  ] = await Promise.all([
+    // ── Public: the confirmed entry list (no auth needed) ──────────────────
+    // registrations/registration_drivers, not team_registrations/team_members —
+    // registration_drivers is authoritative for "who is in this car for this
+    // event" (see supabase/migrations/20260814d-f). Waitlisted entries are
+    // excluded from the public entry list (they aren't "in" the event yet),
+    // but see takenSet below — a waitlisted claim still counts as taken.
+    adminClient
+      .from('registrations')
+      .select(
+        'id, team_id, car_model_id, division_id, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, tier, is_sralien))',
+      )
+      .eq('championship_key', champ.registrationKey)
+      .eq('season', champ.registrationSeason)
+      .eq('status', 'confirmed')
+      .order('id'),
+    // Every driver already CLAIMED for this event, confirmed or waitlisted —
+    // register_entry()'s unique constraint blocks a second claim regardless of
+    // status, so a waitlisted driver must not appear as "available" here
+    // either. Queried directly against registration_drivers (denormalized
+    // championship_key/season, see 20260814d), not derived from the
+    // confirmed-only entry list above, specifically to include waitlisted
+    // claims the public entry list itself doesn't show.
+    adminClient
+      .from('registration_drivers')
+      .select('driver_id')
+      .eq('championship_key', champ.registrationKey)
+      .eq('season', champ.registrationSeason),
+    graded
+      ? adminClient.from('divisions').select('id, name').order('id')
+      : Promise.resolve({ data: null }),
+    graded
+      ? adminClient
+          .from('drivers')
+          .select('id, display_name, division_id, tier, is_sralien')
+          .not('division_id', 'is', null)
+      : Promise.resolve({ data: null }),
+    createSupabaseServerClient().then((supabase) => supabase.auth.getUser()),
+  ]);
+  const divisions = (divisionRows ?? []) as { id: number; name: string }[];
 
   // One registrations row is one CAR. On a car-per-driver championship (GT3
   // Team Series — championships.shared_car = false, see 20260915) a team is
@@ -168,32 +210,14 @@ export async function RegisterBody({
   // Only meaningful for a graded series; a single-grid event (LIAW) has no
   // divisions to break down and renders nothing.
   const divisionCapacity =
-    champ.requiresDivision !== false && champ.divisionDriverCap != null
-      ? await (async () => {
-          const { data: divisions } = await adminClient
-            .from('divisions')
-            .select('id, name')
-            .order('id');
-          return buildDivisionCapacity(
-            teams.map((t) => ({ divisionId: t.division_id, driverCount: t.members.length })),
-            (divisions ?? []) as { id: number; name: string }[],
-            champ.divisionDriverCap ?? null,
-          );
-        })()
+    graded && champ.divisionDriverCap != null
+      ? buildDivisionCapacity(
+          teams.map((t) => ({ divisionId: t.division_id, driverCount: t.members.length })),
+          divisions,
+          champ.divisionDriverCap ?? null,
+        )
       : [];
 
-  // Every driver already CLAIMED for this event, confirmed or waitlisted —
-  // register_entry()'s unique constraint blocks a second claim regardless of
-  // status, so a waitlisted driver must not appear as "available" here
-  // either. Queried directly against registration_drivers (denormalized
-  // championship_key/season, see 20260814d), not derived from the
-  // confirmed-only `teams` list above, specifically to include waitlisted
-  // claims the public entry list itself doesn't show.
-  const { data: claimedRows } = await adminClient
-    .from('registration_drivers')
-    .select('driver_id')
-    .eq('championship_key', champ.registrationKey)
-    .eq('season', champ.registrationSeason);
   const takenSet = new Set((claimedRows ?? []).map((r) => r.driver_id as string));
 
   // ── Still to register, per division ───────────────────────────────────────
@@ -201,43 +225,25 @@ export async function RegisterBody({
   // claim set as the teammate picker, so a driver is never both "available"
   // there and "registered" here. Graded series only — an ungraded event has
   // no roster to be missing from.
-  const unregisteredByDivision =
-    champ.requiresDivision !== false
-      ? await (async () => {
-          const [{ data: divisions }, { data: graded }] = await Promise.all([
-            adminClient.from('divisions').select('id, name').order('id'),
-            adminClient
-              .from('drivers')
-              .select('id, display_name, division_id, tier, is_sralien')
-              .not('division_id', 'is', null),
-          ]);
-          const roster: RosterDriver[] = ((graded ?? []) as {
-            id: string;
-            display_name: string | null;
-            division_id: number | null;
-            tier: 'gold' | 'silver' | null;
-            is_sralien: boolean | null;
-          }[]).map((d) => ({
-            id: d.id,
-            displayName: d.display_name ? bareDriverName(d.display_name) : null,
-            divisionId: d.division_id,
-            tier: d.tier,
-            isSralien: d.is_sralien ?? false,
-          }));
-          return buildUnregisteredByDivision(
-            roster,
-            takenSet,
-            (divisions ?? []) as { id: number; name: string }[],
-          );
-        })()
-      : [];
+  const roster: RosterDriver[] = ((gradedRows ?? []) as {
+    id: string;
+    display_name: string | null;
+    division_id: number | null;
+    tier: 'gold' | 'silver' | null;
+    is_sralien: boolean | null;
+  }[]).map((d) => ({
+    id: d.id,
+    displayName: d.display_name ? bareDriverName(d.display_name) : null,
+    divisionId: d.division_id,
+    tier: d.tier,
+    isSralien: d.is_sralien ?? false,
+  }));
+  const unregisteredByDivision = graded
+    ? buildUnregisteredByDivision(roster, takenSet, divisions)
+    : [];
 
   // ── Auth ───────────────────────────────────────────────────────────────────
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  // `user` was resolved in the parallel batch above.
   let userSection: ReactNode;
   // Captured inside the branch below (only known once we've resolved a
   // driver record) and read afterward by TeamList's "mine" row highlight —

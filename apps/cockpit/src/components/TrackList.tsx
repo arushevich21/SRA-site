@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatInTimeZone } from 'date-fns-tz';
-import { Icon, type IconName } from '@cardog-icons/react';
+import { CarIcon } from './CarIcon';
 import { FallbackLogoImage } from './FallbackLogoImage';
 import type { TrackSummary, TrackTopEntry } from '@/lib/track-summary';
 import { countryFlagUrl } from '@/lib/country-flag';
@@ -144,7 +144,7 @@ export function TrackList({
                     title={entry.carLabel ?? undefined}
                   >
                     {entry.manufacturerIconName ? (
-                      <Icon name={entry.manufacturerIconName as IconName} size={20} color="white" />
+                      <CarIcon name={entry.manufacturerIconName} size={20} />
                     ) : (
                       entry.manufacturerLogoUrl && (
                         <FallbackLogoImage src={entry.manufacturerLogoUrl} alt={entry.carLabel ?? ''} />

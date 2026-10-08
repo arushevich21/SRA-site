@@ -1,4 +1,4 @@
-import { Icon, type IconName } from '@cardog-icons/react';
+import { CarIcon } from './CarIcon';
 import { FallbackLogoImage } from './FallbackLogoImage';
 
 // A manufacturer icon/logo box, sized to `size`. Takes the already-resolved
@@ -21,7 +21,7 @@ export function CarLogo({
   if (manufacturerIconName) {
     return (
       <span className="relative shrink-0 flex items-center justify-center" style={box}>
-        <Icon name={manufacturerIconName as IconName} size={size} />
+        <CarIcon name={manufacturerIconName} size={size} alt={alt} />
       </span>
     );
   }
