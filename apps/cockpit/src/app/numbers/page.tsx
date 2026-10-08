@@ -1,6 +1,7 @@
 import { supabase as adminClient } from '@/lib/supabase';
 import Link from 'next/link';
 import NumberChecker, { type TakenEntry } from './NumberChecker';
+import NumberBrowser from './NumberBrowser';
 
 // Registry only changes via admin actions — static, busted on-demand by
 // revalidatePath in admin/numbers/actions.ts.
@@ -77,7 +78,8 @@ export default async function NumbersPage() {
         Every driver runs a permanent number from{' '}
         <strong className="text-txt">2–999</strong>. #1 is the reigning Division
         1 champion&apos;s badge — they run it while keeping their own number.
-        Check whether a number is free below.
+        Check a number below, or browse the free ones and pick one for your
+        profile.
       </p>
 
       <NumberChecker takenMap={takenMap} min={MIN} max={MAX} />
@@ -99,6 +101,13 @@ export default async function NumbersPage() {
             Available
           </p>
         </div>
+      </div>
+
+      <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3 mb-4">
+        Available Numbers
+      </p>
+      <div className="mb-14">
+        <NumberBrowser takenMap={takenMap} min={MIN} max={MAX} />
       </div>
 
       <p className="font-mono text-[11px] tracking-[.3em] uppercase text-txt-3 mb-6">

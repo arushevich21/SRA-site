@@ -8,7 +8,17 @@ import DriverPhotoForm from './DriverPhotoForm';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ number?: string }>;
+}) {
+  // A number picked on /numbers (NumberBrowser links here with ?number=N).
+  // Only a plausible value prefills the field; the save action still
+  // validates range and uniqueness.
+  const picked = Number((await searchParams).number);
+  const pickedNumber = Number.isInteger(picked) && picked >= 2 && picked <= 999 ? picked : null;
+
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -144,11 +154,13 @@ export default async function ProfilePage() {
           </div>
         )}
         <ProfileDetailsForm
+          // Remount when a different number is picked so defaultValue applies.
+          key={pickedNumber ?? 'current'}
           firstName={driver?.first_name ?? null}
           lastName={driver?.last_name ?? null}
           shortName={driver?.short_name ?? null}
           country={driver?.country ?? null}
-          driverNumber={driver?.driver_number ?? null}
+          driverNumber={pickedNumber ?? driver?.driver_number ?? null}
         />
       </div>
 
