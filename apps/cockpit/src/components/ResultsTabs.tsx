@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Icon, type IconName } from '@cardog-icons/react';
+import { CarIcon } from './CarIcon';
 import { accCarManufacturerIconName } from '@sra/domain';
 import { accCarManufacturerLogoUrl } from '@/lib/acc/manufacturer-logo';
 import type { AccDriverResult, AccSessionResult, AccSessionType } from '@sra/shared-types';
@@ -178,7 +178,7 @@ function ResultsTable({
                   <div className="flex items-center gap-2">
                     <span className="relative w-5 h-5 shrink-0 flex items-center justify-center">
                       {iconName ? (
-                        <Icon name={iconName as IconName} size={18} />
+                        <CarIcon name={iconName} size={18} />
                       ) : (
                         logoUrl && <FallbackLogoImage src={logoUrl} alt={r.carModelName ?? ''} />
                       )}

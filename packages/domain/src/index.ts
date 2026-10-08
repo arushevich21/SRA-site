@@ -102,6 +102,7 @@ export {
 export {
   buildDriverRounds,
   buildTeamRounds,
+  applyIndividualTeamDrops,
   pairOrphanEvents,
   type RoundEvent,
   type RoundRaceResult,

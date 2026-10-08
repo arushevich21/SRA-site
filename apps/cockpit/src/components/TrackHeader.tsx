@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { Icon, type IconName } from '@cardog-icons/react';
+import { CarIcon } from './CarIcon';
 import { FallbackLogoImage } from './FallbackLogoImage';
 import type { TrackSummary, TrackTopEntry } from '@/lib/track-summary';
 import { countryFlagUrl } from '@/lib/country-flag';
@@ -98,7 +98,7 @@ export function TrackHeader({
               <div className="hidden sm:flex items-center gap-2">
                 {fastestLap.manufacturerIconName ? (
                   <span className="relative w-7 h-7 shrink-0 flex items-center justify-center">
-                    <Icon name={fastestLap.manufacturerIconName as IconName} size={28} color="white" />
+                    <CarIcon name={fastestLap.manufacturerIconName} size={28} />
                   </span>
                 ) : (
                   fastestLap.manufacturerLogoUrl && (

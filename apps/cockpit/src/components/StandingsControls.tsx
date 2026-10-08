@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { AccsmTarget } from '@/content/championships';
 import { DivisionBadge } from './DivisionBadge';
 import { DriverTierBadge } from './DriverTierBadge';
+import { LinkPendingBar } from './LinkPendingBar';
 import {
   standingsViewHref,
   type StandingsTierFilter,
@@ -9,12 +10,22 @@ import {
 } from '@/lib/standings-view';
 
 // All three controls are <Link>s, not buttons — see lib/standings-view.ts for
-// why the view lives in the URL. Server components throughout; nothing here
-// needs client JS.
+// why the view lives in the URL. Server components throughout; the only client
+// JS is LinkPendingBar, which shows a click registered while the server
+// renders the next view.
+//
+// Every control uses a full `prefetch`: the page reads searchParams, so it is
+// dynamic, and Next's default prefetch for a dynamic route stops at the
+// loading boundary — each click then waited on a full server render. Full
+// prefetch renders the neighbouring views as soon as the controls are on
+// screen, so switching is instant. Affordable because a view is ~120 KB
+// (see CarLogo) and the Emperor fetch behind it is cached for 5 minutes and
+// shared across views (lib/emperor-standings.ts), so prefetching costs ACCSM
+// nothing extra.
 
-const TAB_BASE = 'px-4 py-2 -mb-px border-b-2 transition-all';
+const TAB_BASE = 'relative px-4 py-2 border-b-2 transition-all';
 const PILL_BASE =
-  'font-mono text-[11px] tracking-[.2em] uppercase px-3 py-1.5 border transition-colors';
+  'relative font-mono text-[11px] tracking-[.2em] uppercase px-3 py-1.5 border transition-colors';
 
 /** Division tab strip. One tab per ACCSM championship the series spans. */
 export function DivisionTabs({
@@ -28,14 +39,17 @@ export function DivisionTabs({
   view: StandingsView;
   activeDivision: number;
 }) {
+  // Inset-shadow baseline rather than a border the tabs overlap with -mb-px —
+  // see LeaderboardTabs for the stray scrollbar that overhang caused.
   return (
-    <div className="flex gap-1 border-b border-line mb-6 overflow-x-auto">
+    <div className="flex gap-1 mb-6 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-line)]">
       {targets.map((t) => {
         const active = t.divisionId === activeDivision;
         return (
           <Link
             key={t.divisionId}
             href={standingsViewHref(basePath, view, { division: t.divisionId })}
+            prefetch
             aria-current={active ? 'page' : undefined}
             className={[
               TAB_BASE,
@@ -49,6 +63,7 @@ export function DivisionTabs({
             ].join(' ')}
           >
             <DivisionBadge division={t.divisionId} label={t.divisionName} height={30} />
+            <LinkPendingBar />
           </Link>
         );
       })}
@@ -91,6 +106,7 @@ export function StandingsViewControls({
       <div className="flex gap-1">
         <Link
           href={standingsViewHref(basePath, view, { entrant: 'drivers' })}
+          prefetch
           className={[
             PILL_BASE,
             view.entrant === 'drivers'
@@ -99,6 +115,7 @@ export function StandingsViewControls({
           ].join(' ')}
         >
           Drivers
+          <LinkPendingBar />
         </Link>
         {/* Hidden entirely rather than disabled when the championship has no
             team standings — an ACCSM championship configured without teams
@@ -107,6 +124,7 @@ export function StandingsViewControls({
         {hasTeamStandings && (
           <Link
             href={standingsViewHref(basePath, view, { entrant: 'teams' })}
+            prefetch
             className={[
               PILL_BASE,
               view.entrant === 'teams'
@@ -115,6 +133,7 @@ export function StandingsViewControls({
             ].join(' ')}
           >
             Teams
+            <LinkPendingBar />
           </Link>
         )}
       </div>
@@ -129,6 +148,7 @@ export function StandingsViewControls({
                 <Link
                   key={t.value}
                   href={standingsViewHref(basePath, view, { tier: t.value })}
+                  prefetch
                   title={showBadge ? `D${badgeDivision} ${t.label}` : undefined}
                   className={[
                     PILL_BASE,
@@ -151,6 +171,7 @@ export function StandingsViewControls({
                   ) : (
                     t.label
                   )}
+                  <LinkPendingBar />
                 </Link>
               );
             })}

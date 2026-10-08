@@ -157,14 +157,11 @@ async function AcEvoStandingsSection({ champ }: { champ: ChampionshipContent }) 
   // from Emperor's per-event points joined to our ingested race sessions —
   // the same path the multi-division Team Series uses.
   if (champ.game !== 'AC Evo') {
-    const rounds = await getChampionshipRoundEvents(champ.emperorChampionshipId!, result.data, champ.schedule);
-    return (
-      <EmperorStandingsTable
-        data={result.data}
-        rounds={rounds}
-        driverInfo={await getDriverInfoForStandings(result.data)}
-      />
-    );
+    const [rounds, driverInfo] = await Promise.all([
+      getChampionshipRoundEvents(champ.emperorChampionshipId!, result.data, champ.schedule),
+      getDriverInfoForStandings(result.data),
+    ]);
+    return <EmperorStandingsTable data={result.data} rounds={rounds} driverInfo={driverInfo} />;
   }
 
   // AC Evo's per-round points come from OUR round-points cache (positions +
@@ -439,16 +436,23 @@ async function MultiDivisionStandingsSection({
   // schedule. Same division-aware dates + split-night window the results page
   // uses, so D1/D3's Tuesday race never matches D2/D4's Wednesday one at the
   // same track (see round-match.ts / roundStartsAtForDivision).
-  const rounds = await getChampionshipRoundEvents(
-    target.emperorChampionshipId,
-    result.data,
-    champ.schedule.map((r) => ({
-      round: r.round,
-      track: r.track,
-      date: roundStartsAtForDivision(r, activeDivision),
-    })),
-    SPLIT_NIGHT_MATCH_WINDOW_MS,
-  );
+  //
+  // Both views need the round columns and the driver lookup (see the teams
+  // branch below), and neither depends on the other — fetched together rather
+  // than as two stacked Supabase round trips.
+  const [rounds, driverInfo] = await Promise.all([
+    getChampionshipRoundEvents(
+      target.emperorChampionshipId,
+      result.data,
+      champ.schedule.map((r) => ({
+        round: r.round,
+        track: r.track,
+        date: roundStartsAtForDivision(r, activeDivision),
+      })),
+      SPLIT_NIGHT_MATCH_WINDOW_MS,
+    ),
+    getDriverInfoForStandings(result.data),
+  ]);
 
   if (view.entrant === 'teams') {
     // Rosters come from the DRIVER standings (the only place Emperor records
@@ -463,7 +467,7 @@ async function MultiDivisionStandingsSection({
         <TeamStandingsTable
           groups={Object.entries(result.data.teamStandings)}
           rosters={rosters}
-          driverInfo={await getDriverInfoForStandings(result.data)}
+          driverInfo={driverInfo}
           rounds={rounds}
           driverStandings={result.data.driverStandings}
         />
@@ -471,7 +475,6 @@ async function MultiDivisionStandingsSection({
     );
   }
 
-  const driverInfo = await getDriverInfoForStandings(result.data);
   const groups = Object.entries(result.data.driverStandings).map(
     ([className, standings]) => [className, filterAndRankByTier(standings, driverInfo, view.tier)] as const,
   );

@@ -64,9 +64,12 @@ export async function middleware(request: NextRequest) {
     // Linking Discord + Steam alone left first_name/last_name/driver_number
     // NULL (see auth/callback/route.ts's newcomer insert) — drivers were
     // showing up nameless in results/standings/registration. /profile itself
-    // must stay reachable or a driver missing these could never fix it.
+    // must stay reachable or a driver missing these could never fix it — and
+    // so must /numbers, the registry a new driver picks their number from
+    // (gating it left them guessing which numbers were free).
     if ((!driver.first_name || !driver.last_name || driver.driver_number == null) &&
-      request.nextUrl.pathname !== '/profile'
+      request.nextUrl.pathname !== '/profile' &&
+      request.nextUrl.pathname !== '/numbers'
     ) {
       const url = request.nextUrl.clone();
       url.pathname = '/profile';

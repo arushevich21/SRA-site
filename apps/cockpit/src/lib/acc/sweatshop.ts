@@ -76,6 +76,9 @@ export type SweatshopDriver = {
   driverNumber: number | null;
   country: string | null;
   badge: DriverTierBadge | null;
+  // The driver's assigned division (an SRAlien keeps theirs), or null when
+  // ungraded — what the board's division filter matches on.
+  division: number | null;
   // Sort key for the Division column: SRAlien, D1 Gold, D1 Silver … D4
   // Silver, then unassigned last.
   divisionOrder: number;
@@ -131,6 +134,7 @@ async function enrich(totals: SweatshopDriverTotal[]): Promise<SweatshopDriver[]
       driverNumber: info.driverNumber,
       country: info.country,
       badge: getDriverTierBadge(info),
+      division: info.division,
       divisionOrder: divisionOrder(info),
       laps: t.laps,
       validLaps: t.validLaps,

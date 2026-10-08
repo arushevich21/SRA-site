@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import Image from 'next/image';
 import type { HotLapEntry } from '@sra/shared-types';
-import { Icon, type IconName } from '@cardog-icons/react';
+import { CarIcon } from './CarIcon';
 import { FallbackLogoImage } from './FallbackLogoImage';
 import { countryFlagUrl } from '@/lib/country-flag';
 import { LAP_TIER_BADGE, type LapTier, type ReferenceLegendEntry } from '@/lib/acc/reference-times';
@@ -396,7 +396,7 @@ export function HotLapBoard({
                       <span className="lg:hidden flex items-center gap-1.5 mt-0.5 pl-16 text-txt-3">
                         <span className="relative w-4 h-4 shrink-0 flex items-center justify-center">
                           {entry.manufacturerIconName ? (
-                            <Icon name={entry.manufacturerIconName as IconName} size={14} />
+                            <CarIcon name={entry.manufacturerIconName} size={14} />
                           ) : (
                             entry.manufacturerLogoUrl && (
                               <FallbackLogoImage
@@ -468,7 +468,7 @@ export function HotLapBoard({
                         })()}
                         <span className="relative w-5 h-5 shrink-0 flex items-center justify-center">
                           {entry.manufacturerIconName ? (
-                            <Icon name={entry.manufacturerIconName as IconName} size={18} />
+                            <CarIcon name={entry.manufacturerIconName} size={18} />
                           ) : (
                             entry.manufacturerLogoUrl && (
                               <FallbackLogoImage src={entry.manufacturerLogoUrl} alt={entry.carModel ?? ''} />

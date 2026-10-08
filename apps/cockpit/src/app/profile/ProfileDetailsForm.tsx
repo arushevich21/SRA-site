@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import Link from 'next/link';
 import { updateProfileDetails, type ProfileDetailsState } from './actions';
 import { COUNTRIES } from '@/lib/countries';
 
@@ -77,6 +78,12 @@ export default function ProfileDetailsForm({
             required
             className="bg-panel-2 border border-line px-4 py-3 font-mono text-[13px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold w-full"
           />
+          <Link
+            href="/numbers"
+            className="font-mono text-[11px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors"
+          >
+            Browse available numbers →
+          </Link>
         </div>
       </div>
 

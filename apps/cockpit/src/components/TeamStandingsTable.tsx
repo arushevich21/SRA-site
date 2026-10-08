@@ -18,7 +18,9 @@ import type { TeamMember } from '@/lib/team-rosters';
 // Emperor's team rows carry no car and no position (derived from order in
 // @sra/emperor-client — see normalizeChampionshipStandings). Per-round
 // points aren't on the team row either — they're each driver's per-team
-// event points added up (buildTeamRounds), with the team's own drop round.
+// event points added up (buildTeamRounds). Team totals drop each DRIVER's own
+// worst round, not the team's worst combined one (applyIndividualTeamDrops,
+// applied in lib/emperor-standings.ts), so a cell can be partly dropped.
 export function TeamStandingsTable({
   groups,
   rosters,
@@ -124,11 +126,16 @@ export function TeamStandingsTable({
 // Team round cell: the team's combined points that night. Colour is the
 // team's RANK among teams that round (there's no "team finishing position"
 // in a race), so the superscript reads "1st that night", not a race result.
+//
+// When one driver dropped this round but a teammate didn't, the night is
+// partly dropped: the total stays, followed by the uncounted part struck
+// through. All of it dropped strikes the whole cell, as on the driver table.
 function TeamRoundCellView({ cell }: { cell: TeamRoundCell }) {
   if (cell.points == null && !cell.dropped) {
     return <span className="text-txt-3/35">—</span>;
   }
   const podium = cell.rank != null && cell.rank <= 3 ? PODIUM_CLASS[cell.rank] : '';
+  const partial = !cell.dropped && cell.droppedPoints > 0;
   return (
     <span
       className={[
@@ -136,11 +143,24 @@ function TeamRoundCellView({ cell }: { cell: TeamRoundCell }) {
         cell.dropped ? 'text-txt-3/55 line-through decoration-txt-3/70' : podium || 'text-txt-2',
         podium && !cell.dropped ? 'font-bold' : '',
       ].join(' ')}
-      title={cell.dropped ? 'Dropped round' : cell.rank != null ? `${cell.rank}${ordinal(cell.rank)} that round` : undefined}
+      title={
+        cell.dropped
+          ? 'Dropped round'
+          : partial
+            ? `${cell.droppedPoints} pts not counted (a driver's drop round)`
+            : cell.rank != null
+              ? `${cell.rank}${ordinal(cell.rank)} that round`
+              : undefined
+      }
     >
       {cell.points ?? '—'}
       {podium && !cell.dropped && (
         <sup className="text-[9px] tracking-[.05em] opacity-85">{cell.rank}{ordinal(cell.rank!)}</sup>
+      )}
+      {partial && (
+        <span className="text-[11px] font-normal text-txt-3/60 line-through decoration-txt-3/70">
+          {cell.droppedPoints}
+        </span>
       )}
     </span>
   );
