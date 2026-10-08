@@ -80,8 +80,10 @@ export type EmperorTeamStanding = {
   teamName: string;
   points: number;
   pointsPenalty: number;
-  // The team's own drop round(s) — Emperor drops the team's worst COMBINED
-  // event, which need not be either driver's individual drop.
+  // The team's own drop round(s) as Emperor reports them — Emperor drops the
+  // team's worst COMBINED event. SRA's rule drops each driver's own worst
+  // event instead, so the app re-scores teams (applyIndividualTeamDrops in
+  // @sra/domain), which clears this.
   droppedEventIds: string[];
 };
 

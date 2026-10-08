@@ -4,7 +4,10 @@
 // our own ingested race sessions (which carry finishing order and lap
 // times). Nothing here re-scores anything: points and drops are Emperor's,
 // verbatim; this only lines them up under round columns and decorates each
-// cell with what the race result says.
+// cell with what the race result says. The one exception is the team
+// championship's drop rule — see applyIndividualTeamDrops.
+
+import type { EmperorChampionshipStandings } from '@sra/shared-types';
 
 export type RoundRaceResult = {
   position: number;
@@ -43,8 +46,14 @@ export type DriverRounds = {
 
 export type TeamRoundCell = {
   // Sum of the team's drivers' points for this event, or null when none of
-  // them scored it.
+  // them scored it. The night's full total, drops included.
   points: number | null;
+  // The part of `points` that doesn't count: the points of each driver whose
+  // own drop round this is (see applyIndividualTeamDrops). 0 when no driver
+  // dropped it.
+  droppedPoints: number;
+  // Every point scored this event is dropped — all of the team's scorers
+  // dropped it.
   dropped: boolean;
   // Rank of this points total among every team in the same group that
   // scored the event (competition ranking: ties share, next rank skips).
@@ -98,30 +107,114 @@ export function buildDriverRounds(
   return { cells, fastestLaps };
 }
 
-/**
- * Round cells for every team in one class group. Points per event are the
- * sum of what each driver scored UNDER THAT TEAM (teamEventPoints), so a
- * driver who moved teams mid-season contributes each night to the team they
- * were on. The drop is the team row's own (Emperor drops the team's worst
- * combined night, which needn't match either driver's individual drop).
- */
-export function buildTeamRounds(
-  teams: { teamName: string; droppedEventIds: string[] }[],
-  drivers: { teamEventPoints: Record<string, Record<string, number>> }[],
-  events: RoundEvent[],
-): Map<string, TeamRoundCell[]> {
-  // teamName -> eventId -> points
-  const totals = new Map<string, Map<string, number>>();
-  for (const t of teams) totals.set(t.teamName, new Map());
+type TeamDriver = {
+  teamEventPoints: Record<string, Record<string, number>>;
+  droppedEventIds: string[];
+};
+
+// teamName -> eventId -> { total scored, part of it dropped }, from what each
+// driver scored UNDER THAT TEAM (teamEventPoints) — a driver who moved teams
+// mid-season contributes each night to the team they were on. A driver's
+// points for an event count as dropped when that event is one of the
+// driver's OWN drop rounds.
+type TeamEventTotal = {
+  points: number;
+  dropped: number;
+  // How many of the team's drivers scored the event, and how many of those
+  // dropped it — equal means none of the night counts.
+  scorers: number;
+  droppers: number;
+};
+
+function teamEventTotals(
+  teamNames: Iterable<string>,
+  drivers: TeamDriver[],
+): Map<string, Map<string, TeamEventTotal>> {
+  const totals = new Map<string, Map<string, TeamEventTotal>>();
+  for (const name of teamNames) totals.set(name, new Map());
   for (const d of drivers) {
+    const driverDrops = new Set(d.droppedEventIds);
     for (const [teamName, byEvent] of Object.entries(d.teamEventPoints)) {
       const team = totals.get(teamName);
       if (!team) continue; // a team Emperor doesn't rank in this group
       for (const [eventId, pts] of Object.entries(byEvent)) {
-        team.set(eventId, (team.get(eventId) ?? 0) + pts);
+        const cell = team.get(eventId) ?? { points: 0, dropped: 0, scorers: 0, droppers: 0 };
+        cell.points += pts;
+        cell.scorers += 1;
+        if (driverDrops.has(eventId)) {
+          cell.dropped += pts;
+          cell.droppers += 1;
+        }
+        team.set(eventId, cell);
       }
     }
   }
+  return totals;
+}
+
+/**
+ * Re-scores the team championship with SRA's drop rule: a team's total is
+ * the sum of its drivers' points with EACH DRIVER'S OWN drop round(s)
+ * removed — not, as Emperor computes it, the team's worst combined night
+ * removed.
+ *
+ *   Driver 1: 35 37 69 100 50 88  (drops R1's 35)
+ *   Driver 2: 80 79 64   0 55 25  (drops R4's 0)
+ *   SRA:      682 - 35 - 0 = 647
+ *   Emperor:  682 - R4's combined 100 = 582
+ *
+ * The driver drops are Emperor's own (droppedEventIds), so the driver table
+ * and the team table agree on which rounds each driver dropped. Teams are
+ * re-ranked on the new totals; a stable sort keeps Emperor's order between
+ * tied teams. A team's PointsPenalty is still deducted. The team rows'
+ * droppedEventIds are cleared — under this rule a drop belongs to a driver,
+ * not a team (see TeamRoundCell.droppedPoints for how it's shown).
+ *
+ * A team none of whose drivers carries per-team event points keeps
+ * Emperor's figure rather than dropping to 0 — there's nothing to re-score
+ * it from.
+ */
+export function applyIndividualTeamDrops(standings: EmperorChampionshipStandings): EmperorChampionshipStandings {
+  const drivers = Object.values(standings.driverStandings).flat();
+  const allTeams = Object.values(standings.teamStandings).flat().map((t) => t.teamName);
+  const totals = teamEventTotals(allTeams, drivers);
+
+  const teamStandings: EmperorChampionshipStandings['teamStandings'] = {};
+  for (const [className, teams] of Object.entries(standings.teamStandings)) {
+    teamStandings[className] = teams
+      .map((t) => {
+        const byEvent = [...(totals.get(t.teamName)?.values() ?? [])];
+        if (byEvent.length === 0) return t;
+        const counted = byEvent.reduce((sum, e) => sum + e.points - e.dropped, 0);
+        return { ...t, points: counted - t.pointsPenalty, droppedEventIds: [] };
+      })
+      .sort((a, b) => b.points - a.points)
+      .map((t, i) => ({ ...t, position: i + 1 }));
+  }
+  return { ...standings, teamStandings };
+}
+
+/**
+ * Round cells for every team in one class group: each night's combined
+ * points, with the part that doesn't count (drivers' own drop rounds — see
+ * applyIndividualTeamDrops) carried alongside.
+ */
+export function buildTeamRounds(
+  teams: { teamName: string }[],
+  drivers: TeamDriver[],
+  events: RoundEvent[],
+): Map<string, TeamRoundCell[]> {
+  const cellTotals = teamEventTotals(
+    teams.map((t) => t.teamName),
+    drivers,
+  );
+  // teamName -> eventId -> points
+  const totals = new Map(
+    [...cellTotals].map(([name, byEvent]) => [
+      name,
+      new Map([...byEvent].map(([ev, c]) => [ev, c.points])),
+    ]),
+  );
 
   // Rank per event, competition style: sort desc, ties share the rank of
   // their first member.
@@ -142,14 +235,18 @@ export function buildTeamRounds(
   const out = new Map<string, TeamRoundCell[]>();
   for (const t of teams) {
     const byEvent = totals.get(t.teamName)!;
-    const dropped = new Set(t.droppedEventIds);
+    const cells = cellTotals.get(t.teamName)!;
     out.set(
       t.teamName,
       events.map((ev) => {
         const points = byEvent.has(ev.eventId) ? byEvent.get(ev.eventId)! : null;
+        const cell = cells.get(ev.eventId);
         return {
           points,
-          dropped: dropped.has(ev.eventId),
+          droppedPoints: cell?.dropped ?? 0,
+          // Fully dropped: every driver who scored this event for the team
+          // dropped it, so none of the night counts.
+          dropped: cell != null && cell.droppers === cell.scorers,
           rank: points == null ? null : (rankByEvent.get(ev.eventId)?.get(t.teamName) ?? null),
         };
       }),
