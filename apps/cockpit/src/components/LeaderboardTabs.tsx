@@ -66,14 +66,17 @@ export function LeaderboardTabs({
     { label: 'Sweatshop 💦', href: `/${simSlug}/leaderboards/sweatshop`, active: onSweatshop, show: true },
   ].filter((t) => t.show);
 
+  // The baseline is an inset shadow, not a border the tabs overlap with
+  // -mb-px: that 1px overhang overflows the box, and overflow-x-auto makes the
+  // y axis scrollable too, so it showed a stray vertical scrollbar.
   return (
-    <div className="flex border-b border-line mb-10 -mt-6 overflow-x-auto">
+    <div className="flex mb-10 -mt-6 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-line)]">
       {tabs.map((t) => (
         <Link
           key={t.href}
           href={t.href}
           className={[
-            'font-mono text-[11px] tracking-[.2em] uppercase px-5 py-3 border-b-2 -mb-px whitespace-nowrap transition-colors',
+            'font-mono text-[11px] tracking-[.2em] uppercase px-5 py-3 border-b-2 whitespace-nowrap transition-colors',
             t.active
               ? 'border-gold text-gold'
               : 'border-transparent text-txt-3 hover:text-txt',
