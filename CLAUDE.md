@@ -209,9 +209,9 @@ linked, 36 orphans remain unlinked. Still outstanding:
   terminal you might screenshot — the password is embedded in it.
 - **Env vars** (in `apps/cockpit/.env.local` + Vercel, both Production and
   Preview): `GRIDOS_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`,
-  `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_PASSWORD` (local schema dumps only),
-  `DISCORD_INTEGRATION_WEBHOOK_URL` (optional — unset disables the SRA-Bot
-  nick/role resync nudge). [VERIFY full current list.]
+  `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_PASSWORD` (local schema dumps only).
+  (SRA-Bot nick/role resyncs go through `profile_sync` rows in `bot_jobs`, not
+  a webhook.) [VERIFY full current list.]
 - **Windows/WSL:** avoid committing `*Zone.Identifier` NTFS metadata files
   (they break Windows checkouts — gitignored). Some pnpm/dev commands must run
   with `--filter cockpit` rather than from root. In PowerShell, backtick line
