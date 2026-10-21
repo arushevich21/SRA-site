@@ -51,8 +51,7 @@ export default function DivisionsTable({
   const [discordIdsInput, setDiscordIdsInput] = useState('');
   const [resolving, setResolving] = useState(false);
   const [notFoundIds, setNotFoundIds] = useState<string[] | null>(null);
-  // Whether the last write pushed the change to Discord, or was too large
-  // and needs the bot's bulk resync instead.
+  // Whether the last write queued a Discord role resync.
   const [discordStatus, setDiscordStatus] = useState<AssignResult['discord'] | null>(null);
 
   const unassignedCount = useMemo(
@@ -361,26 +360,10 @@ export default function DivisionsTable({
       {/* Discord sync outcome — a division written here is only half the
           change; the member's Discord ROLE comes from the bot re-reading this
           row after a nudge, so an admin needs to know whether that happened. */}
-      {discordStatus && discordStatus.kind !== 'none' && (
-        <div
-          className={[
-            'border px-4 py-3 mb-3 font-mono text-[12px]',
-            discordStatus.kind === 'deferred-to-bulk'
-              ? 'border-gold-deep/40 bg-gold-deep/5 text-gold-deep'
-              : 'border-line bg-panel text-txt-2',
-          ].join(' ')}
-        >
-          {discordStatus.kind === 'nudged' ? (
-            <>
-              Discord role resync requested for {discordStatus.count} driver
-              {discordStatus.count === 1 ? '' : 's'}.
-            </>
-          ) : (
-            <>
-              {discordStatus.count} drivers updated — too many to push to Discord one at a
-              time. Run SRA-Bot&apos;s bulk resync to apply their division roles.
-            </>
-          )}
+      {discordStatus && discordStatus.kind === 'nudged' && (
+        <div className="border border-line bg-panel text-txt-2 px-4 py-3 mb-3 font-mono text-[12px]">
+          Discord role resync queued for {discordStatus.count} driver
+          {discordStatus.count === 1 ? '' : 's'}.
         </div>
       )}
 

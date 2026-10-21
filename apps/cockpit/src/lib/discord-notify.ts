@@ -1,177 +1,101 @@
 /**
  * Outbound nudges to SRA-Bot.
  *
- * The bot never polls for profile changes: it writes a member's Discord nickname
- * and division role only from its `on_member_update` listeners. The old sra.gg
- * site closed that loop by POSTing a message into the bot's integration channel;
- * the bot listens for it, sets the member's nick to a placeholder, and that edit
- * fires `on_member_update` → nick + role sync, which then reads the driver row
- * back out of Supabase. So this is a *trigger*, not a data transfer — the payload
- * carries nothing but the Discord ID.
+ * The bot never polls drivers for changes: a member's Discord nickname and
+ * division/SRAlien roles are rewritten only when something tells it to. That
+ * signal is a `profile_sync` job on the `bot_jobs` outbox — the bot drains it
+ * (Realtime for instant pickup, 30s poll as the safety net), re-reads the
+ * driver row out of Supabase, and applies roles + nick. So this is a
+ * *trigger*, not a data transfer — the payload carries only the Discord ID.
+ *
+ * This used to POST `profile_updated|<id>` to an integration webhook. SRA-Bot
+ * removed that listener on 2026-09-16 (it gated on a retired channel), so the
+ * webhook was being sent into the void and site edits never reached Discord.
  *
  * Bot side, for reference:
- *   app/core/cogs/listeners/member_role_sync.py :: trigger_on_member_update_on_profile_update
- *   config/integration_codes.py :: PROFILE_UPDATE_CODE / INTEGRATION_WH_ID
+ *   app/core/cogs/bot_jobs.py :: BotJobs._handle_profile_sync
  *
- * The bot filters on `message.webhook_id == INTEGRATION_WH_ID`, so this MUST be
- * the URL of that exact webhook (id below) — any other webhook is ignored
- * silently. Configure `DISCORD_INTEGRATION_WEBHOOK_URL`; unset (local dev,
- * previews) simply disables the nudge.
+ * `bot_jobs_profile_sync_pending_dedup` allows one *pending* profile_sync per
+ * discord_id. Hitting it (23505) means a sync is already queued, and since the
+ * job reads current DB state when it runs, that one covers this change too.
  */
 
-const PROFILE_UPDATE_CODE = 'profile_updated';
+import { supabase } from '@/lib/supabase';
 
-// Not a secret (the token in the URL is) — it's committed in the bot's
-// config/integration_codes.py too. Used only to catch a misconfigured URL.
-const EXPECTED_WEBHOOK_ID = '1021527577724190800';
+const PROFILE_SYNC = 'profile_sync';
+const UNIQUE_VIOLATION = '23505';
 
-const TIMEOUT_MS = 3000;
+// Snowflakes only: the bot int()s this, so keep anything else from reaching it.
+function usableId(discordId: string | number | null | undefined): string | null {
+  const id = String(discordId ?? '').trim();
+  return /^\d{5,25}$/.test(id) ? id : null;
+}
 
-/**
- * Returns the webhook id if `raw` is a real Discord webhook URL, else null.
- *
- * Exists because the natural misconfiguration here — setting the var to the
- * webhook *id* instead of its full URL — otherwise surfaces only as a generic
- * "Invalid URL" from fetch, swallowed by the catch below, leaving no clue why
- * Discord never updates.
- */
-function webhookId(raw: string): string | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    return null;
+function jobFor(id: string) {
+  return { type: PROFILE_SYNC, payload: { discord_id: id } };
+}
+
+/** Insert one job; an already-pending job for the same member counts as done. */
+async function enqueueOne(id: string): Promise<void> {
+  const { error } = await supabase.from('bot_jobs').insert(jobFor(id));
+  if (error && error.code !== UNIQUE_VIOLATION) {
+    console.error(`[discord-notify] enqueue failed for ${id}: ${error.message}`);
   }
-  if (parsed.protocol !== 'https:') return null;
-  if (!/^(discord|discordapp)\.com$/.test(parsed.hostname)) return null;
-  const m = /^\/api(?:\/v\d+)?\/webhooks\/(\d+)\/[\w-]+$/.exec(parsed.pathname);
-  return m ? m[1] : null;
 }
 
 /**
- * Ask the bot to resync a member's nickname and division role.
+ * Ask the bot to resync a member's nickname and roles.
  *
- * Never throws and never blocks longer than {@link TIMEOUT_MS}: a Discord
- * outage must not fail the profile save that triggered it. The driver row is
- * already committed at that point, so the worst case is a stale nickname until
- * the next member update.
+ * Never throws: the driver row is already committed when this runs, and a
+ * queue hiccup must not fail the save that triggered it.
  */
 export async function notifyDiscordProfileUpdated(
   discordId: string | number | null | undefined,
 ): Promise<void> {
-  const url = process.env.DISCORD_INTEGRATION_WEBHOOK_URL;
-  if (!url) {
-    // Silent no-op here previously left zero trace in logs when this var was
-    // missing in an environment that should have it (e.g. Production) —
-    // indistinguishable from "the bot resynced and did nothing new". Warn so
-    // a stuck-nickname report is diagnosable from Vercel logs instead of
-    // requiring a guess-and-check of env var configuration.
-    console.warn('[discord-notify] skipped: DISCORD_INTEGRATION_WEBHOOK_URL not configured');
-    return;
-  }
-
-  const id = String(discordId ?? '').trim();
-  // Snowflakes only: the bot parses this out of the message content, so keep
-  // anything else from reaching it.
-  if (!/^\d{5,25}$/.test(id)) {
+  const id = usableId(discordId);
+  if (!id) {
     console.warn('[discord-notify] skipped: no usable discord_id');
     return;
   }
-
-  const configuredId = webhookId(url);
-  if (!configuredId) {
-    console.error(
-      '[discord-notify] DISCORD_INTEGRATION_WEBHOOK_URL is not a Discord webhook URL. ' +
-        'Expected https://discord.com/api/webhooks/<id>/<token> — the full URL, not just the id.',
-    );
-    return;
-  }
-  if (configuredId !== EXPECTED_WEBHOOK_ID) {
-    console.warn(
-      `[discord-notify] configured webhook is ${configuredId}, but the bot only reacts to ` +
-        `${EXPECTED_WEBHOOK_ID} (INTEGRATION_WH_ID); this message will be ignored.`,
-    );
-  }
-
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: `${PROFILE_UPDATE_CODE}|${id}`,
-        // The content is machine-read by the bot; never let it ping anyone.
-        allowed_mentions: { parse: [] },
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
-      console.error(
-        `[discord-notify] webhook POST failed: ${res.status} ${res.statusText}`,
-      );
-    }
+    await enqueueOne(id);
   } catch (err) {
-    // Includes the timeout abort. Log and move on.
-    console.error(
-      '[discord-notify] webhook POST error:',
-      err instanceof Error ? err.message : err,
-    );
+    console.error('[discord-notify] enqueue error:', err instanceof Error ? err.message : err);
   }
 }
 
-/**
- * How many drivers a single admin action will nudge individually before it
- * stops and defers to the bot's bulk resync command.
- *
- * Discord rate-limits a webhook to roughly 5 requests per 2 seconds (and ~30
- * messages/minute per channel), so nudging the whole 221-driver classification
- * cohort one at a time would take minutes and blow the server action's
- * execution budget long before it finished. A small edit — regrading a handful
- * of drivers — is worth nudging inline; a bulk run is the bot's job.
- */
-export const DISCORD_NUDGE_LIMIT = 10;
-
-// Spacing between nudges. Comfortably under Discord's ~5-per-2s webhook bucket
-// while keeping a full batch (10 × 250ms = 2.5s) inside a server action's
-// budget alongside the DB write it follows.
-const NUDGE_SPACING_MS = 250;
-
 export type DiscordNudgeOutcome =
-  /** Every affected driver was nudged individually. */
+  /** A resync was queued for every affected driver with a Discord account. */
   | { kind: 'nudged'; count: number }
-  /** Too many to nudge inline — SRA-Bot's bulk resync should be run instead. */
-  | { kind: 'deferred-to-bulk'; count: number }
   /** Nothing to do: no affected driver had a usable discord_id. */
   | { kind: 'none' };
 
 /**
- * Nudges a set of drivers, throttled, or defers when the set is too large.
+ * Queues a resync for a set of drivers.
  *
- * Same trigger-not-transfer semantics as {@link notifyDiscordProfileUpdated}:
- * each nudge makes the bot re-read that driver's row out of Supabase, so the
- * division/tier written immediately before this call is what the bot picks up.
- * Never throws — a Discord problem must not fail a grading write that already
- * committed.
+ * One bulk insert in the common case. If any member already has a pending
+ * sync the whole insert is rejected by the dedup index, so fall back to
+ * per-row inserts that each tolerate it. The bot paces the Discord side
+ * itself, so there is no cap here — a full classification run just queues
+ * every driver. Never throws.
  */
 export async function notifyDiscordProfileUpdatedMany(
   discordIds: (string | null | undefined)[],
-  // Overridable so tests don't spend real seconds asleep. Production callers
-  // pass nothing and get the throttle.
-  { spacingMs = NUDGE_SPACING_MS }: { spacingMs?: number } = {},
 ): Promise<DiscordNudgeOutcome> {
-  const ids = [...new Set(discordIds.filter((id): id is string => !!id && id.trim() !== ''))];
-
+  const ids = [
+    ...new Set(discordIds.map(usableId).filter((id): id is string => id !== null)),
+  ];
   if (ids.length === 0) return { kind: 'none' };
-  if (ids.length > DISCORD_NUDGE_LIMIT) return { kind: 'deferred-to-bulk', count: ids.length };
 
-  for (const [i, id] of ids.entries()) {
-    // Sequential, not Promise.all: the whole point is to stay under the rate
-    // limit, and firing them in parallel would defeat that.
-    await notifyDiscordProfileUpdated(id);
-    if (spacingMs > 0 && i < ids.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, spacingMs));
+  try {
+    const { error } = await supabase.from('bot_jobs').insert(ids.map(jobFor));
+    if (error?.code === UNIQUE_VIOLATION) {
+      for (const id of ids) await enqueueOne(id);
+    } else if (error) {
+      console.error(`[discord-notify] bulk enqueue failed: ${error.message}`);
     }
+  } catch (err) {
+    console.error('[discord-notify] enqueue error:', err instanceof Error ? err.message : err);
   }
 
   return { kind: 'nudged', count: ids.length };

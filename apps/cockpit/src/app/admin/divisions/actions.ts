@@ -49,10 +49,10 @@ export type AssignResult = {
 // Pushes a division/tier change back out to Discord.
 //
 // drivers.division_id and drivers.tier are what the bot's member_role_sync
-// reads to decide a member's division ROLE — but the bot only ever runs that
-// sync from its on_member_update listener; it does not poll. So a write here
-// that isn't followed by a nudge leaves the driver graded on the site with no
-// matching Discord role, indefinitely.
+// reads to decide a member's division ROLE — but the bot only runs that sync
+// on on_member_update or a profile_sync job; it does not poll drivers. So a
+// write here that isn't followed by a nudge leaves the driver graded on the
+// site with no matching Discord role, indefinitely.
 //
 // This is the same loop /profile already closes on a self-service profile save
 // (see app/profile/actions.ts). It was simply never wired to the admin grading
@@ -135,9 +135,6 @@ export async function assignBulk(
 
   if (error) throw new Error(error.message);
   revalidateDriverTierBadgePages();
-  // A grading run over the whole cohort exceeds DISCORD_NUDGE_LIMIT and comes
-  // back 'deferred-to-bulk' — the UI then tells the admin to run SRA-Bot's
-  // bulk resync, which is far quicker than hundreds of throttled webhooks.
   return { updated: driverIds.length, discord: await nudgeDiscordFor(driverIds) };
 }
 
