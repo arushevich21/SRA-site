@@ -5,6 +5,9 @@ export type SimConfig = {
   accentColor: string;
   accentVar: string;
   tagline: string;
+  // Looping background on the sim's landing page. Only sims with footage in
+  // public/videos/ set this; without it the hero is the gradient alone.
+  heroVideo?: { src: string; poster: string };
 };
 
 export const SIMS: SimConfig[] = [
@@ -15,6 +18,7 @@ export const SIMS: SimConfig[] = [
     accentColor: '#E04040',
     accentVar: '--accent-acc',
     tagline: 'The official game of GT World Challenge — machinery built for competitive racing.',
+    heroVideo: { src: '/videos/acc_hero.mp4', poster: '/videos/acc_hero_poster.webp' },
   },
   {
     slug: 'lmu',

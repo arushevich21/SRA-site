@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { EmperorClient } from './client.js';
+import { EmperorClient, EmperorHttpError } from './client.js';
 
 const BASE_URL = 'https://emperor.example.com';
 
@@ -319,5 +319,20 @@ describe('getChampionshipStandings', () => {
     const standings = await new EmperorClient(BASE_URL).getChampionshipStandings('abc');
     expect(standings.driverStandings['']).toEqual([]);
     expect(standings.teamStandings['']).toEqual([]);
+  });
+});
+
+// ── HTTP failures ───────────────────────────────────────────────────────────
+//
+// Callers branch on the status: a 404 from an ACCSM box means "this
+// championship isn't on this server", while a 5xx/429 means the right server
+// is struggling and asking six others won't help.
+describe('HTTP errors', () => {
+  it('throws an EmperorHttpError carrying the status, with the same message as before', async () => {
+    stubFetch({ status: 503 });
+    const err = await makeClient().getChampionshipStandings('abc').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(EmperorHttpError);
+    expect((err as EmperorHttpError).status).toBe(503);
+    expect((err as Error).message).toBe('Emperor championship standings failed: 503');
   });
 });

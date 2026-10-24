@@ -243,7 +243,7 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
   if (scene === 'sponsors') {
     const parsed = query.opacity === undefined ? NaN : Number(query.opacity);
     const opacity = Number.isFinite(parsed) ? Math.min(1, Math.max(0, parsed)) : undefined;
-    const video = query.video && query.video !== '0' ? '/videos/acc_hero.mov' : undefined;
+    const video = query.video && query.video !== '0' ? '/videos/acc_hero_1080.mp4' : undefined;
     return (
       <OverlayCanvas refresh={refresh} opacity={opacity} video={video}>
         <SponsorsOverlay
@@ -317,7 +317,7 @@ export default async function StreamOverlayPage({ params, searchParams }: Overla
   }
 
   if (scene === 'backdrop') {
-    const video = query.video && query.video !== '0' ? '/videos/acc_hero.mov' : undefined;
+    const video = query.video && query.video !== '0' ? '/videos/acc_hero_1080.mp4' : undefined;
     return <OverlayCanvas refresh={refresh} video={video} />;
   }
 

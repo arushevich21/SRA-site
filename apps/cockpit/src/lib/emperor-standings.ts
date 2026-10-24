@@ -1,5 +1,5 @@
 import { unstable_cache } from 'next/cache';
-import { EmperorClient } from '@sra/emperor-client';
+import { EmperorClient, EmperorHttpError } from '@sra/emperor-client';
 import { applyIndividualTeamDrops } from '@sra/domain';
 import type { EmperorChampionshipStandings } from '@sra/shared-types';
 import { EMPEROR_ACEVO_BASE_URL, EMPEROR_ACC_BASE_URLS } from './emperor';
@@ -63,10 +63,11 @@ const lastGood = new Map<string, EmperorChampionshipStandings>();
 async function fetchFromAnyServer(
   baseUrls: string[],
   championshipId: string,
+  deadline: number,
 ): Promise<{ data: EmperorChampionshipStandings; baseUrl: string }> {
   return Promise.any(
     baseUrls.map(async (baseUrl) => ({
-      data: await new EmperorClient(baseUrl).getChampionshipStandings(championshipId),
+      data: await clientFor(baseUrl, deadline).getChampionshipStandings(championshipId),
       baseUrl,
     })),
   ).catch((err: unknown) => {
@@ -78,6 +79,16 @@ async function fetchFromAnyServer(
   });
 }
 
+// Every request in one live attempt shares a single deadline, passed down as
+// the client's own abort timeout. Racing the attempt against a timer (what this
+// used to do) let the page stop waiting at 8s while the fetches underneath ran
+// on to their 15s client default — the remembered host and then the fan-out,
+// back to back — and billed function time the whole way. On 2026-10-24
+// accsm2 500'd a third of its requests and standings p95 passed 20s.
+function clientFor(baseUrl: string, deadline: number): EmperorClient {
+  return new EmperorClient(baseUrl, { requestTimeoutMs: Math.max(1, deadline - Date.now()) });
+}
+
 // One live attempt: the remembered host alone, then the full fan-out if that
 // host has stopped serving this championship (it moves when a championship is
 // recreated in ACCSM, which is exactly why the host isn't a stored column).
@@ -85,29 +96,27 @@ async function fetchLive(
   baseUrls: string[],
   championshipId: string,
 ): Promise<EmperorChampionshipStandings> {
+  const deadline = Date.now() + FETCH_TIMEOUT_MS;
   const remembered = knownHost.get(championshipId);
 
   if (remembered && baseUrls.includes(remembered)) {
     try {
-      return await new EmperorClient(remembered).getChampionshipStandings(championshipId);
-    } catch {
-      // Stale mapping or a transient failure on that one host — fall through
-      // and re-learn. Costs the fan-out we were trying to avoid, but only on
-      // the request that discovers the move.
+      return await clientFor(remembered, deadline).getChampionshipStandings(championshipId);
+    } catch (err) {
+      // Only a 404 means the championship moved. A 5xx, 429 or timeout is the
+      // right server having a bad moment — six more requests to servers that
+      // don't hold it can't help, and add load to boxes sharing its rate
+      // limit. Fail this attempt and let the caller serve the last good copy.
+      if (!(err instanceof EmperorHttpError && err.status === 404)) throw err;
+      // Stale mapping — fall through and re-learn. Costs the fan-out we were
+      // trying to avoid, but only on the request that discovers the move.
       knownHost.delete(championshipId);
     }
   }
 
-  const { data, baseUrl } = await fetchFromAnyServer(baseUrls, championshipId);
+  const { data, baseUrl } = await fetchFromAnyServer(baseUrls, championshipId, deadline);
   knownHost.set(championshipId, baseUrl);
   return data;
-}
-
-function withTimeout<T>(promise: Promise<T>): Promise<T> {
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('Emperor request timed out')), FETCH_TIMEOUT_MS),
-  );
-  return Promise.race([promise, timeout]);
 }
 
 // Only successes reach the cache: the inner function throws on failure, and
@@ -120,7 +129,7 @@ function cachedStandings(
   championshipId: string,
 ): Promise<EmperorChampionshipStandings> {
   return unstable_cache(
-    () => withTimeout(fetchLive(baseUrls, championshipId)),
+    () => fetchLive(baseUrls, championshipId),
     [cacheKey, championshipId],
     { revalidate: STANDINGS_TTL_S },
   )();
