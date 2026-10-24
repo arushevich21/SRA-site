@@ -30,6 +30,18 @@ const nextConfig: NextConfig = {
   // internally to /acc/leaderboards/seasonal/archive/S16/silverstone.
   // afterFiles rewrites (this default form) run before dynamic routes, so
   // the live [season] route never sees a frozen season.
+  // public/ files default to max-age=0, must-revalidate, so a looping hero
+  // video re-requests its byte ranges from the CDN on every pass — one open
+  // tab ran up 250+ GB of transfer. Let browsers keep the bytes for a week;
+  // rename the file (not overwrite it) when the footage changes.
+  async headers() {
+    return [
+      {
+        source: '/videos/:file*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=604800' }],
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

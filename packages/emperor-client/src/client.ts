@@ -92,6 +92,18 @@ export type EmperorClientOptions = {
   downloadTimeoutMs?: number;
 };
 
+// A non-2xx response. Keeps the status so a caller can tell "not on this
+// server" (404) from "server struggling" (5xx/429) without parsing the message.
+export class EmperorHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'EmperorHttpError';
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -130,7 +142,7 @@ export class EmperorClient {
       `${this.baseUrl}/healthcheck.json`,
       this.opts.requestTimeoutMs ?? 15_000,
     );
-    if (!res.ok) throw new Error(`Emperor healthcheck failed: ${res.status}`);
+    if (!res.ok) throw new EmperorHttpError(`Emperor healthcheck failed: ${res.status}`, res.status);
     const raw = await res.json();
     return {
       game: raw.Game ?? '',
@@ -145,7 +157,7 @@ export class EmperorClient {
   async getResultsList(page = 0): Promise<EmperorResultListPage> {
     const url = `${this.baseUrl}/api/results/list.json?page=${page}`;
     const res = await this.throttledFetch(url, this.opts.resultsListTimeoutMs ?? 5_000);
-    if (!res.ok) throw new Error(`Emperor results list failed: ${res.status}`);
+    if (!res.ok) throw new EmperorHttpError(`Emperor results list failed: ${res.status}`, res.status);
     const raw: RawResultListResponse = await res.json();
     return {
       entries: (raw.results ?? []).map(normalizeListEntry),
@@ -169,14 +181,14 @@ export class EmperorClient {
       ? resultsJsonUrl
       : `${this.baseUrl}${resultsJsonUrl}`;
     const res = await this.throttledFetch(url, this.opts.downloadTimeoutMs ?? 15_000);
-    if (!res.ok) throw new Error(`Emperor result download failed: ${res.status} for ${url}`);
+    if (!res.ok) throw new EmperorHttpError(`Emperor result download failed: ${res.status} for ${url}`, res.status);
     return res.json();
   }
 
   async getChampionshipStandings(championshipId: string): Promise<EmperorChampionshipStandings> {
     const url = `${this.baseUrl}/api/championship/${championshipId}/standings.json`;
     const res = await this.throttledFetch(url, this.opts.requestTimeoutMs ?? 15_000);
-    if (!res.ok) throw new Error(`Emperor championship standings failed: ${res.status}`);
+    if (!res.ok) throw new EmperorHttpError(`Emperor championship standings failed: ${res.status}`, res.status);
     const raw: RawChampionshipStandingsResponse = await res.json();
     return normalizeChampionshipStandings(raw);
   }

@@ -68,15 +68,18 @@ export default async function SimOverviewPage({
     <>
       {/* ── HERO VIDEO ─────────────────────────────────────────────── */}
       <section className="relative w-full h-[70vh] min-h-[400px] max-h-[700px] overflow-hidden">
-        <video
-          className="absolute inset-0 w-full h-full object-cover"
-          src={`/videos/${slug}_hero.mov`}
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-        />
+        {sim.heroVideo && (
+          <video
+            className="absolute inset-0 w-full h-full object-cover"
+            src={sim.heroVideo.src}
+            poster={sim.heroVideo.poster}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-carbon via-carbon/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-carbon/60 to-transparent" />
 
