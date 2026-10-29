@@ -1,16 +1,26 @@
 import { sortStandingsWithTiebreak } from '@sra/domain';
 import type { ExportedClassGroup, ExportedDriverStanding } from '../lib/standings-types';
 
-// Uploaded JSON carries a `position` per driver, but ties (equal
-// championshipPoints) aren't resolved upstream — re-derive rank here so no
-// two drivers ever share a position. Tie-break: more races participated
-// (non-DNS) ranks higher; otherwise whoever's running total reached the tied
-// value in the earliest round ranks higher.
+// SimGrid's final total. `championshipPoints` is position points ONLY — it
+// leaves out the +5 pole / fastest-lap bonuses that each race's `pointsTotal`
+// includes, so showing it made a row's total disagree with its own round
+// cells and ranked bonus-earners too low. `actualPoints` is the total after
+// bonuses, drop rounds, penalties and admin adjustments. Older uploads may
+// predate the field, hence the fallback.
+function totalPoints(entry: ExportedDriverStanding): number {
+  return entry.actualPoints ?? entry.championshipPoints;
+}
+
+// Uploaded JSON carries a `position` per driver, but ties (equal totals)
+// aren't resolved upstream — re-derive rank here so no two drivers ever share
+// a position. Tie-break: more races participated (non-DNS) ranks higher;
+// otherwise whoever's running total reached the tied value in the earliest
+// round ranks higher.
 function withResolvedPositions(standings: ExportedDriverStanding[]): ExportedDriverStanding[] {
   const ordered = sortStandingsWithTiebreak(
     standings.map((entry) => ({
       entry,
-      totalPoints: entry.championshipPoints,
+      totalPoints: totalPoints(entry),
       rounds: entry.races.map((r) => ({ points: r.dns ? null : (r.pointsTotal ?? 0) })),
     })),
   );
@@ -58,7 +68,7 @@ export function ClassGroupTable({ group }: { group: ExportedClassGroup }) {
                   {entry.car}
                 </td>
                 <td className="font-mono text-[15px] text-gold-soft py-2 pr-3 text-right">
-                  {entry.championshipPoints}
+                  {totalPoints(entry)}
                 </td>
                 {entry.races.map((race, ri) => (
                   <td
