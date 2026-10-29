@@ -26,7 +26,9 @@ export default async function SeasonalLeaderboardsPage({
   if (!sim) notFound();
   if (sim.game !== 'ACC') notFound();
 
-  const seasons = await getHotlapSeasons();
+  // The scan throws on a failed page rather than returning a partial list;
+  // here that just means no redirect target, so fall through to the empty state.
+  const seasons = await getHotlapSeasons().catch(() => [] as string[]);
   const selectedSeason =
     seasonParam && seasons.includes(seasonParam) ? seasonParam : (seasons[0] ?? null);
 

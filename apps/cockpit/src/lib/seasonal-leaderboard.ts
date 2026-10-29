@@ -163,9 +163,15 @@ export async function fetchHotlapSeasons(): Promise<string[]> {
       .order('season')
       .order('is_wet')
       .range(from, from + page - 1);
+    // Throw, never `break`: returning the seasons seen so far hands the
+    // caching callers a truncated list they store as if it were complete.
+    // Rows are ordered by track_key, so a season whose tracks sort late
+    // vanishes — production served S7–S18 minus S10/S13 and without S19 for
+    // weeks, 404ing /seasonal/S19 and /sweatshop/S19. unstable_cache keeps
+    // serving the last good entry when a refresh throws.
     if (error) {
       console.error('ACC seasonal season list lookup failed:', error);
-      break;
+      throw new Error(`ACC seasonal season list lookup failed: ${error.message}`);
     }
     if (!data || data.length === 0) break;
     for (const r of data) {
