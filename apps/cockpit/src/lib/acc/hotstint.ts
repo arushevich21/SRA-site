@@ -282,9 +282,10 @@ export async function getHotStintSeasons(): Promise<string[]> {
       .order('season')
       .order('is_wet')
       .range(from, from + page - 1);
+    // Throw rather than return a partial list — see fetchHotlapSeasons.
     if (error) {
       console.error('ACC stint season list lookup failed:', error);
-      break;
+      throw new Error(`ACC stint season list lookup failed: ${error.message}`);
     }
     if (!data || data.length === 0) break;
     for (const r of data) {

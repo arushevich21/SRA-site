@@ -25,7 +25,9 @@ export default async function SeasonalHotStintPage({
   if (!sim) notFound();
   if (sim.game !== 'ACC') notFound();
 
-  const seasons = await getHotStintSeasons();
+  // The scan throws on a failed page rather than returning a partial list;
+  // here that just means no redirect target, so fall through to the empty state.
+  const seasons = await getHotStintSeasons().catch(() => [] as string[]);
   const selectedSeason =
     seasonParam && seasons.includes(seasonParam) ? seasonParam : (seasons[0] ?? null);
 
