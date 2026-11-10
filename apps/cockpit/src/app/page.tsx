@@ -5,7 +5,7 @@ import { GameLabel } from '@/components/GameLabel';
 import { CountUpStats } from '@/components/CountUpStats';
 
 const STATS = [
-  { value: '18', label: 'Seasons' },
+  { value: '19', label: 'Seasons' },
   { value: '3,400+', label: 'Members' },
   { value: '40+', label: 'Race Servers' },
   { value: '94,327', label: 'Sessions' },

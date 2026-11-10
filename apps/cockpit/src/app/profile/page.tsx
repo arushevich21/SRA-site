@@ -5,6 +5,8 @@ import Link from 'next/link';
 import SteamLinkForm from './SteamLinkForm';
 import ProfileDetailsForm from './ProfileDetailsForm';
 import DriverPhotoForm from './DriverPhotoForm';
+import { getDriverStats } from '@/lib/driver-stats';
+import { DriverStatsPanel } from '@/components/DriverStatsPanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +29,15 @@ export default async function ProfilePage({
   const { data: driver } = await supabase
     .from('drivers')
     .select(
-      'display_name, avatar_url, photo_url, steam_id, steam_verified, discord_id, is_admin, first_name, last_name, short_name, country, driver_number'
+      'id, display_name, avatar_url, photo_url, steam_id, steam_verified, discord_id, is_admin, first_name, last_name, short_name, country, driver_number, division_id, tier, is_sralien'
     )
     .eq('user_id', user.id)
     .maybeSingle();
+
+  // Results key on SteamID, so stats only make sense once it's verified —
+  // an unverified (or admin-typed) ID might not be this driver's.
+  const stats =
+    driver?.steam_verified && driver.steam_id ? await getDriverStats(driver.steam_id, driver.division_id) : null;
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
@@ -130,6 +137,34 @@ export default async function ProfilePage({
             </div>
           )}
         </div>
+      </div>
+
+      <div className="mb-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+          <h2 className="font-display font-bold text-[28px] uppercase text-txt">Driver Stats</h2>
+          {driver?.id && stats && (
+            <Link
+              href={`/drivers/${driver.id}`}
+              className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 hover:text-gold transition-colors"
+            >
+              View public page →
+            </Link>
+          )}
+        </div>
+        {stats ? (
+          <DriverStatsPanel
+            stats={stats}
+            standing={{ division: driver?.division_id ?? null, tier: driver?.tier ?? null, isSralien: !!driver?.is_sralien }}
+            possessive="Your"
+          />
+        ) : (
+          <div className="border border-line bg-panel px-7 py-6">
+            <p className="font-sans text-[14px] text-txt-2">
+              Verify your Steam account above to see your race record, SRAting and lap stats — results are
+              matched by SteamID.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="border border-line bg-panel px-7 py-6 max-w-[1280px] mb-6">

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { LeaderboardCategory } from '../content/stats-leaderboards';
+import Link from 'next/link';
+import type { LeaderboardCategory } from '@/lib/site-stats';
 
 export function StatsLeaderboard({
   categories,
@@ -10,6 +11,7 @@ export function StatsLeaderboard({
 }) {
   const [activeTab, setActiveTab] = useState(0);
   const active = categories[activeTab];
+  if (!active) return null;
 
   return (
     <div>
@@ -47,13 +49,11 @@ export function StatsLeaderboard({
             </tr>
           </thead>
           <tbody>
-            {active.entries.map((entry) => (
+            {/* Index keys: tied drivers share a rank. */}
+            {active.entries.map((entry, i) => (
               <tr
-                key={entry.rank}
-                className={[
-                  'border-b border-line/20',
-                  entry.rank % 2 !== 0 ? 'bg-carbon-2' : '',
-                ].join(' ')}
+                key={`${active.key}-${i}`}
+                className={['border-b border-line/20', i % 2 === 0 ? 'bg-carbon-2' : ''].join(' ')}
               >
                 <td
                   className={[
@@ -64,7 +64,13 @@ export function StatsLeaderboard({
                   {entry.rank}
                 </td>
                 <td className="font-display font-bold text-[14px] uppercase text-txt px-6 py-3">
-                  {entry.name}
+                  {entry.href ? (
+                    <Link href={entry.href} className="hover:text-gold transition-colors">
+                      {entry.name}
+                    </Link>
+                  ) : (
+                    entry.name
+                  )}
                 </td>
                 <td className="font-mono text-[12px] text-gold-soft text-right px-6 py-3">
                   {entry.value}
