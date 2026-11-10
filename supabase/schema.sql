@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict CsA9NIZvFdmur6otyJv8UMhlb3X5qFXYotfsVmE2Y3EWzSfSBxhmny6rtfBB2KA
+\restrict dZAj9r3CrZORuSC4fgcRjTxE3gZJIbf3ax1hjRP5zxKMFoRFOJfv3yEJkA3MmMK
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -62,6 +62,350 @@ COMMENT ON FUNCTION public.acc_driver_category(p_tier public.driver_tier) IS 'SR
 
 
 --
+-- Name: acc_lap_ledger_ingest(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.acc_lap_ledger_ingest(p_files jsonb) RETURNS integer
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+declare
+  f        jsonb;
+  d        jsonb;
+  v_id     bigint;
+  v_at     timestamptz;
+  v_laps   integer;
+  v_new    text[] := '{}';
+  inserted integer := 0;
+begin
+  for f in select * from jsonb_array_elements(p_files) loop
+    v_at := (f->>'session_at')::timestamptz;
+    select coalesce(sum((x->>'laps')::int), 0) into v_laps
+      from jsonb_array_elements(coalesce(f->'drivers', '[]'::jsonb)) x;
+
+    insert into public.acc_lap_ledger_files
+      (file_key, source, session_type, track_key, session_at, laps, drivers)
+    values
+      (f->>'file_key', f->>'source', f->>'session_type', f->>'track_key', v_at,
+       v_laps, jsonb_array_length(coalesce(f->'drivers', '[]'::jsonb)))
+    on conflict (file_key) do nothing
+    returning id into v_id;
+
+    continue when v_id is null;  -- already recorded
+    inserted := inserted + 1;
+    v_new := v_new || (f->>'file_key');
+
+    for d in select * from jsonb_array_elements(coalesce(f->'drivers', '[]'::jsonb)) loop
+      insert into public.acc_lap_ledger (file_id, steam_id, car_model_id, laps, valid_laps)
+      values (v_id, d->>'steam_id', (d->>'car_model_id')::int,
+              (d->>'laps')::int, (d->>'valid_laps')::int);
+    end loop;
+  end loop;
+
+  -- Latest name per driver across the newly recorded files, one sorted
+  -- upsert (see header). Only ever moves forward in time.
+  insert into public.acc_driver_names as n (steam_id, driver_name, last_seen_at)
+  select steam_id, driver_name, seen_at
+  from (
+    select distinct on (dr->>'steam_id')
+           dr->>'steam_id' as steam_id, dr->>'driver_name' as driver_name,
+           (fl->>'session_at')::timestamptz as seen_at
+    from jsonb_array_elements(p_files) fl
+    cross join jsonb_array_elements(coalesce(fl->'drivers', '[]'::jsonb)) dr
+    where fl->>'file_key' = any (v_new) and coalesce(dr->>'driver_name', '') <> ''
+    order by dr->>'steam_id', (fl->>'session_at')::timestamptz desc
+  ) latest
+  order by steam_id
+  on conflict (steam_id) do update
+    set driver_name = excluded.driver_name, last_seen_at = excluded.last_seen_at
+    where excluded.last_seen_at > n.last_seen_at;
+
+  return inserted;
+end;
+$$;
+
+
+--
+-- Name: acc_qualifying_backfill_targets(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.acc_qualifying_backfill_targets() RETURNS TABLE(file_key text)
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  select distinct g.q_file_key
+  from public.gt3_race_qualifying g
+  where g.q_file_key like 'accsm%'
+    and not exists (select 1 from public.acc_qualifying_results r where r.file_id = g.q_file_id)
+  order by 1;
+$$;
+
+
+--
+-- Name: acc_qualifying_ingest(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.acc_qualifying_ingest(p_files jsonb) RETURNS integer
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+declare
+  f        jsonb;
+  v_id     bigint;
+  v_rows   integer;
+  written  integer := 0;
+begin
+  for f in select * from jsonb_array_elements(p_files) loop
+    select id into v_id from public.acc_lap_ledger_files where file_key = f->>'file_key';
+    continue when v_id is null;
+
+    insert into public.acc_qualifying_results (file_id, position, steam_id, best_lap_ms)
+    select v_id, x.position, x.steam_id, x.best_lap_ms
+    from jsonb_to_recordset(coalesce(f->'results', '[]'::jsonb))
+           as x (position integer, steam_id text, best_lap_ms integer)
+    where x.steam_id is not null and x.steam_id <> ''
+    on conflict (file_id, position) do nothing;
+
+    get diagnostics v_rows = row_count;
+    if v_rows > 0 then written := written + 1; end if;
+  end loop;
+  return written;
+end;
+$$;
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: registrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.registrations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    series text NOT NULL,
+    season text NOT NULL,
+    championship_key text NOT NULL,
+    division_id integer,
+    team_id uuid,
+    car_model_id integer,
+    race_number integer,
+    entry_class text,
+    meta jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    status text DEFAULT 'confirmed'::text NOT NULL,
+    waitlist_position integer,
+    CONSTRAINT registrations_status_check CHECK ((status = ANY (ARRAY['confirmed'::text, 'waitlisted'::text]))),
+    CONSTRAINT registrations_waitlist_position_check CHECK ((((status = 'confirmed'::text) AND (waitlist_position IS NULL)) OR ((status = 'waitlisted'::text) AND (waitlist_position IS NOT NULL))))
+);
+
+
+--
+-- Name: admin_add_team_driver(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.admin_add_team_driver(p_registration_id uuid, p_driver_id uuid) RETURNS public.registrations
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+  v_anchor            registrations;
+  v_row               registrations;
+  v_max_team_size     integer;
+  v_shared_car        boolean;
+  v_requires_division boolean;
+  v_driver_division   integer;
+  v_team_size         integer;
+  v_slot              integer;
+  v_waitlist_position integer;
+BEGIN
+  SELECT * INTO v_anchor FROM registrations WHERE id = p_registration_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'REGISTRATION_NOT_FOUND: %', p_registration_id;
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended(v_anchor.championship_key || ':' || v_anchor.season, 0));
+
+  SELECT max_team_size, shared_car, requires_division
+    INTO v_max_team_size, v_shared_car, v_requires_division
+  FROM championships
+  WHERE registration_key = v_anchor.championship_key
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'CHAMPIONSHIP_KEY_INVALID: %', v_anchor.championship_key;
+  END IF;
+
+  SELECT division_id INTO v_driver_division FROM drivers WHERE id = p_driver_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'DRIVER_NOT_FOUND: %', p_driver_id;
+  END IF;
+
+  -- Drivers across every car of the team (confirmed and waitlisted alike —
+  -- a team split across the two is still one team).
+  SELECT count(*) INTO v_team_size
+  FROM registration_drivers rd
+  JOIN registrations r ON r.id = rd.registration_id
+  WHERE r.championship_key = v_anchor.championship_key
+    AND r.season = v_anchor.season
+    AND (r.id = v_anchor.id
+         OR (v_anchor.team_id IS NOT NULL AND r.team_id = v_anchor.team_id));
+
+  IF v_max_team_size IS NOT NULL AND v_team_size >= v_max_team_size THEN
+    RAISE EXCEPTION 'TEAM_FULL: % of % drivers', v_team_size, v_max_team_size;
+  END IF;
+
+  IF v_requires_division THEN
+    IF v_driver_division IS NULL THEN
+      RAISE EXCEPTION 'DIVISION_UNASSIGNED: %', p_driver_id;
+    END IF;
+    IF v_anchor.division_id IS NOT NULL AND v_driver_division <> v_anchor.division_id THEN
+      RAISE EXCEPTION 'DIVISION_MISMATCH: driver % is division %, expected %',
+        p_driver_id, v_driver_division, v_anchor.division_id;
+    END IF;
+  END IF;
+
+  IF v_shared_car THEN
+    -- ── Shared car: join the existing car ────────────────────────────────
+    SELECT coalesce(max(slot) + 1, 0) INTO v_slot
+    FROM registration_drivers WHERE registration_id = v_anchor.id;
+
+    BEGIN
+      INSERT INTO registration_drivers (registration_id, driver_id, slot)
+      VALUES (v_anchor.id, p_driver_id, v_slot);
+    EXCEPTION WHEN unique_violation THEN
+      RAISE EXCEPTION 'DRIVER_ALREADY_CLAIMED: %', p_driver_id;
+    END;
+
+    RETURN v_anchor;
+  END IF;
+
+  -- ── Car per driver: a new car for the new driver ───────────────────────
+  -- Same status as the team. A waitlisted team's new car joins the back of
+  -- the queue (the admin page sorts a team by its lowest position, so the
+  -- team itself doesn't move).
+  IF v_anchor.status = 'waitlisted' THEN
+    SELECT coalesce(max(waitlist_position), 0) + 1 INTO v_waitlist_position
+    FROM registrations
+    WHERE championship_key = v_anchor.championship_key
+      AND season = v_anchor.season
+      AND status = 'waitlisted';
+  END IF;
+
+  INSERT INTO registrations (
+    series, season, championship_key, division_id, team_id,
+    car_model_id, race_number, entry_class, status, waitlist_position
+  ) VALUES (
+    v_anchor.series, v_anchor.season, v_anchor.championship_key,
+    coalesce(v_anchor.division_id, v_driver_division), v_anchor.team_id,
+    -- race_number stays NULL: on a car-per-driver championship the number
+    -- comes from drivers.driver_number at entrylist-push time.
+    v_anchor.car_model_id, NULL, v_anchor.entry_class,
+    v_anchor.status, v_waitlist_position
+  )
+  RETURNING * INTO v_row;
+
+  BEGIN
+    INSERT INTO registration_drivers (registration_id, driver_id, slot)
+    VALUES (v_row.id, p_driver_id, 0);
+  EXCEPTION WHEN unique_violation THEN
+    -- Raising aborts the whole function, so the car inserted above goes too.
+    RAISE EXCEPTION 'DRIVER_ALREADY_CLAIMED: %', p_driver_id;
+  END;
+
+  RETURN v_row;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION admin_add_team_driver(p_registration_id uuid, p_driver_id uuid); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.admin_add_team_driver(p_registration_id uuid, p_driver_id uuid) IS 'Admin: add a driver to an existing team (new car on car-per-driver championships, next slot on shared cars). Enforces team size, division and the one-claim-per-event rule; not max_registrations. Service role only. See 20261005_admin_add_team_driver.sql.';
+
+
+--
+-- Name: admin_merge_into_team(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.admin_merge_into_team(p_target_registration_id uuid, p_source_registration_id uuid) RETURNS public.registrations
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+  v_target     registrations;
+  v_source     registrations;
+  v_source_ids uuid[];
+  v_driver_ids uuid[];
+  v_driver_id  uuid;
+BEGIN
+  SELECT * INTO v_target FROM registrations WHERE id = p_target_registration_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'REGISTRATION_NOT_FOUND: %', p_target_registration_id;
+  END IF;
+  SELECT * INTO v_source FROM registrations WHERE id = p_source_registration_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'REGISTRATION_NOT_FOUND: %', p_source_registration_id;
+  END IF;
+
+  IF v_source.championship_key <> v_target.championship_key
+     OR v_source.season <> v_target.season THEN
+    RAISE EXCEPTION 'MERGE_DIFFERENT_EVENT: % vs %',
+      v_source.championship_key || '/' || v_source.season,
+      v_target.championship_key || '/' || v_target.season;
+  END IF;
+
+  -- Same lock as register_entry() / admin_add_team_driver() (advisory xact
+  -- locks are re-entrant, so the nested calls below take it again freely).
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended(v_target.championship_key || ':' || v_target.season, 0));
+
+  -- Every car of the source team in this event.
+  SELECT array_agg(id) INTO v_source_ids
+  FROM registrations
+  WHERE championship_key = v_source.championship_key
+    AND season = v_source.season
+    AND (id = v_source.id
+         OR (v_source.team_id IS NOT NULL AND team_id = v_source.team_id));
+
+  IF v_target.id = ANY (v_source_ids)
+     OR (v_target.team_id IS NOT NULL AND v_target.team_id = v_source.team_id) THEN
+    RAISE EXCEPTION 'MERGE_SAME_TEAM: %', p_source_registration_id;
+  END IF;
+
+  SELECT array_agg(rd.driver_id ORDER BY r.created_at, rd.slot) INTO v_driver_ids
+  FROM registration_drivers rd
+  JOIN registrations r ON r.id = rd.registration_id
+  WHERE rd.registration_id = ANY (v_source_ids);
+
+  IF v_driver_ids IS NULL THEN
+    RAISE EXCEPTION 'MERGE_SOURCE_EMPTY: %', p_source_registration_id;
+  END IF;
+
+  -- Cascades to registration_drivers, freeing the claims.
+  DELETE FROM registrations WHERE id = ANY (v_source_ids);
+
+  FOREACH v_driver_id IN ARRAY v_driver_ids LOOP
+    PERFORM admin_add_team_driver(v_target.id, v_driver_id);
+  END LOOP;
+
+  RETURN v_target;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION admin_merge_into_team(p_target_registration_id uuid, p_source_registration_id uuid); Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON FUNCTION public.admin_merge_into_team(p_target_registration_id uuid, p_source_registration_id uuid) IS 'Admin: delete the source entry (whole team) and add its drivers to the target team via admin_add_team_driver(), atomically. For two solo entries that share a car. Service role only. See 20261005b_admin_merge_into_team.sql.';
+
+
+--
 -- Name: bump_registrations_on_driver_update(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -82,6 +426,169 @@ begin
   end if;
   return new;
 end $$;
+
+
+--
+-- Name: driver_directory(text, text, integer, integer, integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.driver_directory(p_search text DEFAULT NULL::text, p_sort text DEFAULT 'wins'::text, p_division integer DEFAULT NULL::integer, p_limit integer DEFAULT 50, p_offset integer DEFAULT 0) RETURNS TABLE(id uuid, display_name text, driver_number integer, country text, division_id integer, tier text, is_sralien boolean, starts bigint, wins bigint, podiums bigint, composite numeric, total_count bigint)
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  with q as (
+    -- Escape LIKE wildcards so a search for "_" or "%" is literal.
+    select nullif(trim(replace(replace(replace(coalesce(p_search, ''), '\', '\\'), '%', '\%'), '_', '\_')), '') as term
+  ),
+  rows as (
+    select d.id, d.display_name, d.driver_number, d.country, d.division_id, d.tier::text as tier,
+           d.is_sralien, r.starts, r.wins, r.podiums, dr.composite
+    from public.drivers d
+    left join public.driver_race_stats r
+      on r.player_id = 'S' || d.steam_id and r.series = 'GT3'
+    left join public.driver_ratings dr
+      on dr.player_id = 'S' || d.steam_id and dr.engine = 'v2-openskill'
+    cross join q
+    where (q.term is null
+           -- the bare name: display_name carries a '┊<number>' suffix, which
+           -- would make a search for "81" also hit #815, #810, …
+           or split_part(d.display_name, '┊', 1) ilike '%' || q.term || '%'
+           or d.driver_number::text = q.term)
+      and (p_division is null or d.division_id = p_division)
+  )
+  select r.*, count(*) over () as total_count
+  from rows r
+  order by
+    case when p_sort = 'name'    then lower(r.display_name) end asc,
+    case when p_sort = 'number'  then r.driver_number end asc nulls last,
+    case when p_sort = 'starts'  then r.starts end desc nulls last,
+    case when p_sort = 'podiums' then r.podiums end desc nulls last,
+    case when p_sort = 'rating'  then r.composite end desc nulls last,
+    case when p_sort not in ('name', 'number', 'starts', 'podiums', 'rating') then r.wins end desc nulls last,
+    r.starts desc nulls last,
+    lower(r.display_name),
+    r.id
+  limit greatest(1, least(p_limit, 200))
+  offset greatest(0, p_offset);
+$$;
+
+
+--
+-- Name: driver_frequent_rivals(text, integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.driver_frequent_rivals(p_player text, p_limit integer DEFAULT 8) RETURNS TABLE(player_id text, meetings bigint, ahead bigint, behind bigint)
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  select pb.player_id,
+         count(*),
+         count(*) filter (where ha.finish_position < hb.finish_position),
+         count(*) filter (where hb.finish_position < ha.finish_position)
+  from public.race_participation pa
+  join public.race_participation pb on pb.file_id = pa.file_id and pb.player_id <> pa.player_id
+  join public.srating_history ha on ha.id = pa.srating_id
+  join public.srating_history hb on hb.id = pb.srating_id
+  where pa.player_id = p_player
+  group by pb.player_id
+  order by count(*) desc, pb.player_id
+  limit greatest(1, least(p_limit, 50));
+$$;
+
+
+--
+-- Name: driver_head_to_head(text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.driver_head_to_head(p_a text, p_b text) RETURNS TABLE(season integer, event integer, track text, event_date date, a_pos integer, b_pos integer, verified boolean, same_race boolean)
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  select ha.season, ha.event, ha.track, ha.event_date,
+         ha.finish_position, hb.finish_position,
+         (pa.file_id is not null and pb.file_id is not null),
+         coalesce(pa.file_id = pb.file_id, false)
+  from public.srating_history ha
+  join public.srating_history hb
+    on hb.series = ha.series and hb.season = ha.season and hb.event = ha.event
+  left join public.race_participation pa on pa.srating_id = ha.id
+  left join public.race_participation pb on pb.srating_id = hb.id
+  where ha.player_id = p_a and hb.player_id = p_b
+    and ha.series = 'GT3'
+    and ha.finish_position is not null and hb.finish_position is not null
+    and (not ha.excluded or ha.exclude_reason in ('Legacy exclusion', 'Server crash'))
+    and (not hb.excluded or hb.exclude_reason in ('Legacy exclusion', 'Server crash'))
+  order by ha.season desc, ha.event desc;
+$$;
+
+
+--
+-- Name: driver_hotlap_placings(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.driver_hotlap_placings(p_steam_id text) RETURNS TABLE(season text, track_key text, car_model_id integer, best_lap_ms integer, is_wet boolean, "position" bigint, board_size bigint)
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  with mine as (
+    select distinct split_part(h.season, '-', 1) as season, h.track_key
+    from public.acc_hotlap_leaderboard h
+    where h.steam_id = p_steam_id and h.board_scope = 'seasonal'
+  ),
+  board as (
+    select distinct on (s.season, h.track_key, h.steam_id, h.car_model_id)
+           s.season, h.track_key, h.steam_id, h.car_model_id, h.best_lap_ms, h.is_wet
+    from public.acc_hotlap_leaderboard h
+    cross join lateral (select split_part(h.season, '-', 1) as season) s
+    join mine m on m.season = s.season and m.track_key = h.track_key
+    where h.board_scope = 'seasonal'
+    order by s.season, h.track_key, h.steam_id, h.car_model_id, h.best_lap_ms
+  ),
+  ranked as (
+    select b.*,
+           row_number() over (partition by b.season, b.track_key
+                              order by b.best_lap_ms, b.steam_id, b.car_model_id) as "position",
+           count(*) over (partition by b.season, b.track_key) as board_size
+    from board b
+  )
+  select distinct on (r.season, r.track_key)
+         r.season, r.track_key, r.car_model_id, r.best_lap_ms, r.is_wet, r."position", r.board_size
+  from ranked r
+  where r.steam_id = p_steam_id
+  order by r.season, r.track_key, r."position";
+$$;
+
+
+--
+-- Name: drivers_overview(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.drivers_overview() RETURNS jsonb
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  select jsonb_build_object(
+    'numbered',     (select count(*) from public.drivers where driver_number is not null),
+    'with_results', (select count(*) from public.drivers d
+                     where exists (select 1 from public.driver_race_stats r
+                                   where r.player_id = 'S' || d.steam_id and r.series = 'GT3')),
+    'in_division',  (select count(*) from public.drivers where division_id is not null),
+    'with_country', (select count(*) from public.drivers where country is not null),
+    'countries',    coalesce((select jsonb_agg(jsonb_build_object('country', country, 'count', n) order by n desc, country)
+                              from (select country, count(*) as n from public.drivers
+                                    where country is not null group by country) c), '[]'::jsonb),
+    'divisions',    coalesce((select jsonb_agg(jsonb_build_object('division', division_id, 'total', total,
+                                                                  'gold', gold, 'silver', silver, 'sralien', sralien)
+                                               order by division_id)
+                              from (select division_id, count(*) as total,
+                                           count(*) filter (where tier = 'gold')   as gold,
+                                           count(*) filter (where tier = 'silver') as silver,
+                                           count(*) filter (where is_sralien)      as sralien
+                                    from public.drivers where division_id is not null
+                                    group by division_id) v), '[]'::jsonb),
+    'computed_at',  now()
+  );
+$$;
 
 
 --
@@ -134,32 +641,25 @@ CREATE FUNCTION public.has_admin_permission(perm text) RETURNS boolean
 $$;
 
 
-SET default_tablespace = '';
-
-SET default_table_access_method = heap;
-
 --
--- Name: registrations; Type: TABLE; Schema: public; Owner: -
+-- Name: refresh_site_stats(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE TABLE public.registrations (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    series text NOT NULL,
-    season text NOT NULL,
-    championship_key text NOT NULL,
-    division_id integer,
-    team_id uuid,
-    car_model_id integer,
-    race_number integer,
-    entry_class text,
-    meta jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    status text DEFAULT 'confirmed'::text NOT NULL,
-    waitlist_position integer,
-    CONSTRAINT registrations_status_check CHECK ((status = ANY (ARRAY['confirmed'::text, 'waitlisted'::text]))),
-    CONSTRAINT registrations_waitlist_position_check CHECK ((((status = 'confirmed'::text) AND (waitlist_position IS NULL)) OR ((status = 'waitlisted'::text) AND (waitlist_position IS NOT NULL))))
-);
+CREATE FUNCTION public.refresh_site_stats() RETURNS void
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+begin
+  refresh materialized view concurrently public.sra_stats_global;
+  refresh materialized view concurrently public.driver_lap_totals;
+  refresh materialized view concurrently public.driver_race_stats;
+  refresh materialized view concurrently public.race_participation;
+  refresh materialized view concurrently public.site_track_laps;
+  refresh materialized view concurrently public.site_car_laps;
+  refresh materialized view concurrently public.driver_car_laps;
+  refresh materialized view concurrently public.driver_pole_stats;
+end;
+$$;
 
 
 --
@@ -874,6 +1374,83 @@ $$;
 
 
 --
+-- Name: stw_set_ticket_party(uuid, text, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stw_set_ticket_party(p_ticket uuid, p_role text, p_driver uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  t      stw_tickets%rowtype;
+  v_rst  text;
+  v_old  uuid;
+  v_num  int;
+  v_me   uuid := stw_current_driver_id();
+  v_from text;
+  v_to   text;
+begin
+  if not stw_is_steward() then
+    raise exception 'not a steward' using errcode = '42501';
+  end if;
+  if p_role not in ('offender', 'reporter') then
+    raise exception 'role must be offender or reporter' using errcode = '22023';
+  end if;
+
+  select * into t from stw_tickets where id = p_ticket for update;
+  if not found then
+    raise exception 'that ticket no longer exists' using errcode = 'P0002';
+  end if;
+  select status into v_rst from stw_rounds where id = t.round_id;
+  if v_rst in ('published', 'appeals', 'final') and not stw_can_manage() then
+    raise exception 'this round is published: changing who a ticket is about needs the Manager or Admin role'
+      using errcode = 'PT403';
+  end if;
+
+  select driver_number into v_num from drivers where id = p_driver;
+  if not found then
+    raise exception 'no such driver' using errcode = 'P0002';
+  end if;
+
+  v_old := case p_role when 'offender' then t.offender_id else t.reporter_id end;
+  if v_old is not distinct from p_driver then
+    return;                                   -- nothing to change
+  end if;
+  -- Offender = reporter is allowed: that is a self-report, which the page
+  -- already labels as one.
+
+  if p_role = 'offender' then
+    update stw_tickets
+       set offender_id = p_driver,
+           offender_car_number = v_num,
+           decided_at = case when v_rst in ('published', 'appeals', 'final')
+                              and code is not null then now() else decided_at end,
+           decided_by = case when v_rst in ('published', 'appeals', 'final')
+                              and code is not null then v_me else decided_by end
+     where id = p_ticket;
+  else
+    update stw_tickets set reporter_id = p_driver where id = p_ticket;
+  end if;
+
+  select coalesce('#' || d.driver_number || ' ', '') ||
+         btrim(coalesce(d.first_name, '') || ' ' || coalesce(d.last_name, ''))
+    into v_from from drivers d where d.id = v_old;
+  select coalesce('#' || d.driver_number || ' ', '') ||
+         btrim(coalesce(d.first_name, '') || ' ' || coalesce(d.last_name, ''))
+    into v_to from drivers d where d.id = p_driver;
+  insert into stw_ticket_comments (ticket_id, author_id, body)
+  values (p_ticket, v_me,
+          (case p_role when 'offender' then 'Reported driver' else 'Reporter' end)
+          || ' changed: ' || coalesce(v_from, 'nobody') || ' -> ' || v_to);
+
+  insert into bot_jobs (type, payload)
+  values ('stw_party_changed', jsonb_build_object(
+            'target', p_ticket, 'role', p_role, 'requested_by', v_me));
+end;
+$$;
+
+
+--
 -- Name: stw_stamp_appeal_filed(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1093,6 +1670,17 @@ CREATE TABLE public.acc_cars (
 
 
 --
+-- Name: acc_driver_names; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.acc_driver_names (
+    steam_id text NOT NULL,
+    driver_name text NOT NULL,
+    last_seen_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: acc_hotlap_leaderboard; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1158,6 +1746,55 @@ CREATE TABLE public.acc_hotstint_leaderboard (
 
 
 --
+-- Name: acc_lap_ledger; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.acc_lap_ledger (
+    file_id bigint NOT NULL,
+    steam_id text NOT NULL,
+    car_model_id integer NOT NULL,
+    laps integer NOT NULL,
+    valid_laps integer NOT NULL,
+    CONSTRAINT acc_lap_ledger_check CHECK (((valid_laps >= 0) AND (valid_laps <= laps))),
+    CONSTRAINT acc_lap_ledger_laps_check CHECK ((laps >= 0))
+);
+
+
+--
+-- Name: acc_lap_ledger_files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.acc_lap_ledger_files (
+    id bigint NOT NULL,
+    file_key text NOT NULL,
+    source text NOT NULL,
+    session_type text NOT NULL,
+    track_key text NOT NULL,
+    session_at timestamp with time zone NOT NULL,
+    laps integer DEFAULT 0 NOT NULL,
+    drivers integer DEFAULT 0 NOT NULL,
+    processed_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT acc_lap_ledger_files_drivers_check CHECK ((drivers >= 0)),
+    CONSTRAINT acc_lap_ledger_files_laps_check CHECK ((laps >= 0)),
+    CONSTRAINT acc_lap_ledger_files_source_check CHECK ((source = ANY (ARRAY['accweb'::text, 'accsm1'::text, 'accsm2'::text])))
+);
+
+
+--
+-- Name: acc_lap_ledger_files_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.acc_lap_ledger_files ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.acc_lap_ledger_files_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: acc_processed_sessions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1167,6 +1804,20 @@ CREATE TABLE public.acc_processed_sessions (
     session_type text NOT NULL,
     session_date text NOT NULL,
     processed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: acc_qualifying_results; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.acc_qualifying_results (
+    file_id bigint NOT NULL,
+    "position" integer NOT NULL,
+    steam_id text NOT NULL,
+    best_lap_ms integer,
+    CONSTRAINT acc_qualifying_results_best_lap_ms_check CHECK (((best_lap_ms IS NULL) OR (best_lap_ms > 0))),
+    CONSTRAINT acc_qualifying_results_position_check CHECK (("position" > 0))
 );
 
 
@@ -1225,7 +1876,9 @@ CREATE TABLE public.acc_tracks (
     display_name text NOT NULL,
     splash_art_url text,
     country text,
-    location text
+    location text,
+    length_m integer,
+    CONSTRAINT acc_tracks_length_m_check CHECK (((length_m IS NULL) OR (length_m > 0)))
 );
 
 
@@ -1773,6 +2426,293 @@ CREATE TABLE public.divisions (
 
 
 --
+-- Name: driver_car_laps; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.driver_car_laps AS
+ SELECT l.steam_id,
+    l.car_model_id,
+    sum(l.laps) AS laps,
+    sum(l.valid_laps) AS valid_laps,
+    count(DISTINCT l.file_id) AS sessions,
+    max(f.session_at) AS last_driven,
+    now() AS computed_at
+   FROM (public.acc_lap_ledger l
+     JOIN public.acc_lap_ledger_files f ON ((f.id = l.file_id)))
+  GROUP BY l.steam_id, l.car_model_id
+ HAVING (sum(l.laps) > 0)
+  WITH NO DATA;
+
+
+--
+-- Name: driver_lap_totals; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.driver_lap_totals AS
+ WITH per_driver AS (
+         SELECT l.steam_id,
+            sum(l.laps) AS laps,
+            sum(l.valid_laps) AS valid_laps,
+            count(DISTINCT l.file_id) AS sessions,
+            min(f.session_at) AS first_seen,
+            max(f.session_at) AS last_seen
+           FROM (public.acc_lap_ledger l
+             JOIN public.acc_lap_ledger_files f ON ((f.id = l.file_id)))
+          GROUP BY l.steam_id
+        ), top_track AS (
+         SELECT DISTINCT ON (l.steam_id) l.steam_id,
+            f.track_key,
+            sum(l.laps) AS laps
+           FROM (public.acc_lap_ledger l
+             JOIN public.acc_lap_ledger_files f ON ((f.id = l.file_id)))
+          GROUP BY l.steam_id, f.track_key
+          ORDER BY l.steam_id, (sum(l.laps)) DESC, f.track_key
+        ), top_car AS (
+         SELECT DISTINCT ON (acc_lap_ledger.steam_id) acc_lap_ledger.steam_id,
+            acc_lap_ledger.car_model_id,
+            sum(acc_lap_ledger.laps) AS laps
+           FROM public.acc_lap_ledger
+          GROUP BY acc_lap_ledger.steam_id, acc_lap_ledger.car_model_id
+          ORDER BY acc_lap_ledger.steam_id, (sum(acc_lap_ledger.laps)) DESC, acc_lap_ledger.car_model_id
+        )
+ SELECT p.steam_id,
+    n.driver_name,
+    p.laps,
+    p.valid_laps,
+    p.sessions,
+    p.first_seen,
+    p.last_seen,
+    t.track_key AS top_track_key,
+    t.laps AS top_track_laps,
+    c.car_model_id AS top_car_model_id,
+    c.laps AS top_car_laps,
+    rank() OVER (ORDER BY p.laps DESC) AS laps_rank,
+    now() AS computed_at
+   FROM (((per_driver p
+     LEFT JOIN public.acc_driver_names n USING (steam_id))
+     LEFT JOIN top_track t USING (steam_id))
+     LEFT JOIN top_car c USING (steam_id))
+  WITH NO DATA;
+
+
+--
+-- Name: srating_history; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.srating_history (
+    id bigint NOT NULL,
+    series text DEFAULT 'GT3'::text NOT NULL,
+    season integer NOT NULL,
+    event integer NOT NULL,
+    track text,
+    event_date date,
+    driver_id uuid,
+    player_id text NOT NULL,
+    finish_position integer,
+    pace_norm numeric,
+    laps integer,
+    pace numeric,
+    openskill numeric,
+    composite numeric,
+    excluded boolean DEFAULT false NOT NULL,
+    exclude_reason text,
+    computed_at timestamp with time zone DEFAULT now() NOT NULL,
+    consistency real,
+    os_pct real
+);
+
+
+--
+-- Name: COLUMN srating_history.consistency; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.srating_history.consistency IS 'Steadiness beyond pace, rolling (same window as pace), pool percentile 0-1, higher = steadier.';
+
+
+--
+-- Name: COLUMN srating_history.os_pct; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.srating_history.os_pct IS 'Head-to-head (OpenSkill mu -- what the composite uses, not the ordinal in `openskill`) as-of that week, pool percentile 0-1, higher = better.';
+
+
+--
+-- Name: race_participation; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.race_participation AS
+ WITH h AS (
+         SELECT srating_history.id,
+            srating_history.player_id,
+            srating_history.series,
+            srating_history.season,
+            srating_history.event,
+            srating_history.event_date,
+            srating_history.laps
+           FROM public.srating_history
+          WHERE ((srating_history.finish_position IS NOT NULL) AND (srating_history.laps IS NOT NULL))
+        ), cand AS (
+         SELECT h.id AS srating_id,
+            h.player_id,
+            h.series,
+            h.season,
+            h.event,
+            f.id AS file_id,
+            abs((l.laps - h.laps)) AS lap_diff,
+            abs(EXTRACT(epoch FROM (f.session_at - (h.event_date)::timestamp with time zone))) AS secs_off
+           FROM ((h
+             JOIN public.acc_lap_ledger l ON ((l.steam_id = h.player_id)))
+             JOIN public.acc_lap_ledger_files f ON (((f.id = l.file_id) AND (f.session_type ~~ 'R%'::text) AND (f.session_at >= (h.event_date - '1 day'::interval)) AND (f.session_at < (h.event_date + '7 days'::interval)))))
+        ), nearest AS (
+         SELECT x.srating_id,
+            x.player_id,
+            x.series,
+            x.season,
+            x.event,
+            x.file_id,
+            x.lap_diff,
+            x.secs_off,
+            x.min_off
+           FROM ( SELECT c.srating_id,
+                    c.player_id,
+                    c.series,
+                    c.season,
+                    c.event,
+                    c.file_id,
+                    c.lap_diff,
+                    c.secs_off,
+                    min(c.secs_off) OVER (PARTITION BY c.player_id, c.file_id) AS min_off
+                   FROM cand c) x
+          WHERE (x.secs_off = x.min_off)
+        ), best AS (
+         SELECT DISTINCT ON (nearest.srating_id) nearest.srating_id,
+            nearest.player_id,
+            nearest.series,
+            nearest.season,
+            nearest.event,
+            nearest.file_id,
+            nearest.lap_diff,
+            nearest.secs_off,
+            nearest.min_off,
+            count(*) OVER (PARTITION BY nearest.srating_id, nearest.lap_diff) AS ties
+           FROM nearest
+          ORDER BY nearest.srating_id, nearest.lap_diff, nearest.secs_off
+        )
+ SELECT srating_id,
+    player_id,
+    series,
+    season,
+    event,
+    file_id
+   FROM best
+  WHERE ((lap_diff <= 1) AND (ties = 1))
+  WITH NO DATA;
+
+
+--
+-- Name: gt3_race_qualifying; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.gt3_race_qualifying WITH (security_invoker='true') AS
+ SELECT rf.id AS race_file_id,
+    q.id AS q_file_id,
+    q.file_key AS q_file_key
+   FROM ((( SELECT DISTINCT race_participation.file_id
+           FROM public.race_participation
+          WHERE (race_participation.series = 'GT3'::text)) r
+     JOIN public.acc_lap_ledger_files rf ON ((rf.id = r.file_id)))
+     CROSS JOIN LATERAL ( SELECT q_1.id,
+            q_1.file_key
+           FROM public.acc_lap_ledger_files q_1
+          WHERE ((q_1.session_type ~~ 'Q%'::text) AND (q_1.laps > 0) AND (q_1.session_at >= (rf.session_at - '01:30:00'::interval)) AND (q_1.session_at < rf.session_at) AND (split_part(q_1.file_key, '/'::text, 1) = split_part(rf.file_key, '/'::text, 1)))
+          ORDER BY q_1.session_at DESC
+         LIMIT 1) q);
+
+
+--
+-- Name: driver_pole_stats; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.driver_pole_stats AS
+ SELECT r.steam_id AS player_id,
+    count(*) AS poles,
+    now() AS computed_at
+   FROM (public.gt3_race_qualifying g
+     JOIN public.acc_qualifying_results r ON (((r.file_id = g.q_file_id) AND (r."position" = 1) AND (r.best_lap_ms IS NOT NULL))))
+  GROUP BY r.steam_id
+  WITH NO DATA;
+
+
+--
+-- Name: driver_race_stats; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.driver_race_stats AS
+ WITH event_leader AS (
+         SELECT srating_history.series,
+            srating_history.season,
+            srating_history.event,
+            srating_history.track,
+            max(srating_history.laps) AS leader_laps
+           FROM public.srating_history
+          GROUP BY srating_history.series, srating_history.season, srating_history.event, srating_history.track
+        ), full_distance AS (
+         SELECT e.series,
+            e.track,
+            percentile_cont((0.5)::double precision) WITHIN GROUP (ORDER BY ((e.leader_laps)::double precision)) AS full_laps
+           FROM ( SELECT h.series,
+                    h.season,
+                    h.event,
+                    h.track,
+                    max(h.laps) AS leader_laps
+                   FROM public.srating_history h
+                  WHERE (NOT h.excluded)
+                  GROUP BY h.series, h.season, h.event, h.track) e
+          GROUP BY e.series, e.track
+        ), counted AS (
+         SELECT h.id,
+            h.series,
+            h.season,
+            h.event,
+            h.track,
+            h.event_date,
+            h.driver_id,
+            h.player_id,
+            h.finish_position,
+            h.pace_norm,
+            h.laps,
+            h.pace,
+            h.openskill,
+            h.composite,
+            h.excluded,
+            h.exclude_reason,
+            h.computed_at,
+            h.consistency,
+            h.os_pct
+           FROM ((public.srating_history h
+             LEFT JOIN event_leader el USING (series, season, event, track))
+             LEFT JOIN full_distance fd USING (series, track))
+          WHERE ((h.finish_position IS NOT NULL) AND ((NOT h.excluded) OR (h.exclude_reason = 'Legacy exclusion'::text) OR ((h.exclude_reason = 'Server crash'::text) AND (fd.full_laps > (0)::double precision) AND ((el.leader_laps)::double precision >= ((0.9)::double precision * fd.full_laps)))))
+        )
+ SELECT player_id,
+    series,
+    (max((driver_id)::text))::uuid AS driver_id,
+    count(*) AS starts,
+    count(*) FILTER (WHERE (finish_position = 1)) AS wins,
+    count(*) FILTER (WHERE (finish_position <= 3)) AS podiums,
+    count(*) FILTER (WHERE (finish_position <= 10)) AS top10s,
+    min(finish_position) AS best_finish,
+    round(avg(finish_position), 1) AS avg_finish,
+    count(DISTINCT season) AS seasons,
+    min(event_date) AS first_race,
+    max(event_date) AS last_race,
+    now() AS computed_at
+   FROM counted
+  GROUP BY player_id, series
+  WITH NO DATA;
+
+
+--
 -- Name: gt3_roster; Type: VIEW; Schema: public; Owner: -
 --
 
@@ -1877,44 +2817,56 @@ CREATE TABLE public.settings (
 
 
 --
--- Name: srating_history; Type: TABLE; Schema: public; Owner: -
+-- Name: site_car_laps; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE TABLE public.srating_history (
-    id bigint NOT NULL,
-    series text DEFAULT 'GT3'::text NOT NULL,
-    season integer NOT NULL,
-    event integer NOT NULL,
-    track text,
-    event_date date,
-    driver_id uuid,
-    player_id text NOT NULL,
-    finish_position integer,
-    pace_norm numeric,
-    laps integer,
-    pace numeric,
-    openskill numeric,
-    composite numeric,
-    excluded boolean DEFAULT false NOT NULL,
-    exclude_reason text,
-    computed_at timestamp with time zone DEFAULT now() NOT NULL,
-    consistency real,
-    os_pct real
-);
+CREATE MATERIALIZED VIEW public.site_car_laps AS
+ SELECT car_model_id,
+    sum(laps) AS laps,
+    count(DISTINCT steam_id) AS drivers,
+    now() AS computed_at
+   FROM public.acc_lap_ledger
+  GROUP BY car_model_id
+ HAVING (sum(laps) > 0)
+  WITH NO DATA;
 
 
 --
--- Name: COLUMN srating_history.consistency; Type: COMMENT; Schema: public; Owner: -
+-- Name: site_track_laps; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.srating_history.consistency IS 'Steadiness beyond pace, rolling (same window as pace), pool percentile 0-1, higher = steadier.';
+CREATE MATERIALIZED VIEW public.site_track_laps AS
+ SELECT track_key,
+    sum(laps) AS laps,
+    count(*) FILTER (WHERE (laps > 0)) AS sessions,
+    ( SELECT count(DISTINCT l.steam_id) AS count
+           FROM (public.acc_lap_ledger l
+             JOIN public.acc_lap_ledger_files f2 ON ((f2.id = l.file_id)))
+          WHERE (f2.track_key = f.track_key)) AS drivers,
+    now() AS computed_at
+   FROM public.acc_lap_ledger_files f
+  GROUP BY track_key
+ HAVING (sum(laps) > 0)
+  WITH NO DATA;
 
 
 --
--- Name: COLUMN srating_history.os_pct; Type: COMMENT; Schema: public; Owner: -
+-- Name: sra_stats_global; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.srating_history.os_pct IS 'Head-to-head (OpenSkill mu -- what the composite uses, not the ordinal in `openskill`) as-of that week, pool percentile 0-1, higher = better.';
+CREATE MATERIALIZED VIEW public.sra_stats_global AS
+ SELECT 1 AS id,
+    count(*) FILTER (WHERE (f.laps > 0)) AS sessions,
+    COALESCE(sum(f.laps), (0)::bigint) AS laps,
+    ( SELECT count(DISTINCT acc_lap_ledger.steam_id) AS count
+           FROM public.acc_lap_ledger) AS drivers,
+    (COALESCE(round((sum(((f.laps)::numeric * (t.length_m)::numeric)) / (1000)::numeric)), (0)::numeric))::bigint AS km,
+    COALESCE(sum(f.laps) FILTER (WHERE (t.length_m IS NULL)), (0)::bigint) AS laps_without_length,
+    min(f.session_at) FILTER (WHERE (f.laps > 0)) AS first_session_at,
+    now() AS computed_at
+   FROM (public.acc_lap_ledger_files f
+     LEFT JOIN public.acc_tracks t ON ((t.track_key = f.track_key)))
+  WITH NO DATA;
 
 
 --
@@ -2526,6 +3478,14 @@ ALTER TABLE ONLY public.acc_cars
 
 
 --
+-- Name: acc_driver_names acc_driver_names_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.acc_driver_names
+    ADD CONSTRAINT acc_driver_names_pkey PRIMARY KEY (steam_id);
+
+
+--
 -- Name: acc_hotlap_leaderboard acc_hotlap_leaderboard_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2550,11 +3510,43 @@ ALTER TABLE ONLY public.acc_hotstint_leaderboard
 
 
 --
+-- Name: acc_lap_ledger_files acc_lap_ledger_files_file_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.acc_lap_ledger_files
+    ADD CONSTRAINT acc_lap_ledger_files_file_key_key UNIQUE (file_key);
+
+
+--
+-- Name: acc_lap_ledger_files acc_lap_ledger_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.acc_lap_ledger_files
+    ADD CONSTRAINT acc_lap_ledger_files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: acc_lap_ledger acc_lap_ledger_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.acc_lap_ledger
+    ADD CONSTRAINT acc_lap_ledger_pkey PRIMARY KEY (file_id, steam_id, car_model_id);
+
+
+--
 -- Name: acc_processed_sessions acc_processed_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.acc_processed_sessions
     ADD CONSTRAINT acc_processed_sessions_pkey PRIMARY KEY (session_url);
+
+
+--
+-- Name: acc_qualifying_results acc_qualifying_results_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.acc_qualifying_results
+    ADD CONSTRAINT acc_qualifying_results_pkey PRIMARY KEY (file_id, "position");
 
 
 --
@@ -3147,6 +4139,13 @@ CREATE INDEX acc_hotstint_track_car_rank_idx ON public.acc_hotstint_leaderboard 
 
 
 --
+-- Name: acc_lap_ledger_files_session_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX acc_lap_ledger_files_session_at_idx ON public.acc_lap_ledger_files USING btree (session_at);
+
+
+--
 -- Name: acc_processed_sessions_url_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3231,6 +4230,41 @@ CREATE INDEX classification_season_idx ON public.classification USING btree (ser
 
 
 --
+-- Name: driver_car_laps_pk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX driver_car_laps_pk_idx ON public.driver_car_laps USING btree (steam_id, car_model_id);
+
+
+--
+-- Name: driver_lap_totals_rank_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX driver_lap_totals_rank_idx ON public.driver_lap_totals USING btree (laps_rank);
+
+
+--
+-- Name: driver_lap_totals_steam_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX driver_lap_totals_steam_id_idx ON public.driver_lap_totals USING btree (steam_id);
+
+
+--
+-- Name: driver_pole_stats_pk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX driver_pole_stats_pk_idx ON public.driver_pole_stats USING btree (player_id);
+
+
+--
+-- Name: driver_race_stats_pk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX driver_race_stats_pk_idx ON public.driver_race_stats USING btree (player_id, series);
+
+
+--
 -- Name: driver_ratings_driver_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3266,6 +4300,27 @@ CREATE INDEX orientation_status_idx ON public.orientation USING btree (status);
 
 
 --
+-- Name: race_participation_file_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX race_participation_file_idx ON public.race_participation USING btree (file_id);
+
+
+--
+-- Name: race_participation_player_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX race_participation_player_idx ON public.race_participation USING btree (player_id);
+
+
+--
+-- Name: race_participation_srating_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX race_participation_srating_idx ON public.race_participation USING btree (srating_id);
+
+
+--
 -- Name: registration_drivers_championship_season_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3291,6 +4346,27 @@ CREATE INDEX registrations_champ_season_status_idx ON public.registrations USING
 --
 
 CREATE INDEX registrations_waitlist_order_idx ON public.registrations USING btree (championship_key, season, waitlist_position) WHERE (status = 'waitlisted'::text);
+
+
+--
+-- Name: site_car_laps_pk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX site_car_laps_pk_idx ON public.site_car_laps USING btree (car_model_id);
+
+
+--
+-- Name: site_track_laps_pk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX site_track_laps_pk_idx ON public.site_track_laps USING btree (track_key);
+
+
+--
+-- Name: sra_stats_global_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sra_stats_global_id_idx ON public.sra_stats_global USING btree (id);
 
 
 --
@@ -3658,6 +4734,22 @@ ALTER TABLE ONLY public.acc_hotlap_leaderboard
 
 ALTER TABLE ONLY public.acc_hotstint_leaderboard
     ADD CONSTRAINT acc_hotstint_leaderboard_car_fk FOREIGN KEY (car_model_id) REFERENCES public.acc_cars(car_model_id);
+
+
+--
+-- Name: acc_lap_ledger acc_lap_ledger_file_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.acc_lap_ledger
+    ADD CONSTRAINT acc_lap_ledger_file_id_fkey FOREIGN KEY (file_id) REFERENCES public.acc_lap_ledger_files(id) ON DELETE CASCADE;
+
+
+--
+-- Name: acc_qualifying_results acc_qualifying_results_file_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.acc_qualifying_results
+    ADD CONSTRAINT acc_qualifying_results_file_id_fkey FOREIGN KEY (file_id) REFERENCES public.acc_lap_ledger_files(id) ON DELETE CASCADE;
 
 
 --
@@ -4139,6 +5231,12 @@ ALTER TABLE ONLY public.track_layouts
 ALTER TABLE public.acc_cars ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: acc_driver_names; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.acc_driver_names ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: acc_hotlap_leaderboard; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -4164,10 +5262,28 @@ ALTER TABLE public.acc_hotlap_refresh_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.acc_hotstint_leaderboard ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: acc_lap_ledger; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.acc_lap_ledger ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: acc_lap_ledger_files; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.acc_lap_ledger_files ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: acc_processed_sessions; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.acc_processed_sessions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: acc_qualifying_results; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.acc_qualifying_results ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: acc_race_sessions; Type: ROW SECURITY; Schema: public; Owner: -
@@ -4868,5 +5984,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CsA9NIZvFdmur6otyJv8UMhlb3X5qFXYotfsVmE2Y3EWzSfSBxhmny6rtfBB2KA
+\unrestrict dZAj9r3CrZORuSC4fgcRjTxE3gZJIbf3ax1hjRP5zxKMFoRFOJfv3yEJkA3MmMK
 
