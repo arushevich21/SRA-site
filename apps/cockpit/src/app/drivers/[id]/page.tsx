@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation';
 import { bareDriverName } from '@/lib/driver-display-name';
 import { getDriverProfile } from '@/lib/driver-profile';
 import { getDriverStats } from '@/lib/driver-stats';
-import { DriverStatsPanel } from '@/components/DriverStatsPanel';
+import { DriverStatsPanel, standingLabel } from '@/components/DriverStatsPanel';
+import { DriverTierBadge } from '@/components/DriverTierBadge';
 import { BackLink } from '@/components/BackLink';
 import { EditProfileButton } from '@/components/EditProfileButton';
 import { COUNTRIES } from '@/lib/countries';
@@ -28,6 +29,7 @@ export default async function DriverPage({ params }: { params: Promise<{ id: str
   const name = bareDriverName(driver.display_name);
   const stats = driver.steam_id ? await getDriverStats(driver.steam_id, driver.division_id) : null;
   const standing = { division: driver.division_id, tier: driver.tier, isSralien: driver.is_sralien };
+  const division = standingLabel(standing);
   const image = driver.photo_url ?? driver.avatar_url;
 
   return (
@@ -48,8 +50,8 @@ export default async function DriverPage({ params }: { params: Promise<{ id: str
           <h1 className="font-display font-black text-[clamp(36px,5vw,64px)] uppercase leading-[.9] tracking-[-1px] text-txt">
             {name}
           </h1>
-          {(driver.driver_number != null || driver.country) && (
-            <p className="flex items-center gap-3 font-mono text-[12px] tracking-[.2em] uppercase text-txt-3 mt-3">
+          {(driver.driver_number != null || driver.country || division) && (
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[12px] tracking-[.2em] uppercase text-txt-3 mt-3">
               {driver.driver_number != null && <span>#{driver.driver_number}</span>}
               {driver.country && (
                 <span
@@ -64,6 +66,12 @@ export default async function DriverPage({ params }: { params: Promise<{ id: str
                     unoptimized
                     className="object-cover"
                   />
+                </span>
+              )}
+              {division && (
+                <span className="flex items-center gap-2 text-txt-2">
+                  <DriverTierBadge {...standing} />
+                  {division}
                 </span>
               )}
             </p>
@@ -92,7 +100,7 @@ export default async function DriverPage({ params }: { params: Promise<{ id: str
       </div>
 
       {stats ? (
-        <DriverStatsPanel stats={stats} standing={standing} />
+        <DriverStatsPanel stats={stats} />
       ) : (
         <div className="border border-line bg-panel px-7 py-6">
           <p className="font-sans text-[14px] text-txt-2">
