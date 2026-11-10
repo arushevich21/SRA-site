@@ -20,7 +20,12 @@ import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { EmperorClient } from '@sra/emperor-client';
 import { accLedgerFileKeyFromEmperorUrl, accLedgerSourceFromBaseUrl } from '@sra/domain';
-import { buildLapLedgerFile, ingestLapLedgerInto, type LapLedgerFile } from '@/lib/acc/lap-ledger-store';
+import {
+  buildLapLedgerFile,
+  ingestLapLedgerInto,
+  ingestQualifyingInto,
+  type LapLedgerFile,
+} from '@/lib/acc/lap-ledger-store';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, '../.env.local') });
@@ -137,6 +142,8 @@ async function runHost(
     if (!dryRun) {
       try {
         totals.written += await ingestLapLedgerInto(supabase, batch);
+        // Q files also fill acc_qualifying_results (Pole Positions).
+        await ingestQualifyingInto(supabase, batch);
       } catch (err) {
         // Nothing in the batch was written (one transaction); its keys stay
         // unrecorded, so a re-run of the script retries them.

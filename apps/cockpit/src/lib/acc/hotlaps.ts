@@ -4,7 +4,7 @@ import type { AccSessionResult } from '@sra/shared-types';
 import { supabase } from '../supabase';
 import { EMPEROR_ACC_BASE_URLS } from '../emperor';
 import { ingestAccRaceSession } from './race-results-store';
-import { buildLapLedgerFile, ingestLapLedgerInto } from './lap-ledger-store';
+import { buildLapLedgerFile, ingestLapLedgerInto, ingestQualifyingInto } from './lap-ledger-store';
 
 const LOCK_RECLAIM_MS = 5 * 60 * 1000;
 const REFRESH_STATE_ID = 'global';
@@ -237,7 +237,11 @@ async function runServerRefresh(
         // replay it).
         try {
           const ledgerFile = buildLapLedgerFile(baseUrl, entry.resultsJsonUrl, raw);
-          if (ledgerFile) await ingestLapLedgerInto(supabase, [ledgerFile]);
+          if (ledgerFile) {
+            await ingestLapLedgerInto(supabase, [ledgerFile]);
+            // Qualifying leaderboard (Pole Positions) — a no-op for FP/R.
+            await ingestQualifyingInto(supabase, [ledgerFile]);
+          }
         } catch (ledgerErr) {
           console.error(`ACC lap-ledger ingest failed for ${entry.resultsJsonUrl}:`, ledgerErr);
         }

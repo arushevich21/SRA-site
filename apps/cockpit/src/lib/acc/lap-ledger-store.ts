@@ -4,6 +4,7 @@ import {
   accLedgerFileKeyFromEmperorUrl,
   accLedgerSourceFromBaseUrl,
   accSessionAtFromFileName,
+  extractAccQualifying,
 } from '@sra/domain';
 
 // Writes ACC sessions into the lap ledger (acc_lap_ledger_files +
@@ -25,6 +26,9 @@ export type LapLedgerFile = {
   track_key: string;
   session_at: string;
   drivers: Array<{ steam_id: string; car_model_id: number; driver_name: string; laps: number; valid_laps: number }>;
+  // Qualifying sessions only: the leaderboard, for acc_qualifying_results
+  // (Pole Positions). acc_lap_ledger_ingest ignores this field.
+  qualifying: Array<{ position: number; steam_id: string; best_lap_ms: number | null }>;
 };
 
 // null when the session can't be keyed (a host the ledger has no source for,
@@ -52,6 +56,11 @@ export function buildLapLedgerFile(baseUrl: string, resultsJsonUrl: string, raw:
       laps: d.laps,
       valid_laps: d.validLaps,
     })),
+    qualifying: extractAccQualifying(raw).map((q) => ({
+      position: q.position,
+      steam_id: q.steamId,
+      best_lap_ms: q.bestLapMs,
+    })),
   };
 }
 
@@ -61,5 +70,18 @@ export async function ingestLapLedgerInto(client: SupabaseClient, files: LapLedg
   if (files.length === 0) return 0;
   const { data, error } = await client.rpc('acc_lap_ledger_ingest', { p_files: files });
   if (error) throw new Error(`acc_lap_ledger_ingest failed: ${error.message}`);
+  return Number(data ?? 0);
+}
+
+// Writes the qualifying leaderboards of files already in the ledger — call
+// after ingestLapLedgerInto. Files with no leaderboard (FP/R) are skipped.
+// Idempotent. Returns how many files gained rows.
+export async function ingestQualifyingInto(client: SupabaseClient, files: LapLedgerFile[]): Promise<number> {
+  const payload = files
+    .filter((f) => f.qualifying.length > 0)
+    .map((f) => ({ file_key: f.file_key, results: f.qualifying }));
+  if (payload.length === 0) return 0;
+  const { data, error } = await client.rpc('acc_qualifying_ingest', { p_files: payload });
+  if (error) throw new Error(`acc_qualifying_ingest failed: ${error.message}`);
   return Number(data ?? 0);
 }

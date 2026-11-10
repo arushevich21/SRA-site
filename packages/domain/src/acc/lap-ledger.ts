@@ -97,3 +97,39 @@ export function accSessionAtFromFileName(name: string): Date | null {
   if (at.getUTCMonth() !== mo - 1 || at.getUTCDate() !== d || at.getUTCHours() !== h) return null;
   return at;
 }
+
+// ── qualifying (Pole Positions) ─────────────────────────────────────────────
+
+export type AccQualifyingLine = {
+  position: number; // leaderboard order, 1 = pole
+  steamId: string; // S-prefixed, like the ledger
+  bestLapMs: number | null; // null = no valid lap (can't hold pole)
+};
+
+const NO_TIME = 2_147_483_647; // ACC's int32-max "no lap" sentinel
+
+type RawQualifyingLine = RawLine & { timing?: { bestLap?: number } };
+
+// A qualifying file's leaderboard, in ACC's own order (it already ranks by
+// best lap — trust it, as parseAccSession does), credited to each line's
+// current driver. Not a qualifying session → []. Lines with no playerId are
+// skipped but keep their position slot, so P1 is only ever the real P1.
+export function extractAccQualifying(raw: unknown): AccQualifyingLine[] {
+  if (!raw || typeof raw !== 'object') return [];
+  const session = raw as { sessionType?: string; sessionResult?: { leaderBoardLines?: RawQualifyingLine[] } };
+  if (!/^Q/i.test(session.sessionType ?? '')) return [];
+
+  const out: AccQualifyingLine[] = [];
+  (session.sessionResult?.leaderBoardLines ?? []).forEach((l, idx) => {
+    const drivers = l.car?.drivers ?? [];
+    const steamId = drivers[l.currentDriverIndex ?? 0]?.playerId;
+    if (!steamId) return;
+    const best = l.timing?.bestLap;
+    out.push({
+      position: idx + 1,
+      steamId,
+      bestLapMs: typeof best === 'number' && best > 0 && best < NO_TIME ? best : null,
+    });
+  });
+  return out;
+}

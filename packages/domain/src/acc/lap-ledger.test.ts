@@ -7,6 +7,7 @@ import {
   accLedgerFileKeyFromEmperorUrl,
   accLedgerSourceFromBaseUrl,
   accSessionAtFromFileName,
+  extractAccQualifying,
 } from './lap-ledger.js';
 
 const FIXTURES = resolve(fileURLToPath(new URL('../../../../fixtures/acc-results', import.meta.url)));
@@ -114,5 +115,43 @@ describe('accSessionAtFromFileName', () => {
   it('rejects names that are not result files or impossible dates', () => {
     expect(accSessionAtFromFileName('d1.json')).toBeNull();
     expect(accSessionAtFromFileName('261399_000000_R.json')).toBeNull();
+  });
+});
+
+describe('extractAccQualifying', () => {
+  function qLine(playerId: string, bestLap: number | undefined, currentDriverIndex = 0, extra: D[] = []) {
+    return {
+      ...line(1, 32, [...extra, [playerId, 'X', 'Y']], currentDriverIndex),
+      timing: bestLap == null ? {} : { bestLap },
+    };
+  }
+  const q = (lines: unknown[], sessionType = 'Q') => ({ sessionType, laps: [], sessionResult: { leaderBoardLines: lines } });
+
+  it('keeps leaderboard order as position and the S-prefixed playerId', () => {
+    expect(extractAccQualifying(q([qLine('S10', 99_937), qLine('S11', 100_120)]))).toEqual([
+      { position: 1, steamId: 'S10', bestLapMs: 99_937 },
+      { position: 2, steamId: 'S11', bestLapMs: 100_120 },
+    ]);
+  });
+
+  it("nulls ACC's int32-max sentinel and a missing best lap", () => {
+    const rows = extractAccQualifying(q([qLine('S10', 99_937), qLine('S11', 2_147_483_647), qLine('S12', undefined)]));
+    expect(rows.map((r) => r.bestLapMs)).toEqual([99_937, null, null]);
+  });
+
+  it("credits the line's current driver", () => {
+    const rows = extractAccQualifying(q([qLine('S21', 99_000, 1, [['S20', 'A', 'B']])]));
+    expect(rows[0].steamId).toBe('S21');
+  });
+
+  it('skips lines with no playerId but keeps the remaining positions', () => {
+    const rows = extractAccQualifying(q([qLine('', 99_000), qLine('S11', 99_500)]));
+    expect(rows).toEqual([{ position: 2, steamId: 'S11', bestLapMs: 99_500 }]);
+  });
+
+  it('returns nothing for non-qualifying sessions or junk', () => {
+    expect(extractAccQualifying(q([qLine('S10', 99_937)], 'R'))).toEqual([]);
+    expect(extractAccQualifying(q([qLine('S10', 99_937)], 'FP'))).toEqual([]);
+    expect(extractAccQualifying(null)).toEqual([]);
   });
 });

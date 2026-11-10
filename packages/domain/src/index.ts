@@ -106,7 +106,9 @@ export {
   accLedgerFileKeyFromEmperorUrl,
   accLedgerSourceFromBaseUrl,
   accSessionAtFromFileName,
+  extractAccQualifying,
   type AccLedgerDriverLaps,
+  type AccQualifyingLine,
 } from './acc/lap-ledger.js';
 
 export {
