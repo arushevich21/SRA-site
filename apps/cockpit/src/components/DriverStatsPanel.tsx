@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { msToLaptime } from '@sra/domain';
-import type { DriverStats } from '@/lib/driver-stats';
+import type { CarLaps, DriverStats } from '@/lib/driver-stats';
 import type { DriverTier } from '@/lib/driver-tier-badge';
 import { DriverTierBadge } from './DriverTierBadge';
 import { SRatingTrend } from './SRatingTrend';
@@ -77,6 +77,53 @@ function Bar({ label, value }: { label: string; value: number | null }) {
       <div className="h-1.5 bg-line/40 overflow-hidden">
         <div className="h-full bg-gold" style={{ width: `${Math.max(0, Math.min(100, (value ?? 0) * 100))}%` }} />
       </div>
+    </div>
+  );
+}
+
+const CARS_SHOWN = 5;
+
+function CarRow({ car }: { car: CarLaps }) {
+  return (
+    <li className="py-2">
+      <div className="flex items-baseline justify-between gap-4 mb-1">
+        <span className="font-sans text-[14px] text-txt min-w-0">{car.name}</span>
+        <span className="font-mono text-[12px] text-txt-2 whitespace-nowrap">
+          {nf.format(car.laps)} <span className="text-txt-3">· {Math.round(car.share * 100)}%</span>
+        </span>
+      </div>
+      <div className="h-1.5 bg-line/40 overflow-hidden">
+        <div className="h-full bg-gold" style={{ width: `${Math.max(1, car.share * 100)}%` }} />
+      </div>
+    </li>
+  );
+}
+
+// Every car the driver has laps in, most first. The rest sit behind a native
+// <details> toggle — no client JS.
+function LapsByCar({ cars }: { cars: CarLaps[] }) {
+  const rest = cars.slice(CARS_SHOWN);
+  return (
+    <div className="mt-6">
+      <p className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 mb-2">Laps by car</p>
+      <ul>
+        {cars.slice(0, CARS_SHOWN).map((c) => (
+          <CarRow key={c.name} car={c} />
+        ))}
+      </ul>
+      {rest.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer list-none font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 hover:text-gold py-2">
+            <span className="group-open:hidden">▸ Show all {cars.length} cars</span>
+            <span className="hidden group-open:inline">▾ Show fewer</span>
+          </summary>
+          <ul>
+            {rest.map((c) => (
+              <CarRow key={c.name} car={c} />
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }
@@ -225,10 +272,11 @@ export function DriverStatsPanel({
               value={`${mileage.topTrack} · ${nf.format(mileage.topTrackLaps ?? 0)} laps`}
             />
           )}
-          {mileage.topCar && (
+          {mileage.cars.length === 0 && mileage.topCar && (
             <Fact label="Most-driven car" value={`${mileage.topCar} · ${nf.format(mileage.topCarLaps ?? 0)} laps`} />
           )}
           {mileage.firstSeen && <Fact label="First seen on track" value={asOf(mileage.firstSeen)} />}
+          {mileage.cars.length > 0 && <LapsByCar cars={mileage.cars} />}
         </Block>
       )}
 

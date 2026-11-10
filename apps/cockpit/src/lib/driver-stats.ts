@@ -61,7 +61,12 @@ export type Mileage = {
   topCarLaps: number | null;
   lapsRank: number;
   computedAt: string;
+  // Every car they've driven, most laps first (driver_car_laps). Empty until
+  // that rollup exists — the panel then falls back to topCar.
+  cars: CarLaps[];
 };
+
+export type CarLaps = { name: string; laps: number; share: number };
 
 export type Placing = {
   season: string;
@@ -215,16 +220,31 @@ async function getHistory(
 }
 
 async function getMileage(playerId: string): Promise<Mileage | null> {
-  const { data, error } = await supabase
-    .from('driver_lap_totals')
-    .select(
-      'laps, valid_laps, sessions, first_seen, top_track_key, top_track_laps, top_car_model_id, top_car_laps, laps_rank, computed_at',
-    )
-    .eq('steam_id', playerId)
-    .maybeSingle();
+  const [{ data, error }, carRows] = await Promise.all([
+    supabase
+      .from('driver_lap_totals')
+      .select(
+        'laps, valid_laps, sessions, first_seen, top_track_key, top_track_laps, top_car_model_id, top_car_laps, laps_rank, computed_at',
+      )
+      .eq('steam_id', playerId)
+      .maybeSingle(),
+    supabase
+      .from('driver_car_laps')
+      .select('car_model_id, laps')
+      .eq('steam_id', playerId)
+      .order('laps', { ascending: false }),
+  ]);
   if (error) console.error('driver_lap_totals read failed:', error);
+  if (carRows.error) console.error('driver_car_laps read failed:', carRows.error);
   if (!data || Number(data.laps) === 0) return null;
+  const carTotal = (carRows.data ?? []).reduce((n, r) => n + Number(r.laps), 0);
+  const cars: CarLaps[] = (carRows.data ?? []).map((r) => ({
+    name: accCarModelName(Number(r.car_model_id)) ?? `Car #${r.car_model_id}`,
+    laps: Number(r.laps),
+    share: carTotal ? Number(r.laps) / carTotal : 0,
+  }));
   return {
+    cars,
     laps: Number(data.laps),
     validLaps: Number(data.valid_laps),
     sessions: Number(data.sessions),

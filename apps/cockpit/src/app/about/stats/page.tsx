@@ -31,11 +31,14 @@ export default async function StatsPage() {
               Since {dateFmt.format(new Date(totals.firstSessionAt))}
             </p>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+          <div
+            className={`grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 ${totals.km != null ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}
+          >
             {[
               { value: totals.laps, label: 'Total Laps' },
               { value: totals.sessions, label: 'Total Sessions' },
               { value: totals.drivers, label: 'Drivers on Track' },
+              ...(totals.km != null ? [{ value: totals.km, label: 'Kilometers Driven' }] : []),
             ].map((stat) => (
               <div key={stat.label} className="border border-line bg-panel p-6">
                 <span className="font-display text-[48px] text-gold leading-none">
@@ -70,8 +73,10 @@ export default async function StatsPage() {
         </span>
         <p className="font-sans text-sm text-txt-2 leading-relaxed">
           ACC laps and sessions from every SRA server — league, practice and time trial — counted
-          once per session. Wins, podiums and top 10s are GT3 Series finishes within each
-          division. Updated nightly
+          once per session; kilometers use each track&apos;s official ACC layout length. Wins,
+          podiums, top 10s and poles are GT3 Series results within each division — poles are P1 in
+          the qualifying session before each race, so seasons run on since-retired servers
+          undercount. Updated nightly
           {totals ? <> (last {dateFmt.format(new Date(totals.computedAt))})</> : null}.
         </p>
       </div>

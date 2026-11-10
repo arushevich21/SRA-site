@@ -41,7 +41,7 @@ export function StatsLeaderboard({
                 Rank
               </th>
               <th className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 px-6 py-4">
-                Driver
+                {active.subjectLabel}
               </th>
               <th className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 px-6 py-4 text-right">
                 {active.valueLabel}
