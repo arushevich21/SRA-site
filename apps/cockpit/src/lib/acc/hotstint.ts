@@ -267,33 +267,15 @@ export async function getAccStintTrackStats(
 // Distinct season codes on the seasonal, dry, non-qualifying stint board,
 // newest first. Pages the column so no season is missed to a row cap.
 export async function getHotStintSeasons(): Promise<string[]> {
-  const seasons = new Set<string>();
-  const page = 1000;
-  for (let from = 0; ; from += page) {
-    const { data, error } = await supabase
-      .from('acc_hotstint_leaderboard')
-      .select('season')
-      .eq('board_scope', 'seasonal')
-      .eq('qualifying', false)
-      // Stable page boundaries need an explicit ORDER BY (see fetchHotlapSeasons).
-      .order('track_key')
-      .order('car_model_id')
-      .order('steam_id')
-      .order('season')
-      .order('is_wet')
-      .range(from, from + page - 1);
-    // Throw rather than return a partial list — see fetchHotlapSeasons.
-    if (error) {
-      console.error('ACC stint season list lookup failed:', error);
-      throw new Error(`ACC stint season list lookup failed: ${error.message}`);
-    }
-    if (!data || data.length === 0) break;
-    for (const r of data) {
-      const s = (r.season as string) ?? '';
-      if (s !== '') seasons.add(displaySeason(s));
-    }
-    if (data.length < page) break;
+  // DISTINCT in the database (acc_hotstint_seasons, 20261111b) rather than
+  // paging every seasonal row's season through PostgREST.
+  const { data, error } = await supabase.rpc('acc_hotstint_seasons', { p_qualifying: false });
+  // Throw rather than return a partial list — see fetchHotlapSeasons.
+  if (error) {
+    console.error('ACC stint season list lookup failed:', error);
+    throw new Error(`ACC stint season list lookup failed: ${error.message}`);
   }
+  const seasons = new Set((data as string[] | null ?? []).map((s) => displaySeason(s)));
   return [...seasons].sort(compareSeasonsDesc);
 }
 

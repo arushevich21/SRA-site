@@ -140,46 +140,22 @@ export function compareSeasonsDesc(a: string, b: string): number {
 
 // Distinct season codes present on the seasonal hot-lap board, newest first.
 // Not filtered by is_wet — a season with only wet rows still counts (wet laps
-// show on the board too, just without a reference-time badge). Pages through
-// the column so a season is never missed to a single-request row cap.
-//
-// This scans the `season` column across EVERY seasonal row in the table (not
-// scoped to one track) — genuinely expensive, and was the main reason a
-// seasonal track page loaded noticeably slower than the regular hot-lap page:
-// every seasonal track view re-ran this full scan from scratch. Cached below.
+// show on the board too, just without a reference-time badge). Cached below
+// (getHotlapSeasons) — it used to page every seasonal row's season column,
+// which was the main reason seasonal track pages loaded slowly.
 export async function fetchHotlapSeasons(): Promise<string[]> {
-  const seasons = new Set<string>();
-  const page = 1000;
-  for (let from = 0; ; from += page) {
-    // Ordered by the full PK: PostgREST paging without ORDER BY is not
-    // stable across requests, so consecutive pages can overlap and skip rows.
-    const { data, error } = await supabase
-      .from('acc_hotlap_leaderboard')
-      .select('season')
-      .eq('board_scope', 'seasonal')
-      .order('track_key')
-      .order('car_model_id')
-      .order('steam_id')
-      .order('season')
-      .order('is_wet')
-      .range(from, from + page - 1);
-    // Throw, never `break`: returning the seasons seen so far hands the
-    // caching callers a truncated list they store as if it were complete.
-    // Rows are ordered by track_key, so a season whose tracks sort late
-    // vanishes — production served S7–S18 minus S10/S13 and without S19 for
-    // weeks, 404ing /seasonal/S19 and /sweatshop/S19. unstable_cache keeps
-    // serving the last good entry when a refresh throws.
-    if (error) {
-      console.error('ACC seasonal season list lookup failed:', error);
-      throw new Error(`ACC seasonal season list lookup failed: ${error.message}`);
-    }
-    if (!data || data.length === 0) break;
-    for (const r of data) {
-      const s = (r.season as string) ?? '';
-      if (s !== '') seasons.add(displaySeason(s));
-    }
-    if (data.length < page) break;
+  // One DISTINCT in the database (acc_hotlap_seasons, 20261111b) instead of
+  // paging the season column of every seasonal row through PostgREST.
+  const { data, error } = await supabase.rpc('acc_hotlap_seasons');
+  // Throw, never return a partial/empty list: the caching callers would
+  // store it as complete (production once served S7–S18 minus S10/S13 and
+  // without S19 for weeks, 404ing /seasonal/S19). unstable_cache keeps
+  // serving the last good entry when a refresh throws.
+  if (error) {
+    console.error('ACC seasonal season list lookup failed:', error);
+    throw new Error(`ACC seasonal season list lookup failed: ${error.message}`);
   }
+  const seasons = new Set((data as string[] | null ?? []).map((s) => displaySeason(s)));
   return [...seasons].sort(compareSeasonsDesc);
 }
 
