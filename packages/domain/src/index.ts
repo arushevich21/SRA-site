@@ -99,6 +99,16 @@ export {
   type SweatshopDriverTotal,
 } from './acc/sweatshop.js';
 
+// ACC lap ledger (live lap/session counters). Mirrored in SRA-Bot's
+// app/util/lap_ledger.py — keep the key + counting rules in step.
+export {
+  extractAccDriverLaps,
+  accLedgerFileKeyFromEmperorUrl,
+  accLedgerSourceFromBaseUrl,
+  accSessionAtFromFileName,
+  type AccLedgerDriverLaps,
+} from './acc/lap-ledger.js';
+
 export {
   buildDriverRounds,
   buildTeamRounds,

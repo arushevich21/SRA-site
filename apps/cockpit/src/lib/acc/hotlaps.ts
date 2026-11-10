@@ -4,6 +4,7 @@ import type { AccSessionResult } from '@sra/shared-types';
 import { supabase } from '../supabase';
 import { EMPEROR_ACC_BASE_URLS } from '../emperor';
 import { ingestAccRaceSession } from './race-results-store';
+import { buildLapLedgerFile, ingestLapLedgerInto } from './lap-ledger-store';
 
 const LOCK_RECLAIM_MS = 5 * 60 * 1000;
 const REFRESH_STATE_ID = 'global';
@@ -228,6 +229,17 @@ async function runServerRefresh(
           await ingestAccRaceSession(session, entry.resultsJsonUrl);
         } catch (raceResultsErr) {
           console.error(`ACC race-results ingest failed for ${entry.resultsJsonUrl}:`, raceResultsErr);
+        }
+        // Lap ledger (live lap/session counters) — same session, already
+        // downloaded, so no extra Emperor request. Own try/catch for the same
+        // reason as above; a miss is recoverable (SRA-Bot records the same
+        // session from disk under the same key, and the backfill script can
+        // replay it).
+        try {
+          const ledgerFile = buildLapLedgerFile(baseUrl, entry.resultsJsonUrl, raw);
+          if (ledgerFile) await ingestLapLedgerInto(supabase, [ledgerFile]);
+        } catch (ledgerErr) {
+          console.error(`ACC lap-ledger ingest failed for ${entry.resultsJsonUrl}:`, ledgerErr);
         }
         const tRace = Date.now();
 
