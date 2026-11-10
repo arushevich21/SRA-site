@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { msToLaptime } from '@sra/domain';
 import type { CarLaps, DriverStats } from '@/lib/driver-stats';
 import type { DriverTier } from '@/lib/driver-tier-badge';
+import { CarLogo } from './CarLogo';
 import { DriverTierBadge } from './DriverTierBadge';
 import { SRatingTrend } from './SRatingTrend';
 
@@ -86,8 +87,14 @@ const CARS_SHOWN = 5;
 function CarRow({ car }: { car: CarLaps }) {
   return (
     <li className="py-2">
-      <div className="flex items-baseline justify-between gap-4 mb-1">
-        <span className="font-sans text-[14px] text-txt min-w-0">{car.name}</span>
+      <div className="flex items-center justify-between gap-4 mb-1">
+        <span className="flex items-center gap-2 min-w-0">
+          {/* Fixed slot so names line up whether or not a badge exists. */}
+          <span className="w-4 flex justify-center shrink-0">
+            <CarLogo {...car.logo} alt="" size={16} />
+          </span>
+          <span className="font-sans text-[14px] text-txt min-w-0">{car.name}</span>
+        </span>
         <span className="font-mono text-[12px] text-txt-2 whitespace-nowrap">
           {nf.format(car.laps)} <span className="text-txt-3">· {Math.round(car.share * 100)}%</span>
         </span>

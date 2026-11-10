@@ -2,7 +2,31 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import type { LeaderboardCategory } from '@/lib/site-stats';
+import type { LeaderboardCategory, LeaderboardIcon } from '@/lib/site-stats';
+import { countryFlagUrl } from '@/lib/country-flag';
+import { CarLogo } from './CarLogo';
+
+// Flag (track) or manufacturer badge (car) in a fixed-width slot, so names
+// line up even on rows where a track has no country or a car no badge.
+function EntryIcon({ icon }: { icon: LeaderboardIcon }) {
+  return (
+    <span className="w-6 flex items-center justify-center shrink-0">
+      {icon.kind === 'flag' ? (
+        // eslint-disable-next-line @next/next/no-img-element -- tiny CDN flag, same as HotLapBoard
+        <img
+          src={countryFlagUrl(icon.country)}
+          alt={icon.country.toUpperCase()}
+          width={20}
+          height={14}
+          className="w-5 h-[14px] object-cover"
+          decoding="async"
+        />
+      ) : (
+        <CarLogo manufacturerIconName={icon.manufacturerIconName} manufacturerLogoUrl={icon.manufacturerLogoUrl} alt="" size={20} />
+      )}
+    </span>
+  );
+}
 
 export function StatsLeaderboard({
   categories,
@@ -64,13 +88,16 @@ export function StatsLeaderboard({
                   {entry.rank}
                 </td>
                 <td className="font-display font-bold text-[14px] uppercase text-txt px-6 py-3">
-                  {entry.href ? (
-                    <Link href={entry.href} className="hover:text-gold transition-colors">
-                      {entry.name}
-                    </Link>
-                  ) : (
-                    entry.name
-                  )}
+                  <span className="flex items-center gap-3">
+                    {entry.icon && <EntryIcon icon={entry.icon} />}
+                    {entry.href ? (
+                      <Link href={entry.href} className="hover:text-gold transition-colors">
+                        {entry.name}
+                      </Link>
+                    ) : (
+                      <span>{entry.name}</span>
+                    )}
+                  </span>
                 </td>
                 <td className="font-mono text-[12px] text-gold-soft text-right px-6 py-3">
                   {entry.value}

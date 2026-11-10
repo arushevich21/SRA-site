@@ -3,6 +3,7 @@ import { accCarModelName } from '@sra/domain';
 import { supabase } from '@/lib/supabase';
 import { bareDriverName } from '@/lib/driver-display-name';
 import { resolveAccTrackName } from '@/lib/acc/track-name';
+import { resolveCarLogo, type CarLogoSource } from '@/lib/acc/manufacturer-logo';
 
 // About → Statistics. Everything here reads the nightly rollups
 // (sra_stats_global, driver_lap_totals, driver_race_stats, driver_pole_stats,
@@ -21,7 +22,10 @@ export type SiteTotals = {
   computedAt: string;
 };
 
-export type LeaderboardEntry = { rank: number; name: string; value: string; href?: string };
+// Shown left of the name on the track/car boards: a country flag for a track,
+// the manufacturer badge for a car. Driver boards carry none.
+export type LeaderboardIcon = { kind: 'flag'; country: string } | ({ kind: 'car' } & CarLogoSource);
+export type LeaderboardEntry = { rank: number; name: string; value: string; href?: string; icon?: LeaderboardIcon };
 export type LeaderboardCategory = {
   key: string;
   label: string;
@@ -123,6 +127,17 @@ async function resolveDrivers(playerIds: string[]): Promise<Map<string, { name: 
   return out;
 }
 
+// ISO country code per track key, from acc_tracks (null-country tracks are
+// left out, so they render without a flag).
+async function resolveTrackCountries(trackKeys: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (trackKeys.length === 0) return out;
+  const { data, error } = await supabase.from('acc_tracks').select('track_key, country').in('track_key', trackKeys);
+  if (error) console.error('acc_tracks country read failed:', error);
+  for (const t of data ?? []) if (t.country) out.set(t.track_key as string, t.country as string);
+  return out;
+}
+
 export async function getStatsLeaderboards(): Promise<LeaderboardCategory[]> {
   const [laps, wins, podiums, top10s, poles, tracks, cars] = await Promise.all([
     driverBoard('driver_lap_totals', 'steam_id', 'laps', { nameColumn: 'driver_name' }),
@@ -133,8 +148,9 @@ export async function getStatsLeaderboards(): Promise<LeaderboardCategory[]> {
     subjectBoard('site_track_laps', 'track_key'),
     subjectBoard('site_car_laps', 'car_model_id'),
   ]);
-  const people = await resolveDrivers([
-    ...new Set([laps, wins, podiums, top10s, poles].flat().map((r) => r.id)),
+  const [people, trackCountries] = await Promise.all([
+    resolveDrivers([...new Set([laps, wins, podiums, top10s, poles].flat().map((r) => r.id))]),
+    resolveTrackCountries(tracks.map((t) => t.id)),
   ]);
 
   const driverEntries = (rows: Row[]): LeaderboardEntry[] =>
@@ -147,8 +163,17 @@ export async function getStatsLeaderboards(): Promise<LeaderboardCategory[]> {
         href: who?.href,
       };
     });
-  const subjectEntries = (rows: Array<{ id: string; value: number }>, name: (id: string) => string) =>
-    ranked(rows).map((r) => ({ rank: r.rank, name: name(r.id), value: nf.format(r.value) }));
+  const subjectEntries = (
+    rows: Array<{ id: string; value: number }>,
+    name: (id: string) => string,
+    icon: (id: string) => LeaderboardIcon | undefined,
+  ): LeaderboardEntry[] =>
+    ranked(rows).map((r) => ({ rank: r.rank, name: name(r.id), value: nf.format(r.value), icon: icon(r.id) }));
+  const flag = (key: string): LeaderboardIcon | undefined => {
+    const country = trackCountries.get(key);
+    return country ? { kind: 'flag', country } : undefined;
+  };
+  const badge = (id: string): LeaderboardIcon => ({ kind: 'car', ...resolveCarLogo(Number(id)) });
 
   const boards: LeaderboardCategory[] = [
     { key: 'all-time-laps', label: 'All-Time Laps', subjectLabel: 'Driver', valueLabel: 'Laps', entries: driverEntries(laps) },
@@ -161,14 +186,14 @@ export async function getStatsLeaderboards(): Promise<LeaderboardCategory[]> {
       label: 'Tracks',
       subjectLabel: 'Track',
       valueLabel: 'Laps',
-      entries: subjectEntries(tracks, (k) => resolveAccTrackName(k)),
+      entries: subjectEntries(tracks, (k) => resolveAccTrackName(k), flag),
     },
     {
       key: 'cars',
       label: 'Cars',
       subjectLabel: 'Car',
       valueLabel: 'Laps',
-      entries: subjectEntries(cars, (id) => accCarModelName(Number(id)) ?? `Car #${id}`),
+      entries: subjectEntries(cars, (id) => accCarModelName(Number(id)) ?? `Car #${id}`, badge),
     },
   ];
   return boards.filter((b) => b.entries.length > 0);

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { ENGINE } from '@/lib/acc/srating';
 import { resolveAccTrackName } from '@/lib/acc/track-name';
 import { resolveCarGroup } from '@/lib/acc/tracks';
+import { resolveCarLogo, type CarLogoSource } from '@/lib/acc/manufacturer-logo';
 import { getChampionships } from '@/lib/championships-store';
 import { isEnduranceChampionship, seasonTrackAllowList } from '@/lib/seasonal-leaderboard';
 
@@ -66,7 +67,7 @@ export type Mileage = {
   cars: CarLaps[];
 };
 
-export type CarLaps = { name: string; laps: number; share: number };
+export type CarLaps = { name: string; laps: number; share: number; logo: CarLogoSource };
 
 export type Placing = {
   season: string;
@@ -242,6 +243,7 @@ async function getMileage(playerId: string): Promise<Mileage | null> {
     name: accCarModelName(Number(r.car_model_id)) ?? `Car #${r.car_model_id}`,
     laps: Number(r.laps),
     share: carTotal ? Number(r.laps) / carTotal : 0,
+    logo: resolveCarLogo(Number(r.car_model_id)),
   }));
   return {
     cars,
