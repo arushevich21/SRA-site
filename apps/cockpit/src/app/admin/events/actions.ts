@@ -2,6 +2,7 @@
 
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { ACC_LEADERBOARD_SHELL_TAG } from '@/lib/acc/leaderboard-shell';
+import { CHAMPIONSHIPS_TAG } from '@/lib/championships-store';
 import { requireAdmin } from '@/lib/require-admin';
 import { supabase } from '@/lib/supabase';
 import { parseAccsmChampionshipId } from '@/lib/accsm-championship-id';
@@ -416,7 +417,10 @@ export async function saveChampionship(input: ChampionshipInput): Promise<SaveRe
     const { error: upErr } = await supabase
       .from('championship_rounds')
       .upsert(rows, { onConflict: 'championship_id,round' });
-    if (upErr) return { ok: false, error: upErr.message };
+    if (upErr) {
+      revalidateTag(CHAMPIONSHIPS_TAG); // earlier writes in this save already landed
+      return { ok: false, error: upErr.message };
+    }
   }
 
   // Then drop only the rounds the admin actually removed. Expressed as "not in
@@ -429,23 +433,33 @@ export async function saveChampionship(input: ChampionshipInput): Promise<SaveRe
     delRounds = delRounds.not('round', 'in', `(${rows.map((r) => r.round).join(',')})`);
   }
   const { error: delErr } = await delRounds;
-  if (delErr) return { ok: false, error: delErr.message };
+  if (delErr) {
+    revalidateTag(CHAMPIONSHIPS_TAG); // earlier writes in this save already landed
+    return { ok: false, error: delErr.message };
+  }
 
   const raceNightErr = await saveRaceNights(championshipId, input.raceNights);
-  if (raceNightErr) return { ok: false, error: raceNightErr };
+  if (raceNightErr) {
+    revalidateTag(CHAMPIONSHIPS_TAG); // earlier writes in this save already landed
+    return { ok: false, error: raceNightErr };
+  }
 
   // After the championships write, so a registration_key set or renamed in
   // this same save exists (and has cascaded to any existing targets) before
   // these rows reference it.
   if (registrationKey) {
     const targetErr = await saveDivisionTargets(registrationKey, divisionTargets);
-    if (targetErr) return { ok: false, error: targetErr };
+    if (targetErr) {
+      revalidateTag(CHAMPIONSHIPS_TAG); // earlier writes in this save already landed
+      return { ok: false, error: targetErr };
+    }
   }
 
   revalidatePath('/', 'layout');
   // A round's hotlapReleased toggle changes the seasonal leaderboards' tab
   // row, which is served from a 1h Data Cache entry (lib/acc/leaderboard-shell.ts).
   revalidateTag(ACC_LEADERBOARD_SHELL_TAG);
+  revalidateTag(CHAMPIONSHIPS_TAG);
   return { ok: true, id: championshipId };
 }
 
@@ -456,6 +470,7 @@ export async function deleteChampionship(id: string): Promise<{ ok: boolean; err
   if (error) return { ok: false, error: error.message };
   revalidatePath('/', 'layout');
   revalidateTag(ACC_LEADERBOARD_SHELL_TAG);
+  revalidateTag(CHAMPIONSHIPS_TAG);
   return { ok: true };
 }
 
