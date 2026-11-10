@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dZAj9r3CrZORuSC4fgcRjTxE3gZJIbf3ax1hjRP5zxKMFoRFOJfv3yEJkA3MmMK
+\restrict db0h3ATt6Wg8pdpaHqxg0AagZ8uNa0CrNyz3Wl3Tjs7ieOhfmbSF4LW3d4gW7Mn
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -59,6 +59,34 @@ $$;
 --
 
 COMMENT ON FUNCTION public.acc_driver_category(p_tier public.driver_tier) IS 'SRA driver tier -> ACC entrylist driverCategory. gold=2 (Gold, white plate), silver=1 (Silver, grey badge), NULL=1. Single source of the mapping: register_entry() and the S19 backfill both call it.';
+
+
+--
+-- Name: acc_hotlap_seasons(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.acc_hotlap_seasons() RETURNS SETOF text
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  select distinct season
+  from public.acc_hotlap_leaderboard
+  where board_scope = 'seasonal' and season <> ''
+$$;
+
+
+--
+-- Name: acc_hotstint_seasons(boolean); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.acc_hotstint_seasons(p_qualifying boolean) RETURNS SETOF text
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  select distinct season
+  from public.acc_hotstint_leaderboard
+  where board_scope = 'seasonal' and qualifying = p_qualifying and season <> ''
+$$;
 
 
 --
@@ -4118,6 +4146,20 @@ ALTER TABLE ONLY public.tracks
 
 
 --
+-- Name: acc_hotlap_board_lap_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX acc_hotlap_board_lap_idx ON public.acc_hotlap_leaderboard USING btree (track_key, board_scope, season, best_lap_ms);
+
+
+--
+-- Name: acc_hotlap_board_updated_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX acc_hotlap_board_updated_idx ON public.acc_hotlap_leaderboard USING btree (track_key, board_scope, season, updated_at DESC);
+
+
+--
 -- Name: acc_hotlap_leaderboard_track_car_rank_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4125,10 +4167,24 @@ CREATE INDEX acc_hotlap_leaderboard_track_car_rank_idx ON public.acc_hotlap_lead
 
 
 --
+-- Name: acc_hotlap_scope_season_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX acc_hotlap_scope_season_idx ON public.acc_hotlap_leaderboard USING btree (board_scope, season);
+
+
+--
 -- Name: acc_hotstint_board_class_rank_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX acc_hotstint_board_class_rank_idx ON public.acc_hotstint_leaderboard USING btree (board_scope, season, is_wet, qualifying, track_key, car_group, best_stint_ms);
+
+
+--
+-- Name: acc_hotstint_board_updated_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX acc_hotstint_board_updated_idx ON public.acc_hotstint_leaderboard USING btree (track_key, board_scope, qualifying, season, updated_at DESC);
 
 
 --
@@ -4143,13 +4199,6 @@ CREATE INDEX acc_hotstint_track_car_rank_idx ON public.acc_hotstint_leaderboard 
 --
 
 CREATE INDEX acc_lap_ledger_files_session_at_idx ON public.acc_lap_ledger_files USING btree (session_at);
-
-
---
--- Name: acc_processed_sessions_url_key; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX acc_processed_sessions_url_key ON public.acc_processed_sessions USING btree (session_url);
 
 
 --
@@ -5984,5 +6033,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dZAj9r3CrZORuSC4fgcRjTxE3gZJIbf3ax1hjRP5zxKMFoRFOJfv3yEJkA3MmMK
+\unrestrict db0h3ATt6Wg8pdpaHqxg0AagZ8uNa0CrNyz3Wl3Tjs7ieOhfmbSF4LW3d4gW7Mn
 
