@@ -6,6 +6,7 @@ import { getDriverProfile } from '@/lib/driver-profile';
 import { getDriverStats } from '@/lib/driver-stats';
 import { DriverStatsPanel } from '@/components/DriverStatsPanel';
 import { BackLink } from '@/components/BackLink';
+import { EditProfileButton } from '@/components/EditProfileButton';
 import { COUNTRIES } from '@/lib/countries';
 import { countryFlagUrl } from '@/lib/country-flag';
 
@@ -31,7 +32,10 @@ export default async function DriverPage({ params }: { params: Promise<{ id: str
 
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
-      <BackLink fallbackHref="/about/drivers" fallbackLabel="Drivers & Stats" />
+      <div className="flex items-start justify-between gap-4">
+        <BackLink fallbackHref="/about/drivers" fallbackLabel="Drivers & Stats" />
+        <EditProfileButton driverId={driver.id} />
+      </div>
       <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">— Driver</span>
       <div className="flex flex-wrap items-center justify-between gap-6 mb-10">
       <div className="flex items-center gap-6 min-w-0">

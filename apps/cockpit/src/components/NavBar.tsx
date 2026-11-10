@@ -14,9 +14,23 @@ import { GameLabel } from '@/components/GameLabel';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 export type NavUser = {
+  id: string;
   display_name: string | null;
   avatar_url: string | null;
+  // Full admin OR any scoped permission — the same rule /admin uses
+  // (getAdminAccess) to decide whether to let someone in. Only decides
+  // whether the menu shows the link; /admin itself is still guarded.
+  canAdmin: boolean;
 };
+
+// Account menu: the name opens the public stats page, hover lists the rest.
+function accountLinks(user: NavUser): NavDrop[] {
+  return [
+    { label: 'My Stats', href: `/drivers/${user.id}` },
+    { label: 'Profile', href: '/profile' },
+    ...(user.canAdmin ? [{ label: 'Admin Panel', href: '/admin' }] : []),
+  ];
+}
 
 type NavDrop = { label: string; href: string };
 type NavItem =
@@ -250,12 +264,21 @@ export default function NavBar({
     let active = true;
 
     async function loadDriver(userId: string) {
-      const { data: driver } = await supabase
-        .from('drivers')
-        .select('display_name, avatar_url')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (active) setUser(driver ?? null);
+      const [{ data: driver }, { data: hasBop }] = await Promise.all([
+        supabase.from('drivers').select('id, display_name, avatar_url, is_admin').eq('user_id', userId).maybeSingle(),
+        supabase.rpc('has_admin_permission', { perm: 'bop' }),
+      ]);
+      if (!active) return;
+      setUser(
+        driver
+          ? {
+              id: driver.id,
+              display_name: driver.display_name,
+              avatar_url: driver.avatar_url,
+              canAdmin: !!driver.is_admin || !!hasBop,
+            }
+          : null,
+      );
     }
 
     function handleSession(session: { user: { id: string } } | null) {
@@ -450,21 +473,31 @@ export default function NavBar({
 
             {user ? (
               <div className="flex items-center gap-3 ml-1">
-                {user.avatar_url && (
-                  <Image
-                    src={user.avatar_url}
-                    alt=''
-                    width={28}
-                    height={28}
-                    className="rounded-full shrink-0"
-                  />
-                )}
-                <Link
-                  href="/profile"
-                  className="text-[12.5px] font-semibold tracking-[.1em] uppercase text-txt hover:text-gold-soft transition-colors whitespace-nowrap"
-                >
-                  {user.display_name ?? 'Account'}
-                </Link>
+                <div className="nav-has relative">
+                  <Link
+                    href={`/drivers/${user.id}`}
+                    className="flex items-center gap-3 py-[10px] text-[12.5px] font-semibold tracking-[.1em] uppercase text-txt hover:text-gold-soft transition-colors whitespace-nowrap"
+                  >
+                    {user.avatar_url && (
+                      <Image
+                        src={user.avatar_url}
+                        alt=''
+                        width={28}
+                        height={28}
+                        className="rounded-full shrink-0"
+                      />
+                    )}
+                    {user.display_name ?? 'Account'}
+                    <span className="text-[8px] opacity-50">▾</span>
+                  </Link>
+                  <div className="nav-drop nav-drop--end">
+                    {accountLinks(user).map((l) => (
+                      <Link key={l.href} href={l.href}>
+                        {l.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
                 <form action="/auth/signout" method="POST">
                   <button type="submit" className="nav-signin">
                     <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
@@ -653,12 +686,24 @@ export default function NavBar({
               )}
               <div>
                 <Link
-                  href="/profile"
+                  href={`/drivers/${user.id}`}
                   className="block font-semibold text-[14px] tracking-[.06em] uppercase text-txt hover:text-gold transition-colors"
                   onClick={close}
                 >
                   {user.display_name ?? 'Account'}
                 </Link>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                  {accountLinks(user).map((l) => (
+                    <Link
+                      key={l.href}
+                      href={l.href}
+                      className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 hover:text-gold transition-colors"
+                      onClick={close}
+                    >
+                      {l.label}
+                    </Link>
+                  ))}
+                </div>
               </div>
               <form action="/auth/signout" method="POST" className="ml-auto">
                 <button
