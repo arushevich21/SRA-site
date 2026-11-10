@@ -38,9 +38,9 @@ export function SRatingTrend({ points }: { points: RatingPoint[] }) {
 
   return (
     <figure className="m-0">
-      <div className="flex items-baseline justify-between font-mono text-[11px] uppercase text-txt-3 mb-1">
+      <div className="flex items-baseline justify-between font-sans text-[13px] text-txt-3 mb-1">
         <span>Last {points.length} race weeks</span>
-        <span className="text-txt-2 normal-case">
+        <span className="font-mono text-[12px] text-txt-2">
           {points[shown].label} · {pct(points[shown].composite)}
         </span>
       </div>
@@ -81,7 +81,7 @@ export function SRatingTrend({ points }: { points: RatingPoint[] }) {
         </svg>
       </div>
       <figcaption className="flex justify-between font-mono text-[10px] text-txt-3 mt-1">
-        <span>range {pct(lo)} – {pct(hi)}</span>
+        <span>Range {pct(lo)} – {pct(hi)}</span>
         <span>{points[0].label} → {points[last].label}</span>
       </figcaption>
     </figure>

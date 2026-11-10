@@ -38,7 +38,6 @@ export default async function DriverPage({ params }: { params: Promise<{ id: str
         <BackLink fallbackHref="/about/drivers" fallbackLabel="Drivers & Stats" />
         <EditProfileButton driverId={driver.id} />
       </div>
-      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">— Driver</span>
       <div className="flex flex-wrap items-center justify-between gap-6 mb-10">
       <div className="flex items-center gap-6 min-w-0">
         {image ? (
@@ -51,8 +50,10 @@ export default async function DriverPage({ params }: { params: Promise<{ id: str
             {name}
           </h1>
           {(driver.driver_number != null || driver.country || division) && (
-            <p className="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[12px] tracking-[.2em] uppercase text-txt-3 mt-3">
-              {driver.driver_number != null && <span>#{driver.driver_number}</span>}
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-2 font-sans text-[14px] text-txt-2 mt-3">
+              {driver.driver_number != null && (
+                <span className="font-display font-bold text-[22px] leading-none text-gold">#{driver.driver_number}</span>
+              )}
               {driver.country && (
                 <span
                   className="relative inline-block w-6 h-[18px] overflow-hidden"
@@ -81,7 +82,7 @@ export default async function DriverPage({ params }: { params: Promise<{ id: str
         {driver.steam_id && (
           <form method="get" action={`/drivers/${driver.id}/vs`} className="flex items-end gap-2">
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[11px] tracking-[.2em] uppercase text-txt-3">Head to head</span>
+              <span className="font-sans text-[13px] text-txt-3">Compare head to head</span>
               <input
                 type="search"
                 name="q"
@@ -91,7 +92,7 @@ export default async function DriverPage({ params }: { params: Promise<{ id: str
             </label>
             <button
               type="submit"
-              className="font-mono text-[12px] tracking-[.2em] uppercase px-4 py-3 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors"
+              className="font-display text-[16px] tracking-[.06em] uppercase px-5 py-2 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors"
             >
               Go
             </button>

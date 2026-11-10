@@ -47,11 +47,13 @@ function Block({
   return (
     <div className="border border-line bg-panel px-7 py-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-5">
-        <p className="font-mono text-[11px] tracking-[.35em] uppercase text-gold">
+        <h2 className="font-display font-semibold text-[19px] uppercase tracking-[.04em] leading-none text-gold">
           {title}
-          {context && <span className="text-txt-3 ml-3 tracking-[.2em]">{context}</span>}
-        </p>
-        {note && <p className="font-mono text-[10px] tracking-[.15em] uppercase text-txt-3">{note}</p>}
+          {context && (
+            <span className="font-sans font-normal normal-case tracking-normal text-[13px] text-txt-3 ml-3">{context}</span>
+          )}
+        </h2>
+        {note && <p className="font-sans text-[12px] text-txt-3">{note}</p>}
       </div>
       {children}
     </div>
@@ -62,7 +64,7 @@ function Tile({ value, label }: { value: string; label: string }) {
   return (
     <div>
       <span className="block font-display text-[36px] text-gold leading-none">{value}</span>
-      <span className="block font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 mt-2">{label}</span>
+      <span className="block font-sans text-[13px] text-txt-3 mt-2">{label}</span>
     </div>
   );
 }
@@ -70,7 +72,7 @@ function Tile({ value, label }: { value: string; label: string }) {
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-2 border-b border-line last:border-b-0">
-      <span className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3">{label}</span>
+      <span className="font-sans text-[13px] text-txt-3">{label}</span>
       <span className="font-sans text-[14px] text-txt text-right">{value}</span>
     </div>
   );
@@ -79,9 +81,9 @@ function Fact({ label, value }: { label: string; value: string }) {
 function Bar({ label, value }: { label: string; value: number | null }) {
   return (
     <div>
-      <div className="flex items-center justify-between font-mono text-[11px] uppercase text-txt-3 mb-1">
+      <div className="flex items-center justify-between font-sans text-[13px] text-txt-3 mb-1.5">
         <span>{label}</span>
-        <span className="text-txt-2">{pct(value)}</span>
+        <span className="font-mono text-[12px] text-txt-2 tabular-nums">{pct(value)}</span>
       </div>
       <div className="h-1.5 bg-line/40 overflow-hidden">
         <div className="h-full bg-gold" style={{ width: `${Math.max(0, Math.min(100, (value ?? 0) * 100))}%` }} />
@@ -202,7 +204,7 @@ function LapsByCar({ cars }: { cars: CarLaps[] }) {
   const rest = cars.slice(CARS_SHOWN);
   return (
     <div className="mt-6">
-      <p className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 mb-2">Laps by car</p>
+      <h3 className="font-display font-semibold text-[15px] uppercase tracking-[.04em] text-txt-2 mb-2">Laps by car</h3>
       <ul>
         {cars.slice(0, CARS_SHOWN).map((c) => (
           <CarRow key={c.name} car={c} />
@@ -210,7 +212,7 @@ function LapsByCar({ cars }: { cars: CarLaps[] }) {
       </ul>
       {rest.length > 0 && (
         <details className="group">
-          <summary className="cursor-pointer list-none font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 hover:text-gold py-2">
+          <summary className="cursor-pointer list-none font-sans text-[13px] text-txt-3 hover:text-gold py-2">
             <span className="group-open:hidden">▸ Show all {cars.length} cars</span>
             <span className="hidden group-open:inline">▾ Show fewer</span>
           </summary>
@@ -361,7 +363,7 @@ export function DriverStatsPanel({
         <Block
           title="Mileage"
           context="All ACC servers"
-          note={mileage.firstSeen ? `on track since ${monthYear(mileage.firstSeen)}` : undefined}
+          note={mileage.firstSeen ? `On track since ${monthYear(mileage.firstSeen)}` : undefined}
         >
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-6">
             <Tile value={nf.format(mileage.laps)} label="Laps" />
@@ -421,7 +423,7 @@ export function DriverStatsPanel({
             // Named group: the rows are `group`s too, and an unnamed one here
             // would light up every row's hover style at once.
             <details className="group/more">
-              <summary className="cursor-pointer list-none font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 hover:text-gold pt-3">
+              <summary className="cursor-pointer list-none font-sans text-[13px] text-txt-3 hover:text-gold pt-3">
                 <span className="group-open/more:hidden">▸ Show {more.length} more</span>
                 <span className="hidden group-open/more:inline">▾ Show fewer</span>
               </summary>
