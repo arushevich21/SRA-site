@@ -1,4 +1,6 @@
 import 'server-only';
+import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
 import { supabase } from './supabase';
 import { CHAMPIONSHIPS, type ChampionshipContent } from '@/content/championships';
 import { mapChampionship, type AccsmTargetRow, type ChampionshipRow } from './championships-map';
@@ -59,7 +61,19 @@ async function getAccsmTargetsByKey(): Promise<Map<string, AccsmTargetRow[]>> {
   return byKey;
 }
 
-export async function getChampionships(): Promise<ChampionshipContent[]> {
+// Read by the root layout (nav dropdowns) and most public pages, so on a
+// dynamic page it ran twice per request, each a cross-country round trip to
+// the database. Two layers now:
+//   - unstable_cache: shared across requests, 5 min TTL, and dropped at once
+//     by revalidateTag(CHAMPIONSHIPS_TAG) in admin/events/actions.ts — the
+//     only code that writes these tables.
+//   - React cache(): layout + page in the same request share one call.
+// Only a successful read is cached: loadChampionships throws on failure (an
+// empty table counts too), so the seed fallback below is never pinned for
+// the whole TTL.
+export const CHAMPIONSHIPS_TAG = 'championships';
+
+async function loadChampionships(): Promise<ChampionshipContent[]> {
   const [{ data, error }, targetsByKey] = await Promise.all([
     supabase
       .from('championships')
@@ -68,16 +82,27 @@ export async function getChampionships(): Promise<ChampionshipContent[]> {
     getAccsmTargetsByKey(),
   ]);
 
-  if (error) {
-    console.error('championships read failed — falling back to seed content:', error.message);
-    return CHAMPIONSHIPS;
-  }
-  if (!data || data.length === 0) return CHAMPIONSHIPS;
+  if (error) throw new Error(`championships read failed: ${error.message}`);
+  if (!data || data.length === 0) throw new Error('championships table is empty');
 
   return (data as ChampionshipRow[]).map((row) =>
     mapChampionship(row, row.registration_key ? (targetsByKey.get(row.registration_key) ?? []) : []),
   );
 }
+
+const cachedChampionships = unstable_cache(loadChampionships, ['championships-v1'], {
+  revalidate: 300,
+  tags: [CHAMPIONSHIPS_TAG],
+});
+
+export const getChampionships = cache(async (): Promise<ChampionshipContent[]> => {
+  try {
+    return await cachedChampionships();
+  } catch (err) {
+    console.error('championships read failed — falling back to seed content:', err instanceof Error ? err.message : err);
+    return CHAMPIONSHIPS;
+  }
+});
 
 // ── Admin reads (include the DB id, never exposed to the public render layer) ──
 

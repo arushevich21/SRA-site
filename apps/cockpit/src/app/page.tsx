@@ -3,16 +3,26 @@ import Link from 'next/link';
 import { SIMS } from '@/content/sims';
 import { GameLabel } from '@/components/GameLabel';
 import { CountUpStats } from '@/components/CountUpStats';
+import { getSiteTotals } from '@/lib/site-stats';
 
-const STATS = [
-  { value: '18', label: 'Seasons' },
-  { value: '3,400+', label: 'Members' },
-  { value: '40+', label: 'Race Servers' },
-  { value: '94,327', label: 'Sessions' },
-  { value: '4,540,616', label: 'Laps' },
-];
+// Sessions/Laps come from the nightly rollup (refreshed 09:15 UTC), so an
+// hourly regenerate is plenty — same cadence as /about/stats.
+export const revalidate = 3600;
 
-export default function HomePage() {
+const nf = new Intl.NumberFormat('en-US');
+
+export default async function HomePage() {
+  const totals = await getSiteTotals();
+  // Members and Race Servers stay static by choice. The fallbacks are the last
+  // hardcoded figures, used only if the rollup read fails.
+  const STATS = [
+    { value: '19', label: 'Seasons' },
+    { value: '3,400+', label: 'Members' },
+    { value: '40+', label: 'Race Servers' },
+    { value: totals ? nf.format(totals.sessions) : '94,327', label: 'Sessions' },
+    { value: totals ? nf.format(totals.laps) : '4,540,616', label: 'Laps' },
+  ];
+
   return (
     <>
       {/* ── HERO ──────────────────────────────────────────────────────── */}

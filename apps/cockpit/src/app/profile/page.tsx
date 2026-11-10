@@ -27,7 +27,7 @@ export default async function ProfilePage({
   const { data: driver } = await supabase
     .from('drivers')
     .select(
-      'display_name, avatar_url, photo_url, steam_id, steam_verified, discord_id, is_admin, first_name, last_name, short_name, country, driver_number'
+      'id, display_name, avatar_url, photo_url, steam_id, steam_verified, discord_id, is_admin, first_name, last_name, short_name, country, driver_number'
     )
     .eq('user_id', user.id)
     .maybeSingle();
@@ -42,12 +42,14 @@ export default async function ProfilePage({
       </h1>
 
       <div className="flex flex-wrap gap-3 mb-12">
-        {driver?.is_admin && (
+        {/* Stats live on the public driver page; Admin Panel moved to the
+            account menu in the nav. */}
+        {driver?.id && (
           <Link
-            href="/admin"
+            href={`/drivers/${driver.id}`}
             className="inline-block font-mono text-[12px] tracking-[.2em] uppercase px-5 py-3 bg-gold text-carbon font-bold hover:bg-gold-soft transition-colors"
           >
-            Admin Panel →
+            My Stats →
           </Link>
         )}
         <Link

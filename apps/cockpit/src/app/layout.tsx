@@ -23,7 +23,16 @@ const mono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-jetbrains',
   display: 'swap',
+  // Data only (lap times, counts) — not worth competing with the display and
+  // body faces for first-paint bandwidth. Still loads, just not preloaded.
+  preload: false,
 });
+
+// Run server code next to the database. Supabase lives in us-west-2
+// (Oregon); Vercel's default region is iad1 (Washington DC), which put every
+// query a page makes on a cross-country round trip. pdx1 is Portland.
+// Child layouts/pages inherit this.
+export const preferredRegion = 'pdx1';
 
 export const metadata: Metadata = {
   title: 'Sim Racing Alliance',
