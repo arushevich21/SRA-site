@@ -9,7 +9,8 @@ import { SRatingTrend } from './SRatingTrend';
 // is_sralien) — shown in Racing Record.
 export type DriverStanding = { division: number | null; tier: DriverTier | null; isSralien: boolean };
 
-const HOT_LAPS_SHOWN = 8;
+const HOT_LAPS_SHOWN = 5;
+const HOT_LAPS_MAX = 15;
 
 // Driver stats blocks — shared by /profile (your own) and /drivers/[id]
 // (public). Server component; only the trend sparkline hydrates. Each block
@@ -18,13 +19,8 @@ const HOT_LAPS_SHOWN = 8;
 
 const nf = new Intl.NumberFormat('en-US');
 
-function asOf(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'America/New_York',
-  });
+function monthYear(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'America/New_York' });
 }
 
 function pct(v: number | null, digits = 1): string {
@@ -92,6 +88,82 @@ function Bar({ label, value }: { label: string; value: number | null }) {
       </div>
     </div>
   );
+}
+
+// Where a driver's races end up, as one bar: wins ⊂ podiums ⊂ top 10s ⊂
+// starts, so each band is the increment over the one before it.
+function FinishProfile({ starts, wins, podiums, top10s }: { starts: number; wins: number; podiums: number; top10s: number }) {
+  if (starts === 0) return null;
+  const bands = [
+    { label: 'Wins', n: wins, cls: 'bg-gold' },
+    { label: 'Podiums', n: podiums - wins, cls: 'bg-gold-soft/60' },
+    { label: 'Top 10s', n: top10s - podiums, cls: 'bg-gold-deep/45' },
+    { label: 'Other', n: starts - top10s, cls: 'bg-line' },
+  ];
+  return (
+    <div>
+      <div className="flex h-3 overflow-hidden gap-px" role="img" aria-label={bands.map((b) => `${b.label} ${b.n}`).join(', ')}>
+        {bands.map((b) =>
+          b.n > 0 ? <div key={b.label} className={b.cls} style={{ width: `${(b.n / starts) * 100}%`, minWidth: 3 }} /> : null,
+        )}
+      </div>
+      <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3 font-sans text-[12px] text-txt-3">
+        {[
+          { label: 'Win', value: wins / starts, cls: 'bg-gold' },
+          { label: 'Podium', value: podiums / starts, cls: 'bg-gold-soft/60' },
+          { label: 'Top 10', value: top10s / starts, cls: 'bg-gold-deep/45' },
+        ].map((r) => (
+          <span key={r.label} className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 ${r.cls}`} />
+            {r.label} rate <span className="text-txt">{pct(r.value)}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Small secondary figure: value over a quiet caption, no box.
+function Mini({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <span className="block font-display text-[22px] text-txt leading-none">{value}</span>
+      <span className="block font-sans text-[12px] text-txt-3 mt-1.5">{label}</span>
+    </div>
+  );
+}
+
+type HotLap = DriverStats['placings'][number];
+
+function HotLapRow({ p }: { p: HotLap }) {
+  return (
+    <tr className="border-t border-line group">
+      <td className={`py-2.5 font-display text-[18px] w-14 ${p.position <= 3 ? 'text-gold' : 'text-txt'}`}>
+        P{p.position}
+      </td>
+      <td className="py-2.5 font-sans text-[14px] text-txt">
+        <Link href={p.href} className="group-hover:text-gold underline-offset-4 group-hover:underline">
+          {p.track}
+        </Link>
+        <span className="block font-sans text-[12px] text-txt-3 mt-0.5">
+          {p.season} / {p.car ?? p.carClass}
+          {p.isWet ? ' / Wet' : ''} / {nf.format(p.boardSize)} drivers
+        </span>
+      </td>
+      <td className="py-2.5 text-right font-mono text-[13px] text-txt-2 tabular-nums">
+        <Link href={p.href} className="group-hover:text-gold">
+          {msToLaptime(p.bestLapMs)}
+        </Link>
+      </td>
+    </tr>
+  );
+}
+
+function finishTone(position: number): string {
+  if (position === 1) return 'bg-gold text-carbon border-gold';
+  if (position <= 3) return 'border-gold text-gold';
+  if (position <= 10) return 'border-line-2 text-txt';
+  return 'border-line text-txt-2';
 }
 
 const CARS_SHOWN = 5;
@@ -195,21 +267,22 @@ export function DriverStatsPanel({
   if (record) {
     blocks.push({
       key: 'record',
-      weight: 9,
+      weight: 8,
       node: (
-        <Block title="Racing Record" context="GT3 Series" note={`as of ${asOf(record.computedAt)}`}>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-6">
+        <Block title="Racing Record" context="GT3 Series">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-7">
             <Tile value={nf.format(record.starts)} label="Starts" />
             <Tile value={nf.format(record.wins)} label="Wins" />
             <Tile value={nf.format(record.podiums)} label="Podiums" />
             <Tile value={nf.format(record.top10s)} label="Top 10s" />
           </div>
-          <Fact label="Win rate" value={pct(record.starts ? record.wins / record.starts : null)} />
-          <Fact label="Podium rate" value={pct(record.starts ? record.podiums / record.starts : null)} />
-          <Fact label="Best finish" value={record.bestFinish ? ordinal(record.bestFinish) : '—'} />
-          <Fact label="Average finish" value={record.avgFinish != null ? record.avgFinish.toFixed(1) : '—'} />
-          <Fact label="Seasons raced" value={String(record.seasons)} />
-          {record.firstRace && <Fact label="First race" value={asOf(record.firstRace)} />}
+          <FinishProfile starts={record.starts} wins={record.wins} podiums={record.podiums} top10s={record.top10s} />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-7 pt-6 border-t border-line">
+            <Mini value={record.bestFinish ? ordinal(record.bestFinish) : '—'} label="Best finish" />
+            <Mini value={record.avgFinish != null ? record.avgFinish.toFixed(1) : '—'} label="Average finish" />
+            <Mini value={String(record.seasons)} label="Seasons" />
+            {record.firstRace && <Mini value={monthYear(record.firstRace)} label="First race" />}
+          </div>
         </Block>
       ),
     });
@@ -244,44 +317,37 @@ export function DriverStatsPanel({
   if (recent.length > 0) {
     blocks.push({
       key: 'recent',
-      weight: 2 + recent.length,
+      weight: 4,
       node: (
         <Block title="Recent Results" context="GT3 Series">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="font-mono text-[10px] tracking-[.15em] uppercase text-txt-3">
-                <th className="font-normal pb-2">Round</th>
-                <th className="font-normal pb-2">Track</th>
-                <th className="font-normal pb-2 text-right">Finish</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recent.map((r) => (
-                <tr key={`${r.season}-${r.round}`} className="border-t border-line">
-                  <td className="py-2.5 pr-4 font-mono text-[13px] text-txt-3 whitespace-nowrap w-24">
-                    S{r.season} R{r.round}
-                  </td>
-                  <td className="py-2.5 font-sans text-[14px] text-txt">
-                    {r.href ? (
-                      <Link href={r.href} className="hover:text-gold underline-offset-4 hover:underline">
-                        {r.track}
-                      </Link>
-                    ) : (
-                      r.track
-                    )}
-                    {r.note && (
-                      <span className="ml-2 font-mono text-[10px] tracking-[.1em] uppercase text-txt-3">{r.note}</span>
-                    )}
-                  </td>
-                  <td
-                    className={`py-2.5 text-right font-display text-[18px] ${r.position <= 3 ? 'text-gold' : 'text-txt'}`}
-                  >
+          {/* Newest first, one card per race: the finish is the headline. */}
+          <ol className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {recent.map((r) => {
+              const card = (
+                <>
+                  <span className={`flex items-center justify-center h-14 border font-display text-[24px] leading-none ${finishTone(r.position)} group-hover:border-gold-soft transition-colors`}>
                     P{r.position}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </span>
+                  <span className="block font-sans text-[12px] text-txt-2 mt-2 leading-tight truncate">{r.track}</span>
+                  <span className="block font-mono text-[10px] text-txt-3 mt-0.5">
+                    S{r.season} R{r.round}
+                    {r.note ? ` ${r.note}` : ''}
+                  </span>
+                </>
+              );
+              return (
+                <li key={`${r.season}-${r.round}`} className="min-w-0">
+                  {r.href ? (
+                    <Link href={r.href} className="block group" title={`${r.track}, S${r.season} R${r.round}`}>
+                      {card}
+                    </Link>
+                  ) : (
+                    card
+                  )}
+                </li>
+              );
+            })}
+          </ol>
         </Block>
       ),
     });
@@ -292,13 +358,17 @@ export function DriverStatsPanel({
       key: 'mileage',
       weight: 8 + Math.min(mileage.cars.length, CARS_SHOWN),
       node: (
-        <Block title="Mileage" context="All ACC servers" note={`as of ${asOf(mileage.computedAt)}`}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-6">
+        <Block
+          title="Mileage"
+          context="All ACC servers"
+          note={mileage.firstSeen ? `on track since ${monthYear(mileage.firstSeen)}` : undefined}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-6">
             <Tile value={nf.format(mileage.laps)} label="Laps" />
-            <Tile value={pct(mileage.laps ? mileage.validLaps / mileage.laps : null, 0)} label="Valid" />
+            <Tile value={`#${nf.format(mileage.lapsRank)}`} label="All-time" />
             <Tile value={nf.format(mileage.sessions)} label="Sessions" />
+            <Tile value={pct(mileage.laps ? mileage.validLaps / mileage.laps : null, 0)} label="Valid" />
           </div>
-          <Fact label="All-time laps rank" value={`#${nf.format(mileage.lapsRank)}`} />
           {mileage.topTrack && (
             <Fact
               label="Most-driven track"
@@ -308,7 +378,6 @@ export function DriverStatsPanel({
           {mileage.cars.length === 0 && mileage.topCar && (
             <Fact label="Most-driven car" value={`${mileage.topCar}, ${nf.format(mileage.topCarLaps ?? 0)} laps`} />
           )}
-          {mileage.firstSeen && <Fact label="First seen on track" value={asOf(mileage.firstSeen)} />}
           {mileage.cars.length > 0 && <LapsByCar cars={mileage.cars} />}
         </Block>
       ),
@@ -317,6 +386,7 @@ export function DriverStatsPanel({
 
   if (placings.length > 0) {
     const shown = placings.slice(0, HOT_LAPS_SHOWN);
+    const more = placings.slice(HOT_LAPS_SHOWN, HOT_LAPS_MAX);
     blocks.push({
       key: 'placings',
       weight: 3 + shown.length * 1.2,
@@ -343,28 +413,27 @@ export function DriverStatsPanel({
           <table className="w-full text-left">
             <tbody>
               {shown.map((p) => (
-                <tr key={`${p.season}-${p.track}`} className="border-t border-line group">
-                  <td className={`py-2.5 font-display text-[18px] w-14 ${p.position <= 3 ? 'text-gold' : 'text-txt'}`}>
-                    P{p.position}
-                  </td>
-                  <td className="py-2.5 font-sans text-[14px] text-txt">
-                    <Link href={p.href} className="group-hover:text-gold underline-offset-4 group-hover:underline">
-                      {p.track}
-                    </Link>
-                    <span className="block font-mono text-[10px] tracking-[.1em] uppercase text-txt-3 mt-0.5">
-                      {p.season} / {p.car ?? p.carClass}
-                      {p.isWet ? ' / Wet' : ''} / {nf.format(p.boardSize)} drivers
-                    </span>
-                  </td>
-                  <td className="py-2.5 text-right font-mono text-[13px] text-txt-2 tabular-nums">
-                    <Link href={p.href} className="group-hover:text-gold">
-                      {msToLaptime(p.bestLapMs)}
-                    </Link>
-                  </td>
-                </tr>
+                <HotLapRow key={`${p.season}-${p.track}`} p={p} />
               ))}
             </tbody>
           </table>
+          {more.length > 0 && (
+            // Named group: the rows are `group`s too, and an unnamed one here
+            // would light up every row's hover style at once.
+            <details className="group/more">
+              <summary className="cursor-pointer list-none font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 hover:text-gold pt-3">
+                <span className="group-open/more:hidden">▸ Show {more.length} more</span>
+                <span className="hidden group-open/more:inline">▾ Show fewer</span>
+              </summary>
+              <table className="w-full text-left">
+                <tbody>
+                  {more.map((p) => (
+                    <HotLapRow key={`${p.season}-${p.track}`} p={p} />
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          )}
         </Block>
       ),
     });
