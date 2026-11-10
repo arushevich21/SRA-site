@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict o1JaFoD2f6Nk6m1XysMcmMqL88kZsKxudZoJ1nb23sH4Q7YvRe2UbbLqzeM0dhe
+\restrict dZAj9r3CrZORuSC4fgcRjTxE3gZJIbf3ax1hjRP5zxKMFoRFOJfv3yEJkA3MmMK
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -121,6 +121,55 @@ begin
     where excluded.last_seen_at > n.last_seen_at;
 
   return inserted;
+end;
+$$;
+
+
+--
+-- Name: acc_qualifying_backfill_targets(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.acc_qualifying_backfill_targets() RETURNS TABLE(file_key text)
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  select distinct g.q_file_key
+  from public.gt3_race_qualifying g
+  where g.q_file_key like 'accsm%'
+    and not exists (select 1 from public.acc_qualifying_results r where r.file_id = g.q_file_id)
+  order by 1;
+$$;
+
+
+--
+-- Name: acc_qualifying_ingest(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.acc_qualifying_ingest(p_files jsonb) RETURNS integer
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+declare
+  f        jsonb;
+  v_id     bigint;
+  v_rows   integer;
+  written  integer := 0;
+begin
+  for f in select * from jsonb_array_elements(p_files) loop
+    select id into v_id from public.acc_lap_ledger_files where file_key = f->>'file_key';
+    continue when v_id is null;
+
+    insert into public.acc_qualifying_results (file_id, position, steam_id, best_lap_ms)
+    select v_id, x.position, x.steam_id, x.best_lap_ms
+    from jsonb_to_recordset(coalesce(f->'results', '[]'::jsonb))
+           as x (position integer, steam_id text, best_lap_ms integer)
+    where x.steam_id is not null and x.steam_id <> ''
+    on conflict (file_id, position) do nothing;
+
+    get diagnostics v_rows = row_count;
+    if v_rows > 0 then written := written + 1; end if;
+  end loop;
+  return written;
 end;
 $$;
 
@@ -605,6 +654,10 @@ begin
   refresh materialized view concurrently public.driver_lap_totals;
   refresh materialized view concurrently public.driver_race_stats;
   refresh materialized view concurrently public.race_participation;
+  refresh materialized view concurrently public.site_track_laps;
+  refresh materialized view concurrently public.site_car_laps;
+  refresh materialized view concurrently public.driver_car_laps;
+  refresh materialized view concurrently public.driver_pole_stats;
 end;
 $$;
 
@@ -1755,6 +1808,20 @@ CREATE TABLE public.acc_processed_sessions (
 
 
 --
+-- Name: acc_qualifying_results; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.acc_qualifying_results (
+    file_id bigint NOT NULL,
+    "position" integer NOT NULL,
+    steam_id text NOT NULL,
+    best_lap_ms integer,
+    CONSTRAINT acc_qualifying_results_best_lap_ms_check CHECK (((best_lap_ms IS NULL) OR (best_lap_ms > 0))),
+    CONSTRAINT acc_qualifying_results_position_check CHECK (("position" > 0))
+);
+
+
+--
 -- Name: acc_race_sessions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1809,7 +1876,9 @@ CREATE TABLE public.acc_tracks (
     display_name text NOT NULL,
     splash_art_url text,
     country text,
-    location text
+    location text,
+    length_m integer,
+    CONSTRAINT acc_tracks_length_m_check CHECK (((length_m IS NULL) OR (length_m > 0)))
 );
 
 
@@ -2357,6 +2426,25 @@ CREATE TABLE public.divisions (
 
 
 --
+-- Name: driver_car_laps; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.driver_car_laps AS
+ SELECT l.steam_id,
+    l.car_model_id,
+    sum(l.laps) AS laps,
+    sum(l.valid_laps) AS valid_laps,
+    count(DISTINCT l.file_id) AS sessions,
+    max(f.session_at) AS last_driven,
+    now() AS computed_at
+   FROM (public.acc_lap_ledger l
+     JOIN public.acc_lap_ledger_files f ON ((f.id = l.file_id)))
+  GROUP BY l.steam_id, l.car_model_id
+ HAVING (sum(l.laps) > 0)
+  WITH NO DATA;
+
+
+--
 -- Name: driver_lap_totals; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
@@ -2446,6 +2534,113 @@ COMMENT ON COLUMN public.srating_history.consistency IS 'Steadiness beyond pace,
 --
 
 COMMENT ON COLUMN public.srating_history.os_pct IS 'Head-to-head (OpenSkill mu -- what the composite uses, not the ordinal in `openskill`) as-of that week, pool percentile 0-1, higher = better.';
+
+
+--
+-- Name: race_participation; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.race_participation AS
+ WITH h AS (
+         SELECT srating_history.id,
+            srating_history.player_id,
+            srating_history.series,
+            srating_history.season,
+            srating_history.event,
+            srating_history.event_date,
+            srating_history.laps
+           FROM public.srating_history
+          WHERE ((srating_history.finish_position IS NOT NULL) AND (srating_history.laps IS NOT NULL))
+        ), cand AS (
+         SELECT h.id AS srating_id,
+            h.player_id,
+            h.series,
+            h.season,
+            h.event,
+            f.id AS file_id,
+            abs((l.laps - h.laps)) AS lap_diff,
+            abs(EXTRACT(epoch FROM (f.session_at - (h.event_date)::timestamp with time zone))) AS secs_off
+           FROM ((h
+             JOIN public.acc_lap_ledger l ON ((l.steam_id = h.player_id)))
+             JOIN public.acc_lap_ledger_files f ON (((f.id = l.file_id) AND (f.session_type ~~ 'R%'::text) AND (f.session_at >= (h.event_date - '1 day'::interval)) AND (f.session_at < (h.event_date + '7 days'::interval)))))
+        ), nearest AS (
+         SELECT x.srating_id,
+            x.player_id,
+            x.series,
+            x.season,
+            x.event,
+            x.file_id,
+            x.lap_diff,
+            x.secs_off,
+            x.min_off
+           FROM ( SELECT c.srating_id,
+                    c.player_id,
+                    c.series,
+                    c.season,
+                    c.event,
+                    c.file_id,
+                    c.lap_diff,
+                    c.secs_off,
+                    min(c.secs_off) OVER (PARTITION BY c.player_id, c.file_id) AS min_off
+                   FROM cand c) x
+          WHERE (x.secs_off = x.min_off)
+        ), best AS (
+         SELECT DISTINCT ON (nearest.srating_id) nearest.srating_id,
+            nearest.player_id,
+            nearest.series,
+            nearest.season,
+            nearest.event,
+            nearest.file_id,
+            nearest.lap_diff,
+            nearest.secs_off,
+            nearest.min_off,
+            count(*) OVER (PARTITION BY nearest.srating_id, nearest.lap_diff) AS ties
+           FROM nearest
+          ORDER BY nearest.srating_id, nearest.lap_diff, nearest.secs_off
+        )
+ SELECT srating_id,
+    player_id,
+    series,
+    season,
+    event,
+    file_id
+   FROM best
+  WHERE ((lap_diff <= 1) AND (ties = 1))
+  WITH NO DATA;
+
+
+--
+-- Name: gt3_race_qualifying; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.gt3_race_qualifying WITH (security_invoker='true') AS
+ SELECT rf.id AS race_file_id,
+    q.id AS q_file_id,
+    q.file_key AS q_file_key
+   FROM ((( SELECT DISTINCT race_participation.file_id
+           FROM public.race_participation
+          WHERE (race_participation.series = 'GT3'::text)) r
+     JOIN public.acc_lap_ledger_files rf ON ((rf.id = r.file_id)))
+     CROSS JOIN LATERAL ( SELECT q_1.id,
+            q_1.file_key
+           FROM public.acc_lap_ledger_files q_1
+          WHERE ((q_1.session_type ~~ 'Q%'::text) AND (q_1.laps > 0) AND (q_1.session_at >= (rf.session_at - '01:30:00'::interval)) AND (q_1.session_at < rf.session_at) AND (split_part(q_1.file_key, '/'::text, 1) = split_part(rf.file_key, '/'::text, 1)))
+          ORDER BY q_1.session_at DESC
+         LIMIT 1) q);
+
+
+--
+-- Name: driver_pole_stats; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.driver_pole_stats AS
+ SELECT r.steam_id AS player_id,
+    count(*) AS poles,
+    now() AS computed_at
+   FROM (public.gt3_race_qualifying g
+     JOIN public.acc_qualifying_results r ON (((r.file_id = g.q_file_id) AND (r."position" = 1) AND (r.best_lap_ms IS NOT NULL))))
+  GROUP BY r.steam_id
+  WITH NO DATA;
 
 
 --
@@ -2567,79 +2762,6 @@ CREATE TABLE public.orientation (
 
 
 --
--- Name: race_participation; Type: MATERIALIZED VIEW; Schema: public; Owner: -
---
-
-CREATE MATERIALIZED VIEW public.race_participation AS
- WITH h AS (
-         SELECT srating_history.id,
-            srating_history.player_id,
-            srating_history.series,
-            srating_history.season,
-            srating_history.event,
-            srating_history.event_date,
-            srating_history.laps
-           FROM public.srating_history
-          WHERE ((srating_history.finish_position IS NOT NULL) AND (srating_history.laps IS NOT NULL))
-        ), cand AS (
-         SELECT h.id AS srating_id,
-            h.player_id,
-            h.series,
-            h.season,
-            h.event,
-            f.id AS file_id,
-            abs((l.laps - h.laps)) AS lap_diff,
-            abs(EXTRACT(epoch FROM (f.session_at - (h.event_date)::timestamp with time zone))) AS secs_off
-           FROM ((h
-             JOIN public.acc_lap_ledger l ON ((l.steam_id = h.player_id)))
-             JOIN public.acc_lap_ledger_files f ON (((f.id = l.file_id) AND (f.session_type ~~ 'R%'::text) AND (f.session_at >= (h.event_date - '1 day'::interval)) AND (f.session_at < (h.event_date + '7 days'::interval)))))
-        ), nearest AS (
-         SELECT x.srating_id,
-            x.player_id,
-            x.series,
-            x.season,
-            x.event,
-            x.file_id,
-            x.lap_diff,
-            x.secs_off,
-            x.min_off
-           FROM ( SELECT c.srating_id,
-                    c.player_id,
-                    c.series,
-                    c.season,
-                    c.event,
-                    c.file_id,
-                    c.lap_diff,
-                    c.secs_off,
-                    min(c.secs_off) OVER (PARTITION BY c.player_id, c.file_id) AS min_off
-                   FROM cand c) x
-          WHERE (x.secs_off = x.min_off)
-        ), best AS (
-         SELECT DISTINCT ON (nearest.srating_id) nearest.srating_id,
-            nearest.player_id,
-            nearest.series,
-            nearest.season,
-            nearest.event,
-            nearest.file_id,
-            nearest.lap_diff,
-            nearest.secs_off,
-            nearest.min_off,
-            count(*) OVER (PARTITION BY nearest.srating_id, nearest.lap_diff) AS ties
-           FROM nearest
-          ORDER BY nearest.srating_id, nearest.lap_diff, nearest.secs_off
-        )
- SELECT srating_id,
-    player_id,
-    series,
-    season,
-    event,
-    file_id
-   FROM best
-  WHERE ((lap_diff <= 1) AND (ties = 1))
-  WITH NO DATA;
-
-
---
 -- Name: ref_times; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2695,18 +2817,55 @@ CREATE TABLE public.settings (
 
 
 --
+-- Name: site_car_laps; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.site_car_laps AS
+ SELECT car_model_id,
+    sum(laps) AS laps,
+    count(DISTINCT steam_id) AS drivers,
+    now() AS computed_at
+   FROM public.acc_lap_ledger
+  GROUP BY car_model_id
+ HAVING (sum(laps) > 0)
+  WITH NO DATA;
+
+
+--
+-- Name: site_track_laps; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.site_track_laps AS
+ SELECT track_key,
+    sum(laps) AS laps,
+    count(*) FILTER (WHERE (laps > 0)) AS sessions,
+    ( SELECT count(DISTINCT l.steam_id) AS count
+           FROM (public.acc_lap_ledger l
+             JOIN public.acc_lap_ledger_files f2 ON ((f2.id = l.file_id)))
+          WHERE (f2.track_key = f.track_key)) AS drivers,
+    now() AS computed_at
+   FROM public.acc_lap_ledger_files f
+  GROUP BY track_key
+ HAVING (sum(laps) > 0)
+  WITH NO DATA;
+
+
+--
 -- Name: sra_stats_global; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
 CREATE MATERIALIZED VIEW public.sra_stats_global AS
  SELECT 1 AS id,
-    count(*) FILTER (WHERE (laps > 0)) AS sessions,
-    COALESCE(sum(laps), (0)::bigint) AS laps,
+    count(*) FILTER (WHERE (f.laps > 0)) AS sessions,
+    COALESCE(sum(f.laps), (0)::bigint) AS laps,
     ( SELECT count(DISTINCT acc_lap_ledger.steam_id) AS count
            FROM public.acc_lap_ledger) AS drivers,
-    min(session_at) FILTER (WHERE (laps > 0)) AS first_session_at,
+    (COALESCE(round((sum(((f.laps)::numeric * (t.length_m)::numeric)) / (1000)::numeric)), (0)::numeric))::bigint AS km,
+    COALESCE(sum(f.laps) FILTER (WHERE (t.length_m IS NULL)), (0)::bigint) AS laps_without_length,
+    min(f.session_at) FILTER (WHERE (f.laps > 0)) AS first_session_at,
     now() AS computed_at
-   FROM public.acc_lap_ledger_files f
+   FROM (public.acc_lap_ledger_files f
+     LEFT JOIN public.acc_tracks t ON ((t.track_key = f.track_key)))
   WITH NO DATA;
 
 
@@ -3383,6 +3542,14 @@ ALTER TABLE ONLY public.acc_processed_sessions
 
 
 --
+-- Name: acc_qualifying_results acc_qualifying_results_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.acc_qualifying_results
+    ADD CONSTRAINT acc_qualifying_results_pkey PRIMARY KEY (file_id, "position");
+
+
+--
 -- Name: acc_race_sessions acc_race_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3972,6 +4139,13 @@ CREATE INDEX acc_hotstint_track_car_rank_idx ON public.acc_hotstint_leaderboard 
 
 
 --
+-- Name: acc_lap_ledger_files_session_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX acc_lap_ledger_files_session_at_idx ON public.acc_lap_ledger_files USING btree (session_at);
+
+
+--
 -- Name: acc_processed_sessions_url_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4056,6 +4230,13 @@ CREATE INDEX classification_season_idx ON public.classification USING btree (ser
 
 
 --
+-- Name: driver_car_laps_pk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX driver_car_laps_pk_idx ON public.driver_car_laps USING btree (steam_id, car_model_id);
+
+
+--
 -- Name: driver_lap_totals_rank_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4067,6 +4248,13 @@ CREATE INDEX driver_lap_totals_rank_idx ON public.driver_lap_totals USING btree 
 --
 
 CREATE UNIQUE INDEX driver_lap_totals_steam_id_idx ON public.driver_lap_totals USING btree (steam_id);
+
+
+--
+-- Name: driver_pole_stats_pk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX driver_pole_stats_pk_idx ON public.driver_pole_stats USING btree (player_id);
 
 
 --
@@ -4158,6 +4346,20 @@ CREATE INDEX registrations_champ_season_status_idx ON public.registrations USING
 --
 
 CREATE INDEX registrations_waitlist_order_idx ON public.registrations USING btree (championship_key, season, waitlist_position) WHERE (status = 'waitlisted'::text);
+
+
+--
+-- Name: site_car_laps_pk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX site_car_laps_pk_idx ON public.site_car_laps USING btree (car_model_id);
+
+
+--
+-- Name: site_track_laps_pk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX site_track_laps_pk_idx ON public.site_track_laps USING btree (track_key);
 
 
 --
@@ -4540,6 +4742,14 @@ ALTER TABLE ONLY public.acc_hotstint_leaderboard
 
 ALTER TABLE ONLY public.acc_lap_ledger
     ADD CONSTRAINT acc_lap_ledger_file_id_fkey FOREIGN KEY (file_id) REFERENCES public.acc_lap_ledger_files(id) ON DELETE CASCADE;
+
+
+--
+-- Name: acc_qualifying_results acc_qualifying_results_file_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.acc_qualifying_results
+    ADD CONSTRAINT acc_qualifying_results_file_id_fkey FOREIGN KEY (file_id) REFERENCES public.acc_lap_ledger_files(id) ON DELETE CASCADE;
 
 
 --
@@ -5068,6 +5278,12 @@ ALTER TABLE public.acc_lap_ledger_files ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.acc_processed_sessions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: acc_qualifying_results; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.acc_qualifying_results ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: acc_race_sessions; Type: ROW SECURITY; Schema: public; Owner: -
@@ -5768,5 +5984,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict o1JaFoD2f6Nk6m1XysMcmMqL88kZsKxudZoJ1nb23sH4Q7YvRe2UbbLqzeM0dhe
+\unrestrict dZAj9r3CrZORuSC4fgcRjTxE3gZJIbf3ax1hjRP5zxKMFoRFOJfv3yEJkA3MmMK
 
