@@ -40,25 +40,29 @@ type NavItem =
   // cumulative calendar while the dropdown still lists each championship.
   | { label: string; href: string; drop: NavDrop[]; clickParent?: boolean };
 
+// Shared by the main nav and every sim's nav, so About is reachable from
+// anywhere on the site rather than only from the home page.
+const ABOUT_NAV: NavItem = {
+  label: 'About',
+  href: '/about',
+  drop: [
+    { label: 'League Info', href: '/about/league-info' },
+    { label: 'Rules & Regs', href: '/about/rules' },
+    { label: 'Reference Lap Times', href: '/about/reference-lap-times' },
+    { label: 'Custom BoP', href: '/about/custom-bop' },
+    { label: 'SRAting', href: '/acc/srating' },
+    { label: 'Drivers & Stats', href: '/about/drivers' },
+    { label: 'Statistics', href: '/about/stats' },
+    { label: 'Accolades', href: '/about/accolades' },
+    { label: 'Partners', href: '/about/partners' },
+    { label: 'Support SRA', href: '/about/sponsor' },
+    { label: 'Server Info', href: '/about/servers' },
+    { label: 'Discord', href: '/about/discord' },
+  ],
+};
+
 const MAIN_NAV: NavItem[] = [
-  {
-    label: 'About',
-    href: '/about',
-    drop: [
-      { label: 'League Info', href: '/about/league-info' },
-      { label: 'Rules & Regs', href: '/about/rules' },
-      { label: 'Reference Lap Times', href: '/about/reference-lap-times' },
-      { label: 'Custom BoP', href: '/about/custom-bop' },
-      { label: 'SRAting', href: '/acc/srating' },
-      { label: 'Drivers & Stats', href: '/about/drivers' },
-      { label: 'Statistics', href: '/about/stats' },
-      { label: 'Accolades', href: '/about/accolades' },
-      { label: 'Partners', href: '/about/partners' },
-      { label: 'Support SRA', href: '/about/sponsor' },
-      { label: 'Server Info', href: '/about/servers' },
-      { label: 'Discord', href: '/about/discord' },
-    ],
-  },
+  ABOUT_NAV,
   { label: 'Calendar', href: '/calendar' },
   { label: 'Store', href: 'https://exclaim.gg/store/simracingalliance' },
 ];
@@ -183,6 +187,9 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
     // Calendar keeps its per-championship dropdown but drops the "All" head —
     // clicking the "Calendar" word itself goes to the cumulative sim calendar.
     tabNavItem(sim, 'Calendar', 'calendar', calendarChamps, false, true),
+    // One place for every result: championship rounds by division, practice
+    // races, and other server races. See [sim]/results/page.tsx.
+    { label: 'Results', href: `/${sim.slug}/results` },
     // Register always shows. With open championships it's a dropdown of them;
     // with none open it's a plain link to /[sim]/register, which renders the
     // "coming soon — watch Discord" state. alwaysDropdown keeps the dropdown
@@ -192,6 +199,7 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
     tabNavItem(sim, 'Register', 'register', registerChamps, false, false, true),
     leaderboardItem,
     tabNavItem(sim, 'Standings', 'standings', standingsChamps, true, false, true),
+    ABOUT_NAV,
   ];
 }
 
@@ -204,8 +212,12 @@ function useSimContext(): { sim: SimConfig | null; subPath: string } {
   return { sim, subPath };
 }
 
+// Tight spacing: a sim's row (Home, sim switcher, seven tabs, account) must
+// fit the header's 1280px max width at every viewport — the container never
+// grows past that, and the fixed header can't scroll to whatever falls off
+// the right edge (see the xl note below).
 const LINK_CLS =
-  'text-[12.5px] font-semibold tracking-[.13em] uppercase text-txt px-[13px] py-[10px] hover:text-gold-soft transition-colors whitespace-nowrap';
+  'text-[12.5px] font-semibold tracking-[.08em] uppercase text-txt px-[8px] py-[10px] hover:text-gold-soft transition-colors whitespace-nowrap';
 
 // ── Hamburger / Close icon ──────────────────────────────────────────────────
 function HamburgerIcon({ open }: { open: boolean }) {
@@ -389,7 +401,7 @@ export default function NavBar({
               <>
                 <Link
                   href="/"
-                  className="text-[12.5px] font-bold tracking-[.13em] uppercase px-[13px] py-[10px] transition-colors whitespace-nowrap"
+                  className="text-[12.5px] font-bold tracking-[.08em] uppercase px-[8px] py-[10px] transition-colors whitespace-nowrap"
                   style={{ color: '#e6b53d' }}
                 >
                   Home
@@ -476,6 +488,7 @@ export default function NavBar({
                 <div className="nav-has relative">
                   <Link
                     href={`/drivers/${user.id}`}
+                    aria-label={user.display_name ?? 'Account'}
                     className="flex items-center gap-3 py-[10px] text-[12.5px] font-semibold tracking-[.1em] uppercase text-txt hover:text-gold-soft transition-colors whitespace-nowrap"
                   >
                     {user.avatar_url && (
@@ -487,7 +500,13 @@ export default function NavBar({
                         className="rounded-full shrink-0"
                       />
                     )}
-                    {user.display_name ?? 'Account'}
+                    {/* Avatar alone on sim pages when there is one — that
+                        row is the widest on the site and the name is its
+                        widest item. Still the link's accessible name via
+                        aria-label, and listed in the dropdown's My Stats. */}
+                    <span className={sim && user.avatar_url ? 'hidden' : undefined}>
+                      {user.display_name ?? 'Account'}
+                    </span>
                     <span className="text-[8px] opacity-50">▾</span>
                   </Link>
                   <div className="nav-drop nav-drop--end">

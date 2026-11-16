@@ -3,6 +3,7 @@ import { msToLaptime, mapSessionType } from '@sra/domain';
 import type { AccSessionResult, AccSessionType } from '@sra/shared-types';
 import { supabase } from '../supabase';
 import { ingestAccRaceSessionInto } from './ingest-session';
+import { accsmResultPageUrl } from './accsm-links';
 
 const SESSION_ORDER: Record<AccSessionType, number> = { Practice: 0, Qualify: 1, Race: 2 };
 
@@ -44,15 +45,33 @@ type RaceSessionRow = {
 // table in sync, and fine at the data volumes a league's race archive
 // actually produces; revisit with a SQL view if this ever needs to paginate
 // server-side.
-async function fetchAccRaceEvents(): Promise<AccRaceEventSummary[]> {
-  const { data, error } = await supabase
-    .from('acc_race_sessions')
-    .select('event_key, track_key, server_name, session_date, session_type, championship_id, season_id')
-    .order('session_date', { ascending: false });
-  if (error) throw error;
+// PostgREST caps every response at 1000 rows, and an un-ranged select doesn't
+// error past that, it just stops. With free-practice servers logging a session
+// every hour or two, the newest 1000 rows reached back only about a month
+// (2,255 rows on 2026-11-16), so older championship rounds quietly lost their
+// result links. Page through the whole table. session_key is the PK, which
+// keeps the order stable across pages.
+const PAGE_SIZE = 1000;
 
+async function fetchAllRaceSessionRows(): Promise<RaceSessionRow[]> {
+  const rows: RaceSessionRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('acc_race_sessions')
+      .select('event_key, track_key, server_name, session_date, session_type, championship_id, season_id')
+      .order('session_date', { ascending: false })
+      .order('session_key', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as RaceSessionRow[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) return rows;
+  }
+}
+
+async function fetchAccRaceEvents(): Promise<AccRaceEventSummary[]> {
   const byEvent = new Map<string, AccRaceEventSummary>();
-  for (const row of (data ?? []) as RaceSessionRow[]) {
+  for (const row of await fetchAllRaceSessionRows()) {
     // Normalizes historical rows written before mapSessionType learned to
     // collapse sprint-weekend R1/R2/... codes to 'Race' — those rows still
     // have the raw code stored verbatim in session_type.
@@ -93,6 +112,7 @@ export function getAccRaceEvents(): Promise<AccRaceEventSummary[]> {
 }
 
 type FullRaceSessionRow = RaceSessionRow & {
+  session_key: string;
   session_file: string | null;
   meta_data: string | null;
   is_wet_session: boolean;
@@ -100,16 +120,38 @@ type FullRaceSessionRow = RaceSessionRow & {
   results: AccSessionResult['results'];
 };
 
+export type AccRaceEventDetail = {
+  sessions: AccSessionResult[];
+  // The same session on ACCSM, keyed by sessionFile (ResultsTabs' tab key).
+  // A session with no link (manual upload, no SRAM tag) is simply absent.
+  accsmLinks: Record<string, string>;
+};
+
 export async function getAccRaceEventSessions(eventKey: string): Promise<AccSessionResult[]> {
+  return (await getAccRaceEvent(eventKey)).sessions;
+}
+
+export async function getAccRaceEvent(eventKey: string): Promise<AccRaceEventDetail> {
   const { data, error } = await supabase
     .from('acc_race_sessions')
     .select(
-      'session_type, track_key, server_name, session_date, session_file, meta_data, championship_id, season_id, is_wet_session, best_lap_ms, results',
+      'session_key, session_type, track_key, server_name, session_date, session_file, meta_data, championship_id, season_id, is_wet_session, best_lap_ms, results',
     )
     .eq('event_key', eventKey);
   if (error) throw error;
 
-  const sessions: AccSessionResult[] = ((data ?? []) as FullRaceSessionRow[]).map((row) => ({
+  const rows = (data ?? []) as FullRaceSessionRow[];
+  const accsmLinks: Record<string, string> = {};
+  for (const row of rows) {
+    const url = accsmResultPageUrl({
+      sessionKey: row.session_key,
+      sessionFile: row.session_file,
+      serverName: row.server_name,
+    });
+    if (url && row.session_file) accsmLinks[row.session_file] = url;
+  }
+
+  const sessions: AccSessionResult[] = rows.map((row) => ({
     // See getAccRaceEvents's byEvent loop — same normalization for historical
     // R1/R2 rows.
     sessionType: mapSessionType(row.session_type),
@@ -131,11 +173,12 @@ export async function getAccRaceEventSessions(eventKey: string): Promise<AccSess
   // same type (e.g. LIAW's Race 1/Race 2 format), and Supabase doesn't
   // guarantee row order without an explicit .order() — without this, which
   // race renders as "Race 1" vs "Race 2" in ResultsTabs would be arbitrary.
-  return sessions.sort((a, b) => {
+  sessions.sort((a, b) => {
     const byType = SESSION_ORDER[a.sessionType] - SESSION_ORDER[b.sessionType];
     if (byType !== 0) return byType;
     return (a.date ?? '').localeCompare(b.date ?? '');
   });
+  return { sessions, accsmLinks };
 }
 
 // Loose comparison between a round's authored display name (round.track,

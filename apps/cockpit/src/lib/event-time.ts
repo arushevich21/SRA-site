@@ -20,6 +20,16 @@ export function eventInstant(iso: string): number {
   return fromZonedTime(iso, EVENT_SOURCE_TIMEZONE).getTime();
 }
 
+// The authored wall-clock read as if it were UTC — NOT a real instant. Only
+// for comparing against ACCSM session dates (acc_race_sessions.session_date),
+// which carry the server's Eastern wall-clock time with a "Z" stuck on (the
+// file 261109_221219_R is dated 2026-11-09T22:12:19Z). Comparing those to
+// eventInstant() is off by the EDT/EST offset, a gap that grows by an hour
+// when DST ends. Read both sides as wall-clock and the offset cancels out.
+export function eventWallClockMs(iso: string): number {
+  return Date.parse(hasEventTime(iso) ? `${iso}Z` : `${iso}T00:00:00Z`);
+}
+
 const DATE_FORMAT: Intl.DateTimeFormatOptions = {
   weekday: 'short',
   month: 'short',

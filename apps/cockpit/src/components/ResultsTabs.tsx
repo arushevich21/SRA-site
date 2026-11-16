@@ -73,14 +73,19 @@ function buildTabs(sessions: AccSessionResult[]): ResultsTab[] {
 export function ResultsTabs({
   sessions,
   driverInfo,
+  accsmLinks = {},
 }: {
   sessions: AccSessionResult[];
   driverInfo: Record<string, DriverInfo>;
+  // The same session on ACCSM, keyed by sessionFile — see getAccRaceEvent.
+  // Follows the selected tab, so "View on ACCSM" always opens what's shown.
+  accsmLinks?: Record<string, string>;
 }) {
   const tabs = buildTabs(sessions);
   const [activeKey, setActiveKey] = useState<string | null>(tabs[0]?.key ?? null);
 
   const active = tabs.find((t) => t.key === activeKey) ?? tabs[0];
+  const accsmUrl = active?.session.sessionFile ? accsmLinks[active.session.sessionFile] : undefined;
 
   if (!active) {
     return (
@@ -92,7 +97,7 @@ export function ResultsTabs({
 
   return (
     <div>
-      <div className="flex gap-1 border-b border-line mb-4 flex-wrap">
+      <div className="flex items-end gap-1 border-b border-line mb-4 flex-wrap">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -106,6 +111,16 @@ export function ResultsTabs({
             {tab.label}
           </button>
         ))}
+        {accsmUrl && (
+          <a
+            href={accsmUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto font-mono text-[11px] tracking-[.2em] uppercase text-txt-3 hover:text-gold transition-colors px-2 py-2"
+          >
+            {TAB_LABEL[active.session.sessionType]} on ACCSM ↗
+          </a>
+        )}
       </div>
       <ResultsTable session={active.session} driverInfo={driverInfo} />
     </div>

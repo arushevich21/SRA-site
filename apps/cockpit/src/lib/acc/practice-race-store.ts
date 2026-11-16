@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { eventInstant } from '@/lib/event-time';
+import { eventWallClockMs } from '@/lib/event-time';
 import type { CalendarEventRow } from '@/lib/calendar-events-store';
 import { groupForServer, type PracticeRaceGroup } from './practice-race';
 
@@ -8,9 +8,12 @@ import { groupForServer, type PracticeRaceGroup } from './practice-race';
 // practice-race.ts.
 
 // How far either side of the calendar's 9 PM start a session may fall and
-// still be that night's practice race. Qualifying opens ~20 minutes before;
-// the race result lands ~1.5 hours after; anything the next day is not ours.
-const BEFORE_MS = 3 * 60 * 60 * 1000;
+// still be that night's practice race, in wall-clock terms (session dates are
+// stamped when the session ENDS). Practice/qualifying wrap up around and
+// after the start; the race result lands ~1.5 hours after. One hour back is
+// enough. Further back starts catching unrelated earlier sessions on the same
+// server, and the earliest match per grid wins.
+const BEFORE_MS = 1 * 60 * 60 * 1000;
 const AFTER_MS = 6 * 60 * 60 * 1000;
 
 // Only the practice-race servers — the free-practice servers running the same
@@ -31,7 +34,11 @@ type Row = { event_key: string; track_key: string; server_name: string | null; s
 export async function getPracticeRaceEvents(
   event: Pick<CalendarEventRow, 'eventDate'>,
 ): Promise<Map<PracticeRaceGroup['key'], PracticeRaceEvent>> {
-  const start = eventInstant(event.eventDate);
+  // Wall-clock on both sides — session_date is ACCSM's Eastern wall-clock
+  // stamped as UTC. Comparing it to the real instant missed every practice
+  // race after DST ended (the 9 PM start moved to 02:00Z, five hours past
+  // the 22:12Z-stamped result, outside BEFORE_MS). See eventWallClockMs.
+  const start = eventWallClockMs(event.eventDate);
   const { data, error } = await supabase
     .from('acc_race_sessions')
     .select('event_key, track_key, server_name, session_date')

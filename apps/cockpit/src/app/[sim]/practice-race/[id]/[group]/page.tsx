@@ -4,7 +4,7 @@ import { getSimBySlug } from '@/content/sims';
 import { DivisionBadge } from '@/components/DivisionBadge';
 import { ResultsTabs } from '@/components/ResultsTabs';
 import { getCalendarEventById } from '@/lib/calendar-events-store';
-import { getAccRaceEventSessions } from '@/lib/acc/race-results-store';
+import { getAccRaceEvent } from '@/lib/acc/race-results-store';
 import { getAccTrack } from '@/lib/acc/tracks';
 import { isPracticeRaceEvent, practiceRaceGroup } from '@/lib/acc/practice-race';
 import { getPracticeRaceEvents } from '@/lib/acc/practice-race-store';
@@ -31,7 +31,7 @@ export default async function PracticeRaceResultsPage({ params }: PageProps) {
   const race = (await getPracticeRaceEvents(event)).get(group.key);
   if (!race) notFound();
 
-  const sessions = await getAccRaceEventSessions(race.eventKey);
+  const { sessions, accsmLinks } = await getAccRaceEvent(race.eventKey);
   if (sessions.length === 0) notFound();
 
   const header = sessions.find((s) => s.sessionType === 'Race') ?? sessions[0];
@@ -77,7 +77,7 @@ export default async function PracticeRaceResultsPage({ params }: PageProps) {
         })}
       </p>
 
-      <ResultsTabs sessions={sessions} driverInfo={driverInfo} />
+      <ResultsTabs sessions={sessions} driverInfo={driverInfo} accsmLinks={accsmLinks} />
     </section>
   );
 }

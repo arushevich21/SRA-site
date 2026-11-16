@@ -3,6 +3,7 @@ import {
   EVENT_SOURCE_TIMEZONE,
   eventDateTimeParts,
   eventInstant,
+  eventWallClockMs,
   hasEventTime,
 } from './event-time.js';
 
@@ -77,5 +78,27 @@ describe('hasEventTime', () => {
   it('distinguishes datetime from date-only entries', () => {
     expect(hasEventTime('2026-07-06T21:00:00')).toBe(true);
     expect(hasEventTime('2026-08-01')).toBe(false);
+  });
+});
+
+describe('eventWallClockMs — same clock as ACCSM session dates', () => {
+  // ACCSM stamps sessions with the server's Eastern wall-clock time but a "Z"
+  // suffix: the Nov 9 practice race's file is 261109_221219_R and its date
+  // reads 2026-11-09T22:12:19Z, though it ended at 10:12 PM EST.
+  const raceEnd = Date.parse('2026-11-09T22:12:19Z');
+
+  it('lines an authored start up with that session on either side of DST', () => {
+    expect(raceEnd - eventWallClockMs('2026-11-09T21:00:00')).toBe((72 * 60 + 19) * 1000);
+    expect(Date.parse('2026-10-26T22:15:10Z') - eventWallClockMs('2026-10-26T21:00:00')).toBe((75 * 60 + 10) * 1000);
+  });
+
+  it('is what eventInstant gets wrong for this comparison after DST ends', () => {
+    // The true instant is 02:00Z, five hours "after" the mislabelled stamp's
+    // clock — which pushed the race outside a 3-hour lookback.
+    expect(eventInstant('2026-11-09T21:00:00') - raceEnd).toBeGreaterThan(3 * 60 * 60 * 1000);
+  });
+
+  it('treats a date-only entry as midnight', () => {
+    expect(eventWallClockMs('2026-11-09')).toBe(Date.UTC(2026, 10, 9));
   });
 });
