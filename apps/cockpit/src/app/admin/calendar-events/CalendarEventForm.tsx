@@ -84,11 +84,11 @@ export function CalendarEventForm({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <SelectField
-          label="Sim (optional — blank shows on the cumulative calendar only)"
+          label="Sim (optional — blank = league-wide, shows on every calendar)"
           value={f.game}
           onChange={(v) => set('game', v)}
           options={GAMES}
-          placeholder="— Cumulative only —"
+          placeholder="— League-wide —"
         />
         <label className={labelCls}>
           Type

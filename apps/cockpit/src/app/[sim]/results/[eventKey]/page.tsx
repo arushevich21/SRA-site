@@ -1,33 +1,16 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
-import { getAccRaceEventSessions } from '@/lib/acc/race-results-store';
+import { getAccRaceEvent } from '@/lib/acc/race-results-store';
 import { getAccTrack } from '@/lib/acc/tracks';
 import { ResultsTabs } from '@/components/ResultsTabs';
 import { getDriverInfoBySteamIds } from '@/lib/driver-lookup';
+import { cleanServerName } from '@/lib/acc/server-name';
 
 // Single event's sessions — bounded (one race's worth of results, not
 // unbounded per-track history). No documented reason for force-dynamic and
 // no dynamic API dependency; switched to ISR (2026-08-25) to cut Vercel usage.
 export const revalidate = 300;
-
-// ACCSM server names are "|"-delimited and mix boilerplate (server-manager
-// tag, the league's own site URL, hosting/room tags) in with the one or two
-// segments that actually distinguish this server (division/season/series) —
-// strip the boilerplate segments, keep the rest, case-insensitive since the
-// source data isn't consistently cased ("#SRAggTT", "cBOP").
-const SERVER_NAME_NOISE = ['sraggtt', 'sragg', 'simracingalliance.com', '#sram', 'cbop'];
-
-function cleanServerName(serverName: string | null): string | null {
-  if (!serverName) return null;
-  const kept = serverName
-    .split('|')
-    .map((part) => part.trim())
-    .filter(
-      (part) => part.length > 0 && !SERVER_NAME_NOISE.some((noise) => part.toLowerCase().includes(noise)),
-    );
-  return kept.length > 0 ? kept.join(' | ') : null;
-}
 
 type PageProps = {
   params: Promise<{ sim: string; eventKey: string }>;
@@ -44,7 +27,7 @@ export default async function SimResultsEventPage({ params }: PageProps) {
   // used when building the link on the list page) rather than pre-decoded by
   // Next.js, so it must be decoded before it'll match the raw event_key stored
   // in Supabase.
-  const sessions = await getAccRaceEventSessions(decodeURIComponent(eventKey));
+  const { sessions, accsmLinks } = await getAccRaceEvent(decodeURIComponent(eventKey));
   if (sessions.length === 0) notFound();
 
   // Any session carries the same track/server/metaData — prefer the Race
@@ -95,7 +78,7 @@ export default async function SimResultsEventPage({ params }: PageProps) {
         </p>
       )}
 
-      <ResultsTabs sessions={sessions} driverInfo={driverInfo} />
+      <ResultsTabs sessions={sessions} driverInfo={driverInfo} accsmLinks={accsmLinks} />
     </section>
   );
 }

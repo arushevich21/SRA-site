@@ -29,8 +29,8 @@ export default async function AdminCalendarEventsPage() {
 
       <p className="font-sans text-[13px] text-txt-3 -mt-6 mb-10 max-w-[600px]">
         Calendar entries not tied to a championship round — classification deadlines, reveal
-        streams, announcements. Shows on the cumulative calendar (/calendar), and on a sim's own
-        calendar too when a sim is set.
+        streams, announcements. With a sim set, it shows under that sim; left blank it&apos;s
+        league-wide and shows on every sim&apos;s calendar.
       </p>
 
       {events.length === 0 ? (

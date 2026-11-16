@@ -13,11 +13,12 @@ import { DivisionTabs } from '@/components/StandingsControls';
 import { AcEvoResultsTabs } from '@/components/AcEvoResultsTabs';
 import { ResultsTabs } from '@/components/ResultsTabs';
 import {
-  getAccRaceEventSessions,
+  getAccRaceEvent,
   matchAccRoundsToResultEvents,
   SPLIT_NIGHT_MATCH_WINDOW_MS,
 } from '@/lib/acc/race-results-store';
 import { getDriverInfoBySteamIds } from '@/lib/driver-lookup';
+import { eventInstant } from '@/lib/event-time';
 
 type PageProps = {
   params: Promise<{ sim: string; slug: string; round: string }>;
@@ -101,7 +102,19 @@ export default async function ChampionshipRoundResultsPage({ params, searchParam
           )
         ).get(round.round)
       : undefined;
-  const accSessions = accEventKey ? await getAccRaceEventSessions(accEventKey) : null;
+  const accEvent = accEventKey ? await getAccRaceEvent(accEventKey) : null;
+  const accSessions = accEvent?.sessions ?? null;
+
+  // Neighbouring rounds for the prev/next links. Only ones already raced —
+  // "next" pointing at a round that hasn't happened is a dead end.
+  const roundIndex = content.schedule.indexOf(round);
+  const prevRound = roundIndex > 0 ? content.schedule[roundIndex - 1] : null;
+  const candidateNext = content.schedule[roundIndex + 1] ?? null;
+  const nextDate = candidateNext ? roundStartsAtForDivision(candidateNext, activeDivision) : null;
+  const nextRound = candidateNext && nextDate && eventInstant(nextDate) <= Date.now() ? candidateNext : null;
+  const roundHref = (n: number) =>
+    `/${sim.slug}/championships/${slug}/results/${n}` +
+    (multiDivision && activeDivision != null ? `?division=${activeDivision}` : '');
 
   // The date shown under the title is THIS division's night. Reading
   // round.date directly would show D2/D4 the Tuesday they don't race on.
@@ -172,10 +185,35 @@ export default async function ChampionshipRoundResultsPage({ params, searchParam
       )}
 
       {accSessions ? (
-        <ResultsTabs sessions={accSessions} driverInfo={accDriverInfo} />
-      ) : (
-        <AcEvoResultsTabs trackKey={round.emperorRawTrackName!} />
-      )}
+        <ResultsTabs sessions={accSessions} driverInfo={accDriverInfo} accsmLinks={accEvent?.accsmLinks} />
+      ) : round.emperorRawTrackName ? (
+        <AcEvoResultsTabs trackKey={round.emperorRawTrackName} />
+      ) : null}
+
+      {/* Step through the season without bouncing back to a list. The
+          division carries over, so a D3 driver stays on D3. */}
+      <nav
+        aria-label="Rounds"
+        className="mt-12 pt-6 border-t border-line flex items-center justify-between gap-4 font-mono text-[11px] tracking-[.2em] uppercase"
+      >
+        {prevRound ? (
+          <Link href={roundHref(prevRound.round)} className="text-txt-3 hover:text-gold transition-colors">
+            ← R{prevRound.round} {prevRound.track}
+          </Link>
+        ) : (
+          <span />
+        )}
+        <Link href={`/${sim.slug}/results`} className="text-txt-3 hover:text-gold transition-colors">
+          All Results
+        </Link>
+        {nextRound ? (
+          <Link href={roundHref(nextRound.round)} className="text-txt-3 hover:text-gold transition-colors text-right">
+            R{nextRound.round} {nextRound.track} →
+          </Link>
+        ) : (
+          <span />
+        )}
+      </nav>
     </section>
   );
 }

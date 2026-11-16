@@ -3,8 +3,9 @@ import { supabase } from './supabase';
 
 // Admin-managed calendar entries not tied to a championship round — see
 // supabase/migrations/20260827_calendar_events.sql. `game` null means
-// cumulative-calendar-only; set to a sims.ts `game` string (e.g. 'ACC') to
-// also show on that sim's own calendar page.
+// league-wide: shows on /calendar and on every sim's calendar. Set to a
+// sims.ts `game` string (e.g. 'ACC') to show only under that sim. See
+// components/RaceCalendar.tsx.
 export type CalendarEventRow = {
   id: string;
   slug: string | null;
