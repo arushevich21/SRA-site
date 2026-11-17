@@ -11,7 +11,7 @@ import { stripSteamIdPrefix, type DriverInfo } from '@/lib/driver-lookup';
 import { bareDriverName } from '@/lib/driver-display-name';
 import { resolveCarLogo } from '@/lib/acc/manufacturer-logo';
 import { CarLogo } from './CarLogo';
-import { RoundHeaders, PODIUM_CLASS } from './RoundCells';
+import { RoundHeaders, PODIUM_CLASS, ROUND_CELL_CLS } from './RoundCells';
 
 // Emperor's own `position` field can repeat across a full points tie (see
 // e.g. a 4-way tie all shown as position 8) rather than resolving it — reuse
@@ -74,10 +74,10 @@ export function EmperorStandingsTable({
                   <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3">
                     Driver
                   </th>
-                  <th className="font-sans text-[15px] text-txt-3 py-2 pr-3 hidden lg:table-cell">
+                  <th className="font-sans text-[15px] text-txt-3 py-2 pr-3 hidden lg:table-cell w-full">
                     Car
                   </th>
-                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-5 w-20 text-right">
+                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-3 pr-2 text-right">
                     Pts
                   </th>
                   {hasRounds && (
@@ -85,7 +85,7 @@ export function EmperorStandingsTable({
                       <RoundHeaders rounds={rounds!} />
                       <th
                         title="Fastest laps"
-                        className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 py-2 pl-5 w-14 text-right hidden sm:table-cell"
+                        className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-3 py-2 pl-2 text-right hidden md:table-cell"
                       >
                         FL
                       </th>
@@ -105,7 +105,7 @@ export function EmperorStandingsTable({
                       >
                         {entry.position}
                       </td>
-                      <td className="font-display font-bold text-[16px] uppercase text-txt py-2 pr-3 truncate max-w-[220px]">
+                      <td className="font-display font-bold text-[16px] uppercase text-txt py-2 pr-3 whitespace-nowrap">
                         <span className="inline-flex items-center gap-2">
                           {info && (
                             <DriverTierBadge isSralien={info.isSralien} division={info.division} tier={info.tier} />
@@ -117,7 +117,7 @@ export function EmperorStandingsTable({
                           {bareDriverName(entry.driverName)}
                         </span>
                       </td>
-                      <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 max-w-[240px] hidden lg:table-cell">
+                      <td className="font-sans text-[15px] text-txt-3 py-2 pr-3 max-w-0 min-w-[44px] hidden lg:table-cell" title={entry.carModel ?? undefined}>
                         {/* Emperor gives the car as a NAME; accCarModelIdFromName
                             gets the id back so the logo resolves the same way
                             the register page's entry list does. Unknown name =>
@@ -132,7 +132,7 @@ export function EmperorStandingsTable({
                         </span>
                       </td>
                       <td
-                        className="font-mono text-[15px] py-2 pl-5 text-right"
+                        className="font-mono text-[15px] py-2 pl-3 pr-2 text-right"
                         style={{ color: 'var(--sim-accent)' }}
                       >
                         {entry.points}
@@ -142,14 +142,14 @@ export function EmperorStandingsTable({
                           {driverRounds.cells.map((cell, i) => (
                             <td
                               key={rounds![i].eventId}
-                              className="font-mono text-[15px] py-2 pl-5 text-center hidden sm:table-cell"
+                              className={`font-mono text-[15px] py-2 ${ROUND_CELL_CLS}`}
                             >
                               <DriverRoundCellView cell={cell} />
                             </td>
                           ))}
                           <td
                             className={[
-                              'font-mono text-[15px] py-2 pl-5 text-right hidden sm:table-cell',
+                              'font-mono text-[15px] py-2 pl-2 text-right hidden md:table-cell',
                               driverRounds.fastestLaps > 0 ? 'text-purple' : 'text-txt-3/35',
                             ].join(' ')}
                           >
@@ -189,7 +189,7 @@ function DriverRoundCellView({ cell }: { cell: DriverRoundCell }) {
     >
       {cell.points ?? '—'}
       {podium && !cell.dropped && (
-        <sup className="text-[9px] tracking-[.05em] opacity-85">P{cell.finish}</sup>
+        <sup className="hidden xl:inline text-[9px] tracking-[.05em] opacity-85">P{cell.finish}</sup>
       )}
       {cell.fastestLap && (
         <i

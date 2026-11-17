@@ -1,6 +1,6 @@
 import { accCarModelIdFromName, buildTeamRounds, type RoundEvent, type TeamRoundCell } from '@sra/domain';
 import type { EmperorDriverStanding, EmperorTeamStanding } from '@sra/shared-types';
-import { RoundHeaders, PODIUM_CLASS } from './RoundCells';
+import { RoundHeaders, PODIUM_CLASS, ROUND_CELL_CLS } from './RoundCells';
 import { bareDriverName } from '@/lib/driver-display-name';
 import { resolveCarLogo } from '@/lib/acc/manufacturer-logo';
 import { CarLogo } from './CarLogo';
@@ -56,13 +56,13 @@ export function TeamStandingsTable({
                   <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3 w-8">
                     P
                   </th>
-                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3">
+                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3 w-full">
                     Team
                   </th>
-                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3 hidden md:table-cell">
+                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pr-3 hidden xl:table-cell">
                     Drivers
                   </th>
-                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-5 w-20 text-right">
+                  <th className="font-mono text-[15px] tracking-[.3em] uppercase text-txt-3 py-2 pl-3 pr-2 text-right">
                     Pts
                   </th>
                   {teamRounds && <RoundHeaders rounds={rounds!} />}
@@ -82,21 +82,21 @@ export function TeamStandingsTable({
                       >
                         {entry.position}
                       </td>
-                      <td className="py-3 pr-3">
-                        <span className="font-display font-bold text-[16px] uppercase text-txt block truncate max-w-[280px]">
+                      <td className="py-3 pr-3 max-w-0 min-w-[180px]">
+                        <span className="font-display font-bold text-[16px] uppercase text-txt block truncate" title={entry.teamName}>
                           {entry.teamName}
                         </span>
                         {/* Below the team name on narrow screens, where the
                             dedicated Drivers column is hidden. */}
-                        <span className="md:hidden block mt-1">
+                        <span className="xl:hidden block mt-1">
                           <Roster roster={roster} driverInfo={driverInfo} />
                         </span>
                       </td>
-                      <td className="py-3 pr-3 hidden md:table-cell">
+                      <td className="py-3 pr-3 hidden xl:table-cell whitespace-nowrap">
                         <Roster roster={roster} driverInfo={driverInfo} />
                       </td>
                       <td
-                        className="font-mono text-[15px] py-3 pl-5 text-right"
+                        className="font-mono text-[15px] py-3 pl-3 pr-2 text-right"
                         style={{ color: 'var(--sim-accent)' }}
                       >
                         {entry.points}
@@ -105,7 +105,7 @@ export function TeamStandingsTable({
                         (teamRounds.get(entry.teamName) ?? []).map((cell, i) => (
                           <td
                             key={rounds![i].eventId}
-                            className="font-mono text-[15px] py-3 pl-5 text-center hidden sm:table-cell"
+                            className={`font-mono text-[15px] py-3 ${ROUND_CELL_CLS}`}
                           >
                             <TeamRoundCellView cell={cell} />
                           </td>
@@ -155,7 +155,7 @@ function TeamRoundCellView({ cell }: { cell: TeamRoundCell }) {
     >
       {cell.points ?? '—'}
       {podium && !cell.dropped && (
-        <sup className="text-[9px] tracking-[.05em] opacity-85">{cell.rank}{ordinal(cell.rank!)}</sup>
+        <sup className="hidden xl:inline text-[9px] tracking-[.05em] opacity-85">{cell.rank}{ordinal(cell.rank!)}</sup>
       )}
       {partial && (
         <span className="text-[11px] font-normal text-txt-3/60 line-through decoration-txt-3/70">
