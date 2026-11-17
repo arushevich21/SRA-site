@@ -52,6 +52,12 @@ export function shortTrackName(name: string): string {
   return SHORT_TRACK_NAMES[key] ?? name;
 }
 
+// Round columns size to their content (no fixed width) with tight padding, so
+// a full season of rounds fits the page instead of spilling into a horizontal
+// scroll. The track subtitle only shows where there's room for it (xl); the
+// header's title attribute carries the full name everywhere.
+export const ROUND_CELL_CLS = 'px-1.5 xl:px-2 text-center whitespace-nowrap hidden md:table-cell';
+
 export function RoundHeaders({ rounds }: { rounds: RoundEvent[] }) {
   return (
     <>
@@ -59,10 +65,10 @@ export function RoundHeaders({ rounds }: { rounds: RoundEvent[] }) {
         <th
           key={r.eventId}
           title={r.track}
-          className="font-mono text-[15px] tracking-[.15em] uppercase text-txt-3 py-2 pl-5 w-20 text-center hidden sm:table-cell"
+          className={`font-mono text-[15px] tracking-[.1em] uppercase text-txt-3 py-2 ${ROUND_CELL_CLS}`}
         >
           R{r.round}
-          <span className="block font-mono text-[10px] tracking-[.1em] normal-case text-txt-3/70 mt-0.5 truncate max-w-[88px] mx-auto">
+          <span className="hidden xl:block font-mono text-[10px] tracking-[.05em] normal-case text-txt-3/70 mt-0.5 truncate max-w-[72px] mx-auto">
             {shortTrackName(r.track)}
           </span>
         </th>
