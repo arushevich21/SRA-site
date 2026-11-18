@@ -7,6 +7,7 @@ import { shortTrackName } from '@/components/RoundCells';
 import { countryFlagUrl } from '@/lib/country-flag';
 import { trackFacts } from './track-maps';
 import { OverlayRefresh } from './OverlayRefresh';
+import { VideoBed } from './VideoBed';
 import type { OverlayRefreshPlan } from '@/lib/stream/refresh';
 
 // The pieces every full-screen scene is assembled from. Layout lives in
@@ -82,11 +83,7 @@ export function OverlayCanvas({
         className="overlay-canvas"
         style={cutouts?.length ? { clipPath: cutoutClipPath(cutouts) } : undefined}
       >
-        {video && (
-          // Muted + playsInline is what lets Chromium autoplay without a gesture,
-          // which an OBS browser source never gets.
-          <video className="ov-video" src={video} autoPlay muted loop playsInline aria-hidden="true" />
-        )}
+        {video && <VideoBed className="ov-video" src={video} />}
         {children}
       </div>
     </div>
