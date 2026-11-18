@@ -349,6 +349,36 @@
 .ov-row.is-podium-1 { border-left-color: var(--ov-gold); }
 .ov-row.is-podium-2 { border-left-color: var(--ov-silver); }
 .ov-row.is-podium-3 { border-left-color: var(--ov-bronze); }
+
+/* Title state (StandingsOverlay markClass). Champion: the whole row goes
+   gold. Title fight: a live-teal edge and wash, so it reads as "still open"
+   next to the gold, and never as a podium colour. */
+.ov-row.is-champion {
+  border-left-color: var(--ov-gold);
+  background: linear-gradient(90deg, rgba(230, 181, 61, 0.34), rgba(230, 181, 61, 0.1) 60%, var(--ov-panel));
+  box-shadow: inset 0 0 0 calc(0.12 * var(--u)) var(--ov-gold), 0 0 calc(1.6 * var(--u)) rgba(230, 181, 61, 0.35);
+}
+.ov-row.is-champion .ov-pos { background: var(--ov-gold); color: #08090c; }
+.ov-row.is-champion .ov-driver b,
+.ov-row.is-champion .ov-team b,
+.ov-row.is-champion .ov-points b { color: var(--ov-gold-soft); }
+.ov-row.is-contender {
+  border-left-color: var(--ov-live);
+  background: linear-gradient(90deg, rgba(54, 224, 200, 0.16), var(--ov-panel) 55%);
+  box-shadow: inset 0 0 0 calc(0.08 * var(--u)) rgba(54, 224, 200, 0.55);
+}
+.ov-title-tag {
+  display: inline-block;
+  margin-right: calc(0.6 * var(--u));
+  padding: 0 calc(0.45 * var(--u));
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.ov-title-tag.is-champion { background: var(--ov-gold); color: #08090c; }
+.ov-title-tag.is-contender { background: var(--ov-live); color: #08090c; }
 .ov-pos {
   align-self: stretch;
   display: flex;

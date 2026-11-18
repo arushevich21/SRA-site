@@ -112,6 +112,19 @@ export {
 } from './acc/lap-ledger.js';
 
 export {
+  MAX_ROUND_POINTS,
+  driverFloor,
+  driverCeiling,
+  teamFloor,
+  teamCeiling,
+  projectedTotal,
+  titleStatuses,
+  type TitleRaceEntrant,
+  type TitleRaceInput,
+  type TitleStatus,
+} from './acc/title-race.js';
+
+export {
   buildDriverRounds,
   buildTeamRounds,
   applyIndividualTeamDrops,

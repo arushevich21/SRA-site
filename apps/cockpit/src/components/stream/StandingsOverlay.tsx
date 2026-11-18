@@ -1,4 +1,5 @@
 import { accCarModelIdFromName } from '@sra/domain';
+import { titleRaceForDivision, type TitleMark } from '@/lib/stream/title-race';
 import type { EmperorDriverStanding, EmperorTeamStanding } from '@sra/shared-types';
 import type { ChampionshipContent } from '@/content/championships';
 import { resolveCarLogo } from '@/lib/acc/manufacturer-logo';
@@ -39,6 +40,9 @@ export function StandingsOverlay({
   const total = type === 'driver' ? standings.drivers.length : standings.teams.length;
   const pageCount = Math.max(1, Math.ceil(total / ROWS_PER_PAGE));
   const start = (page - 1) * ROWS_PER_PAGE;
+  // Worked out over the whole table, not the page: a title fight on page 2
+  // still depends on the leader on page 1.
+  const marks = titleRaceForDivision(standings, totalRounds);
 
   return (
     <OverlayFrame ticker>
@@ -58,6 +62,7 @@ export function StandingsOverlay({
           driverInfo={standings.driverInfo}
           leaderPoints={standings.drivers[0]?.points ?? 0}
           live={standings.source === 'live'}
+          marks={marks.drivers}
         />
       ) : (
         <TeamColumns
@@ -66,6 +71,7 @@ export function StandingsOverlay({
           driverInfo={standings.driverInfo}
           leaderPoints={standings.teams[0]?.points ?? 0}
           live={standings.source === 'live'}
+          marks={marks.teams}
         />
       )}
 
@@ -104,11 +110,13 @@ function DriverColumns({
   driverInfo,
   leaderPoints,
   live,
+  marks,
 }: {
   rows: EmperorDriverStanding[];
   driverInfo: Record<string, DriverInfo>;
   leaderPoints: number;
   live: boolean;
+  marks: Map<string, TitleMark>;
 }) {
   const columns = splitColumns(rows);
   return (
@@ -119,8 +127,9 @@ function DriverColumns({
             const info = driverInfo[stripSteamIdPrefix(row.steamId)];
             const logo = resolveCarLogo(accCarModelIdFromName(row.carModel));
             const badge = info ? getDriverTierBadge(info) : null;
+            const mark = marks.get(row.steamId);
             return (
-              <article className={`ov-row ${podiumClass(row.position, live)}`} key={row.steamId}>
+              <article className={`ov-row ${podiumClass(row.position, live)} ${markClass(mark)}`} key={row.steamId}>
                 <span className="ov-pos">{row.position}</span>
                 <span className="ov-badge">
                   {badge && (
@@ -131,6 +140,7 @@ function DriverColumns({
                 <div className="ov-driver">
                   <b>{bareDriverName(info?.displayName ?? row.driverName)}</b>
                   <span>
+                    <TitleTag mark={mark} />
                     {info?.driverNumber != null && <em>#{info.driverNumber}</em>}
                     {row.teamNames[0] ?? row.carModel ?? ''}
                   </span>
@@ -154,12 +164,14 @@ function TeamColumns({
   driverInfo,
   leaderPoints,
   live,
+  marks,
 }: {
   rows: EmperorTeamStanding[];
   rosters: Map<string, TeamMember[]>;
   driverInfo: Record<string, DriverInfo>;
   leaderPoints: number;
   live: boolean;
+  marks: Map<string, TitleMark>;
 }) {
   const columns = splitColumns(rows);
   return (
@@ -168,12 +180,13 @@ function TeamColumns({
         <div className="ov-standings-col" key={i}>
           {column.map((row) => {
             const members = rosters.get(row.teamName) ?? [];
+            const mark = marks.get(row.teamName);
             return (
-              <article className={`ov-row is-team ${podiumClass(row.position, live)}`} key={row.teamName}>
+              <article className={`ov-row is-team ${podiumClass(row.position, live)} ${markClass(mark)}`} key={row.teamName}>
                 <span className="ov-pos">{row.position}</span>
                 <div className="ov-team">
                   <b>{row.teamName}</b>
-                  <TeamCars members={members} />
+                  <TeamCars members={members} tag={<TitleTag mark={mark} />} />
                 </div>
                 <Roster members={members} driverInfo={driverInfo} />
                 <Points points={row.points} leaderPoints={leaderPoints} position={row.position} live={live} />
@@ -188,11 +201,12 @@ function TeamColumns({
 
 // The car(s) a team runs, under its name: logo + model. A two-car team
 // usually shares one model; when it doesn't, both are listed.
-function TeamCars({ members }: { members: TeamMember[] }) {
+function TeamCars({ members, tag }: { members: TeamMember[]; tag?: React.ReactNode }) {
   const cars = [...new Set(members.map((m) => m.carModel).filter((c): c is string => !!c))];
-  if (cars.length === 0) return null;
+  if (cars.length === 0 && !tag) return null;
   return (
     <span className="ov-team-cars">
+      {tag}
       {cars.map((car) => (
         <span key={car}>
           <span className="ov-car">
@@ -253,4 +267,15 @@ function Points({
 // alphabetical entry list has no "P1".
 function podiumClass(position: number, live: boolean): string {
   return live && position <= 3 ? `is-podium-${position}` : '';
+}
+
+// Title state on a row: a gold treatment for a champion, a highlight for
+// anyone still mathematically in a title fight (lib/stream/title-race.ts).
+function markClass(mark: TitleMark | undefined): string {
+  return mark ? `is-${mark.status}` : '';
+}
+
+function TitleTag({ mark }: { mark: TitleMark | undefined }) {
+  if (!mark) return null;
+  return <i className={`ov-title-tag is-${mark.status}`}>{mark.label}</i>;
 }
