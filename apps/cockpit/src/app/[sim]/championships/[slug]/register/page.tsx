@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import { getChampionships } from '@/lib/championships-store';
 import { RegisterBody } from '@/app/[sim]/register/RegisterBody';
+import { findChampionshipWithMyClaim, isWithdrawWindow } from '@/lib/registration-claims';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,11 @@ export default async function ChampionshipRegisterPage({
   const content = (await getChampionships()).find((c) => c.game === sim.game && c.slug === slug);
   if (!content) notFound();
 
+  // Sign-ups closed but the event is still running: an entered driver gets
+  // their entry with Withdraw (see lib/registration-claims.ts).
+  const withdrawOnly =
+    isWithdrawWindow(content) && (await findChampionshipWithMyClaim([content])) !== undefined;
+
   return (
     <section className="max-w-[1280px] mx-auto px-7 pt-14 pb-24">
       <span
@@ -29,7 +35,7 @@ export default async function ChampionshipRegisterPage({
         {content.title}
       </h1>
 
-      <RegisterBody champ={content} sim={sim} simSlug={simSlug} />
+      <RegisterBody champ={content} sim={sim} simSlug={simSlug} withdrawOnly={withdrawOnly} />
     </section>
   );
 }

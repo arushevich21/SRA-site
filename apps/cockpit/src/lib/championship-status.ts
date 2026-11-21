@@ -30,3 +30,10 @@ export function getChampionshipStatus(content: ChampionshipContent): Championshi
   if (!content.registrationKey) return 'active-open';
   return content.registrationOpen ? 'active-open' : 'active-closed';
 }
+
+// A championship whose sign-ups are closed but which is still running: the
+// register page (and its nav item) stays reachable so entered drivers can
+// withdraw — see withdrawFromTeam in app/[sim]/register/actions.ts.
+export function isWithdrawWindow(c: ChampionshipContent): boolean {
+  return !!c.registrationKey && !!c.registrationSeason && !c.registrationOpen && !c.concluded && !c.teaserOnly;
+}

@@ -15,6 +15,7 @@ import { buildDivisionCapacity } from '@/lib/division-capacity';
 import { UnregisteredDrivers } from '@/components/UnregisteredDrivers';
 import { buildUnregisteredByDivision, type RosterDriver } from '@/lib/unregistered-drivers';
 import { bareDriverName } from '@/lib/driver-display-name';
+import { isWithdrawWindow } from '@/lib/championship-status';
 
 // Supabase FK join inference — cast via as unknown as
 type RawMemberJoin = {
@@ -24,6 +25,7 @@ type RawMemberJoin = {
 type RawRegistrationJoin = {
   id: string;
   team_id: string | null;
+  status: 'confirmed' | 'waitlisted';
   car_model_id: number | null;
   division_id: number | null;
   teams: { name: string } | { name: string }[] | null;
@@ -68,18 +70,56 @@ export async function RegisterBody({
   champ,
   sim,
   simSlug,
+  withdrawOnly = false,
 }: {
   champ: ChampionshipContent | undefined;
   sim: SimConfig;
   simSlug: string;
+  // Sign-ups are closed but the signed-in driver holds a claim (see page.tsx):
+  // show their entry with Withdraw only — no form, no car/name edits.
+  withdrawOnly?: boolean;
 }) {
   if (
     !champ?.registrationKey ||
-    !champ.registrationOpen ||
+    (!champ.registrationOpen && !withdrawOnly) ||
     !champ.registrationSeason ||
     !champ.maxTeamSize ||
     !champ.allowedCars
   ) {
+    // Closed but still running (isWithdrawWindow) AND people have entered:
+    // not "coming soon" — and an entered driver who isn't signed in needs to
+    // know where to withdraw. isWithdrawWindow alone can't tell "closed" from
+    // "not opened yet" (both are registration_open = false), so an event with
+    // no entries at all still reads as coming soon.
+    const closedWithEntries =
+      champ != null &&
+      isWithdrawWindow(champ) &&
+      ((
+        await adminClient
+          .from('registrations')
+          .select('id', { count: 'exact', head: true })
+          .eq('championship_key', champ.registrationKey!)
+          .eq('season', champ.registrationSeason!)
+      ).count ?? 0) > 0;
+    if (champ && closedWithEntries) {
+      return (
+        <div className="max-w-[560px] border border-line bg-panel px-7 py-8">
+          <p className="font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-4">
+            Registration Closed
+          </p>
+          <p className="font-sans text-[15px] text-txt-2 leading-relaxed">
+            Sign-ups for {champ.title} are closed. Entered and can&apos;t make
+            it? Sign in with the account you registered with to withdraw.
+          </p>
+          <Link
+            href="/auth/login"
+            className="inline-block mt-6 font-mono text-[11px] tracking-[.2em] uppercase text-gold hover:text-gold-soft transition-colors"
+          >
+            Sign in →
+          </Link>
+        </div>
+      );
+    }
     return (
       <div className="max-w-[560px] border border-line bg-panel px-7 py-8">
         <p className="font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-4">
@@ -123,17 +163,17 @@ export async function RegisterBody({
     // ── Public: the confirmed entry list (no auth needed) ──────────────────
     // registrations/registration_drivers, not team_registrations/team_members —
     // registration_drivers is authoritative for "who is in this car for this
-    // event" (see supabase/migrations/20260814d-f). Waitlisted entries are
-    // excluded from the public entry list (they aren't "in" the event yet),
-    // but see takenSet below — a waitlisted claim still counts as taken.
+    // event" (see supabase/migrations/20260814d-f). Fetched at every status:
+    // waitlisted entries are kept OUT of the public entry list below (they
+    // aren't "in" the event yet), but the signed-in driver's own waitlisted
+    // entry must still be found so they can see it and withdraw from it.
     adminClient
       .from('registrations')
       .select(
-        'id, team_id, car_model_id, division_id, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, tier, is_sralien))',
+        'id, team_id, status, car_model_id, division_id, teams(name), divisions(name), registration_drivers(driver_id, drivers(display_name, tier, is_sralien))',
       )
       .eq('championship_key', champ.registrationKey)
       .eq('season', champ.registrationSeason)
-      .eq('status', 'confirmed')
       .order('id'),
     // Every driver already CLAIMED for this event, confirmed or waitlisted —
     // register_entry()'s unique constraint blocks a second claim regardless of
@@ -166,11 +206,21 @@ export async function RegisterBody({
   // (Endurance) it is a single row with N drivers. TeamList/CurrentTeam think
   // in teams, so fold rows by team_id here — a shared-car row folds to
   // itself, so both shapes come out the same.
+  //
+  // Confirmed and waitlisted rows fold into separate maps: a team registers
+  // atomically (every car confirmed or every car waitlisted together, see
+  // 20260915), so a team never straddles the two. Only `teamsById` is public.
   const teamsById = new Map<string, Team>();
+  const waitlistedById = new Map<string, Team>();
+  // Cars per team — with members.length this tells the withdraw dialog which
+  // shape it's in (shared car: 1 row, N drivers; car-per-driver: N rows).
+  const carCountByTeam = new Map<string, number>();
   for (const r of (rawRegistrations ?? []) as unknown as RawRegistrationJoin[]) {
     // team_id is nullable in the schema; register_entry() always sets it, but
     // a stray null must not collapse every such row into one "team".
     const key = r.team_id ?? r.id;
+    carCountByTeam.set(key, (carCountByTeam.get(key) ?? 0) + 1);
+    const target = r.status === 'waitlisted' ? waitlistedById : teamsById;
     const members = (r.registration_drivers ?? []).map((m) => ({
       driver_id: m.driver_id,
       // Name only — the ┊number suffix is dropped for the entry list and
@@ -180,12 +230,12 @@ export async function RegisterBody({
       tier: (m.drivers?.tier ?? null) as 'gold' | 'silver' | null,
       is_sralien: m.drivers?.is_sralien ?? false,
     }));
-    const existing = teamsById.get(key);
+    const existing = target.get(key);
     if (existing) {
       existing.members.push(...members);
       continue;
     }
-    teamsById.set(key, {
+    target.set(key, {
       id: key,
       team_name: one(r.teams)?.name ?? 'Unnamed Team',
       car: (r.car_model_id != null ? accCarModelName(r.car_model_id) : null) ?? 'Unknown Car',
@@ -334,17 +384,13 @@ export async function RegisterBody({
         </div>
       );
     } else {
-      // Derive team membership from the already-fetched (confirmed-only)
-      // teams list. NOTE: a WAITLISTED registrant (claimed via takenSet
-      // above, but not in `teams` since that's confirmed-only) falls
-      // through to the registration form below rather than a "you're
-      // waitlisted" state — CurrentTeam/TeamList have no such state today.
-      // They'd hit DRIVER_ALREADY_CLAIMED if they tried to submit again,
-      // which is correct but not a good message for someone legitimately
-      // waitlisted. Flagged, not built — out of scope for this pass.
-      const myTeam = teams.find((t) =>
-        t.members.some((m) => m.driver_id === driver.id),
-      );
+      // The driver's own entry, confirmed or waitlisted. A waitlisted
+      // registrant used to fall through to the form (and hit
+      // DRIVER_ALREADY_CLAIMED on submit) with no way to see or leave the
+      // entry they were holding.
+      const isMine = (t: Team) => t.members.some((m) => m.driver_id === driver.id);
+      const myConfirmed = teams.find(isMine);
+      const myTeam = myConfirmed ?? [...waitlistedById.values()].find(isMine);
 
       if (myTeam) {
         const nextRound = findNextRound(champ.schedule);
@@ -367,7 +413,24 @@ export async function RegisterBody({
             season={champ.registrationSeason}
             allowedCars={champ.allowedCars}
             nextRound={nextRound ? toNextRoundInfo(nextRound) : null}
+            registrationOpen={champ.registrationOpen === true}
+            waitlisted={!myConfirmed}
+            sharesCar={(carCountByTeam.get(myTeam.id) ?? 1) < myTeam.members.length}
           />
+        );
+      } else if (withdrawOnly) {
+        // page.tsx only picks a closed championship when this driver holds a
+        // claim in it, so this is a race (they withdrew in another tab) —
+        // say so rather than offering a form for a closed event.
+        userSection = (
+          <div className="max-w-[480px] border border-line bg-panel px-6 py-5">
+            <p className="font-mono text-[11px] tracking-[.3em] uppercase text-gold-deep mb-3">
+              Registration Closed
+            </p>
+            <p className="font-mono text-[13px] text-txt-2 leading-relaxed">
+              You&apos;re not entered in this event.
+            </p>
+          </div>
         );
       } else {
         // Teammate pool. Same-division only where divisions exist —

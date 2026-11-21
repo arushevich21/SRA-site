@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import { getChampionships } from '@/lib/championships-store';
+import { findChampionshipWithMyClaim, isWithdrawWindow } from '@/lib/registration-claims';
 import { RegisterBody } from './RegisterBody';
 
 export const dynamic = 'force-dynamic';
@@ -13,13 +14,18 @@ export default async function RegisterPage({ params }: Props) {
   const sim = getSimBySlug(simSlug);
   if (!sim) notFound();
 
-  const champ = (await getChampionships()).find(
-    (c) => c.game === sim.game && c.registrationKey && c.registrationOpen,
-  );
+  const champs = (await getChampionships()).filter((c) => c.game === sim.game && c.registrationKey);
+  const open = champs.find((c) => c.registrationOpen);
+  // Once sign-ups close, a registered driver still needs this page: it is the
+  // only place they can withdraw. Without it, a driver who can't make the race
+  // has to ask an admin, who then edits the ACCSM grid by hand — and the next
+  // entrylist push either overwrites that edit or refuses to touch the grid.
+  const closedWithMine = open ? undefined : await findChampionshipWithMyClaim(champs.filter(isWithdrawWindow));
+  const champ = open ?? closedWithMine;
 
   return (
     <Shell sim={sim} title={champ?.title ?? 'Register'}>
-      <RegisterBody champ={champ} sim={sim} simSlug={simSlug} />
+      <RegisterBody champ={champ} sim={sim} simSlug={simSlug} withdrawOnly={!open && !!closedWithMine} />
     </Shell>
   );
 }

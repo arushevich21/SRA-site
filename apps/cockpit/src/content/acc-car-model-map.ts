@@ -55,6 +55,26 @@ export const ACC_CAR_MODEL_ID_BY_NAME: Readonly<Record<string, number>> = {
   'Nissan GT-R Nismo GT3': 6, // 2018 — 34 occurrences; the 2017 variant (id 10) has none
   'Mercedes-AMG GT3 EVO': 25, // "2020" — 65 occurrences vs. 8 for the base 2016 car (id 1), which
   // only appears in one ~45-minute window, not recurring use
+
+  // ── Multiclass endurance (SRA Multiclass Enduro, 2026-12) ────────────────
+  // GT4: every name is an exact ACC_CAR_MODEL_NAMES match, and ACC has only
+  // one model-year of each, so no variant ambiguity (id 54 doesn't exist).
+  'Alpine A110 GT4': 50,
+  'AMR V8 Vantage GT4': 51,
+  'Audi R8 LMS GT4': 52,
+  'BMW M4 GT4': 53,
+  'Chevrolet Camaro GT4': 55,
+  'Ginetta G55 GT4': 56,
+  'KTM X-Bow GT4': 57,
+  'Maserati MC GT4': 58,
+  'McLaren 570S GT4': 59,
+  'Mercedes-AMG GT4': 60,
+  'Porsche 718 Cayman GT4': 61,
+  // Porsche Cup ("P-Cup"): the league runs the Porsche only — not the
+  // Lamborghini Super Trofeo / Ferrari Challenge cars ACC also classes GTC.
+  // The 992 (id 28), not the 991 II (id 9): settled by our own lap ledger,
+  // 11,751 laps in the 992 vs 1,387 in the 991 II as of 2026-11-21.
+  'Porsche 992 GT3 Cup': 28,
 };
 
 // Reverse of the map above, id -> allowedCars picker string. Needed anywhere

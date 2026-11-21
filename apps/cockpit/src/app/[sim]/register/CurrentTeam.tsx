@@ -9,7 +9,7 @@ import { allowedCarNameForModelId } from '@/content/acc-car-model-map';
 import { FallbackLogoImage } from '@/components/FallbackLogoImage';
 import { DriverTierBadge } from '@/components/DriverTierBadge';
 import { getDriverTierBadge } from '@/lib/driver-tier-badge';
-import { leaveTeam, updateRegistration, type UpdateRegistrationState } from './actions';
+import { withdrawFromTeam, updateRegistration, type UpdateRegistrationState } from './actions';
 
 type Member = {
   driver_id: string;
@@ -44,6 +44,14 @@ type Props = {
   season: string;
   allowedCars: string[];
   nextRound: NextRoundInfo | null;
+  // false once sign-ups close: the page stays up so drivers can withdraw,
+  // but car / team-name edits are locked (updateRegistration enforces it).
+  registrationOpen: boolean;
+  // Entry is on the waitlist, not the grid yet.
+  waitlisted: boolean;
+  // Every driver on this entry shares ONE car (Endurance). Only changes what
+  // the withdraw confirmation says will happen to the car.
+  sharesCar: boolean;
 };
 
 export default function CurrentTeam({
@@ -64,10 +72,15 @@ export default function CurrentTeam({
   season,
   allowedCars,
   nextRound,
+  registrationOpen,
+  waitlisted,
+  sharesCar,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
+  const [confirmingWithdraw, setConfirmingWithdraw] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [state, action, savePending] = useActionState<UpdateRegistrationState, FormData>(
     updateRegistration,
     null,
@@ -83,9 +96,25 @@ export default function CurrentTeam({
   const me = members.find((m) => m.driver_id === currentDriverId);
   const myCrest = me ? getDriverTierBadge({ isSralien: me.is_sralien, division: divisionId, tier: me.tier }) : null;
 
-  function handleLeave() {
+  // What withdrawing does to the grid — said up front, because on a shared
+  // car it isn't obvious whether the car goes with you.
+  const teammates = members.length - 1;
+  const withdrawConsequence =
+    teammates === 0
+      ? 'Your entry will be removed from the grid.'
+      : sharesCar
+        ? `Your car stays on the grid with your ${teammates === 1 ? 'teammate' : `${teammates} teammates`}.`
+        : `Your car will be removed from the grid. Your ${teammates === 1 ? "teammate keeps theirs" : 'teammates keep theirs'} under the same team name.`;
+
+  function handleWithdraw() {
+    setWithdrawError(null);
     startTransition(async () => {
-      await leaveTeam(teamId, championshipKey, season, simSlug);
+      const result = await withdrawFromTeam(teamId, championshipKey, season, simSlug);
+      if ('error' in result) {
+        setWithdrawError(result.error);
+        return;
+      }
+      setConfirmingWithdraw(false);
       router.refresh();
     });
   }
@@ -173,7 +202,7 @@ export default function CurrentTeam({
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} className="w-3 h-3 shrink-0">
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
-                  Registered
+                  {waitlisted ? 'Waitlisted' : 'Registered'}
                 </p>
                 <p className="font-display font-bold text-[22px] uppercase text-txt leading-tight">
                   {teamName}
@@ -197,12 +226,18 @@ export default function CurrentTeam({
                     <DivisionBadge division={divisionId} label={divisionName ?? undefined} height={24} />
                   </span>
                 )}
-                <button
-                  onClick={() => setEditing(true)}
-                  className="mt-4 font-mono text-[11px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors"
-                >
-                  Change car / team name
-                </button>
+                {registrationOpen ? (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="mt-4 font-mono text-[11px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors"
+                  >
+                    Change car / team name
+                  </button>
+                ) : (
+                  <p className="mt-4 font-mono text-[11px] text-txt-3">
+                    Registration is closed — ask an admin to change your car or team name.
+                  </p>
+                )}
               </div>
               {myCrest && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -252,13 +287,53 @@ export default function CurrentTeam({
           </Link>
         </p>
 
-        <button
-          onClick={handleLeave}
-          disabled={isPending}
-          className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 hover:text-red-400 transition-colors disabled:opacity-50"
-        >
-          {isPending ? 'Leaving…' : 'Leave team'}
-        </button>
+        {confirmingWithdraw ? (
+          <div className="border border-red-400/30 bg-red-400/5 px-5 py-4">
+            <p className="font-mono text-[11px] tracking-[.2em] uppercase text-red-400 mb-2">
+              Withdraw from this event?
+            </p>
+            <p className="font-sans text-[13px] text-txt-2 leading-relaxed mb-1">
+              Only you are withdrawn. {withdrawConsequence}
+            </p>
+            <p className="font-sans text-[13px] text-txt-3 leading-relaxed mb-4">
+              The server entry list updates automatically.
+              {registrationOpen
+                ? ' You can register again while sign-ups are open.'
+                : ' Sign-ups are closed, so you won’t be able to re-enter yourself.'}
+            </p>
+            {withdrawError && (
+              <p className="font-mono text-[11px] tracking-[.1em] uppercase text-red-400 mb-3">
+                {withdrawError}
+              </p>
+            )}
+            <div className="flex gap-4">
+              <button
+                onClick={handleWithdraw}
+                disabled={isPending}
+                className="font-mono text-[11px] tracking-[.15em] uppercase px-4 py-2 bg-red-500 text-white font-bold hover:bg-red-400 transition-colors disabled:opacity-50"
+              >
+                {isPending ? 'Withdrawing…' : 'Yes, withdraw me'}
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmingWithdraw(false);
+                  setWithdrawError(null);
+                }}
+                disabled={isPending}
+                className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 hover:text-txt transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmingWithdraw(true)}
+            className="font-mono text-[11px] tracking-[.15em] uppercase text-txt-3 hover:text-red-400 transition-colors"
+          >
+            Can&apos;t make it? Withdraw from this event
+          </button>
+        )}
       </div>
 
       {/* Next Round — real schedule data (ScheduleRound), not a filler

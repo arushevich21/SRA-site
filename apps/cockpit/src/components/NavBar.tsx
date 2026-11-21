@@ -11,6 +11,7 @@ import {
   type ChampionshipContent,
 } from '@/content/championships';
 import { GameLabel } from '@/components/GameLabel';
+import { isWithdrawWindow } from '@/lib/championship-status';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 export type NavUser = {
@@ -134,11 +135,12 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
     (c) => !c.teaserOnly && (accsmChampionshipIds(c).length > 0 || getStandingsKey(c)),
   );
   const leaderboardChamps = champsForSim.filter((c) => accsmChampionshipIds(c).length > 0);
-  // Only championships with registration currently OPEN belong in the Register
-  // menu — a closed/disabled one drops out (and the whole Register item goes
-  // away once none are open).
+  // Championships with registration OPEN belong in the Register menu, and so
+  // do closed ones still running (isWithdrawWindow) — that page is where an
+  // entered driver withdraws. Concluded / teaser ones drop out, and the whole
+  // Register item goes away once none are left.
   const registerChamps = champsForSim.filter(
-    (c) => c.registrationKey && c.registrationOpen,
+    (c) => c.registrationKey && (c.registrationOpen || isWithdrawWindow(c)),
   );
 
   // ACC leaderboards split into seven boards: Hot Lap, Hot Lap (Seasonal),

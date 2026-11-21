@@ -106,6 +106,24 @@ const ACC_GT3_CARS = [
   'Reiter Engineering R-EX GT3',
 ];
 
+// GT4 + Porsche Cup — offered for multiclass events (SRA Multiclass Enduro).
+// Every string must also be in ACC_CAR_MODEL_ID_BY_NAME (acc-car-model-map.ts)
+// or registration with it fails closed.
+const ACC_GT4_CARS = [
+  'Alpine A110 GT4',
+  'AMR V8 Vantage GT4',
+  'Audi R8 LMS GT4',
+  'BMW M4 GT4',
+  'Chevrolet Camaro GT4',
+  'Ginetta G55 GT4',
+  'KTM X-Bow GT4',
+  'Maserati MC GT4',
+  'McLaren 570S GT4',
+  'Mercedes-AMG GT4',
+  'Porsche 718 Cayman GT4',
+];
+const ACC_CUP_CARS = ['Porsche 992 GT3 Cup'];
+
 // ── LMU ───────────────────────────────────────────────────────────────────────
 const LMU_TRACKS: CatalogTrack[] = [
   { displayName: 'Algarve' },
@@ -169,7 +187,7 @@ const ACEVO_CARS = ['Mazda MX-5 (ND)'];
 export const SIM_CATALOG: Record<string, GameCatalog> = {
   ACC: {
     tracks: ACC_TRACKS,
-    cars: ACC_GT3_CARS,
+    cars: [...ACC_GT3_CARS, ...ACC_CUP_CARS, ...ACC_GT4_CARS],
     classTags: ['GT3', 'GT4', 'GT2', 'GTC', 'TCX'],
     formatTags: FORMAT_TAGS,
     classes: ['GT3', 'GT4', 'GT2'],

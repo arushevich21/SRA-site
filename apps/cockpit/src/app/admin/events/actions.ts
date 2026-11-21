@@ -141,7 +141,9 @@ function roundRows(championshipId: string, rounds: ChampionshipRoundInput[]) {
     }));
 }
 
-type ResolvedDivisionTarget = { division_id: number; emperor_championship_id: string };
+// division_id null = a single-championship event (requires_division = false):
+// one ACCSM grid carrying every entry for the registration_key.
+type ResolvedDivisionTarget = { division_id: number | null; emperor_championship_id: string };
 
 // Validates + normalizes the form's division rows. Returns an error string
 // rather than throwing so saveChampionship can surface it inline on the form,
@@ -233,16 +235,18 @@ async function saveDivisionTargets(
     }
   }
 
-  // Drop divisions the admin removed. Scoped to this registration_key, and
-  // expressed as "not in the submitted set" so an empty submission clears them
-  // all - which is the correct reading of removing every row from the form.
+  // Drop targets the admin removed. Scoped to this registration_key, and
+  // expressed as "GUID not in the submitted set" so an empty submission clears
+  // them all - which is the correct reading of removing every row from the
+  // form. Keyed on the GUID rather than division_id because a single-
+  // championship target has division_id NULL, which an IN list can't match.
   let del = supabase
     .from('championship_accsm_targets')
     .delete()
     .eq('registration_key', registrationKey);
 
   if (targets.length > 0) {
-    del = del.not('division_id', 'in', `(${targets.map((t) => t.division_id).join(',')})`);
+    del = del.not('emperor_championship_id', 'in', `(${targets.map((t) => t.emperor_championship_id).join(',')})`);
   }
 
   const { error: delErr } = await del;
@@ -350,6 +354,23 @@ export async function saveChampionship(input: ChampionshipInput): Promise<SaveRe
     return { ok: false, error: 'Slug, title, and class tag are required.' };
   }
 
+  // The single ACSM championship ID gets the same treatment as the division
+  // rows: the form invites pasting the championship URL, so normalize it to
+  // the bare GUID before it's stored (it used to be stored verbatim — URL and
+  // all — matching no Emperor championship), and reject anything else by name.
+  if (input.emperorChampionshipId.trim() !== '') {
+    const guid = parseAccsmChampionshipId(input.emperorChampionshipId);
+    if (guid == null) {
+      return {
+        ok: false,
+        error:
+          `"${input.emperorChampionshipId.trim()}" isn't a valid ACSM championship. ` +
+          'Paste the championship URL (.../championship/<id>) or the ID on its own.',
+      };
+    }
+    input = { ...input, emperorChampionshipId: guid };
+  }
+
   const resolved = resolveDivisionTargets(input.divisionTargets);
   if (!resolved.ok) return { ok: false, error: resolved.error };
   const divisionTargets = resolved.targets;
@@ -448,7 +469,18 @@ export async function saveChampionship(input: ChampionshipInput): Promise<SaveRe
   // this same save exists (and has cascaded to any existing targets) before
   // these rows reference it.
   if (registrationKey) {
-    const targetErr = await saveDivisionTargets(registrationKey, divisionTargets);
+    // A single-championship event (one ACCSM ID, no division rows) still needs
+    // its target row: SRA-Bot resolves GUID -> registration_key through
+    // championship_accsm_targets alone, and without one every entrylist push
+    // for it is refused. This used to be inserted by hand (LIAW) - and since
+    // the reconcile below deletes whatever isn't submitted, re-saving such an
+    // event from this form silently removed it.
+    const singleGuid =
+      divisionTargets.length === 0 ? parseAccsmChampionshipId(input.emperorChampionshipId) : null;
+    const targets: ResolvedDivisionTarget[] = singleGuid
+      ? [{ division_id: null, emperor_championship_id: singleGuid }]
+      : divisionTargets;
+    const targetErr = await saveDivisionTargets(registrationKey, targets);
     if (targetErr) {
       revalidateTag(CHAMPIONSHIPS_TAG); // earlier writes in this save already landed
       return { ok: false, error: targetErr };
