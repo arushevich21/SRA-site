@@ -5,6 +5,7 @@ import { supabase } from '../supabase';
 import { EMPEROR_ACC_BASE_URLS } from '../emperor';
 import { ingestAccRaceSession } from './race-results-store';
 import { buildLapLedgerFile, ingestLapLedgerInto, ingestQualifyingInto } from './lap-ledger-store';
+import { ingestPrequalLaps } from './prequal-ingest';
 
 const LOCK_RECLAIM_MS = 5 * 60 * 1000;
 const REFRESH_STATE_ID = 'global';
@@ -244,6 +245,16 @@ async function runServerRefresh(
           }
         } catch (ledgerErr) {
           console.error(`ACC lap-ledger ingest failed for ${entry.resultsJsonUrl}:`, ledgerErr);
+        }
+        // Endurance pre-qualifying laps — a no-op unless this file is from a
+        // pre-qual server/track inside its window. Same downloaded file, no
+        // extra Emperor request. Own try/catch: a miss is recoverable with
+        // scripts/backfill-prequal.ts and must not leave the session unmarked.
+        try {
+          const n = await ingestPrequalLaps(supabase, baseUrl, entry.resultsJsonUrl, raw);
+          if (n > 0) console.log(`ACC refresh: recorded ${n} pre-qual lap(s) from ${entry.resultsJsonUrl}`);
+        } catch (prequalErr) {
+          console.error(`ACC pre-qual ingest failed for ${entry.resultsJsonUrl}:`, prequalErr);
         }
         const tRace = Date.now();
 

@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import type { AccHotLapEntry } from '@sra/shared-types';
 import type { ChampionshipContent } from '@/content/championships';
 import { getChampionships } from './championships-store';
+import { getCurrentPrequalEvent } from './acc/prequal-store';
 import { accTrackKeyForDisplay } from '@/content/sim-catalog';
 import { ACC_PAST_SEASON_TRACKS } from '@/content/acc-past-season-tracks';
 import {
@@ -55,14 +56,19 @@ export async function hasSeasonalReleased(): Promise<boolean> {
   );
 }
 
+// The Hot Lap (Endurance) tab shows once an endurance round is released OR an
+// endurance pre-qualifying window has opened — the pre-qual board lives on
+// that tab (see [sim]/leaderboards/endurance), so it must appear the moment
+// pre-qual opens without an admin also flipping a round's release toggle.
 export async function hasEnduranceReleased(): Promise<boolean> {
   const champs = await getChampionships();
-  return champs.some(
+  const released = champs.some(
     (c) =>
       c.game === 'ACC' &&
       isEnduranceChampionship(c) &&
       c.schedule.some((r) => r.hotlapReleased),
   );
+  return released || (await getCurrentPrequalEvent()) !== null;
 }
 
 // Full released boards, grouped by championship, for the Seasonal page.

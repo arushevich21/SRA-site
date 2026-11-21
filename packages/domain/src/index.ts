@@ -112,6 +112,17 @@ export {
 } from './acc/lap-ledger.js';
 
 export {
+  extractAccValidLaps,
+  computePrequalStandings,
+  type AccValidLap,
+  type PrequalLap,
+  type PrequalEntryInput,
+  type PrequalOptions,
+  type PrequalDriverResult,
+  type PrequalStandingRow,
+} from './acc/prequal.js';
+
+export {
   MAX_ROUND_POINTS,
   driverFloor,
   driverCeiling,
