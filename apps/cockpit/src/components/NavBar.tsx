@@ -160,8 +160,15 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
   // round. Other sims keep the per-championship list.
   const isEndurance = (c: ChampionshipContent) =>
     (c.formatTag ?? '').trim().toLowerCase() === 'endurance';
+  // Shown for a released endurance round, or for any live endurance event
+  // taking registrations — that page carries its pre-qualifying board, which
+  // has to be reachable from the moment pre-qual opens (the server-side tab
+  // row does the exact check: hasEnduranceReleased).
   const hasEndurance = champsForSim.some(
-    (c) => isEndurance(c) && c.schedule.some((r) => r.hotlapReleased),
+    (c) =>
+      isEndurance(c) &&
+      (c.schedule.some((r) => r.hotlapReleased) ||
+        (!!c.registrationKey && !c.concluded && !c.teaserOnly)),
   );
   const leaderboardItem: NavItem =
     sim.game === 'ACC'
@@ -177,7 +184,7 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
             { label: 'Hot Stint Qualifying', href: `/${sim.slug}/leaderboards/hotstint-qualifying` },
             { label: '#Jagoff', href: `/${sim.slug}/leaderboards/jagoff` },
             ...(hasEndurance
-              ? [{ label: 'Hot Lap (Endurance)', href: `/${sim.slug}/leaderboards/endurance` }]
+              ? [{ label: 'Endurance Pre-Qual', href: `/${sim.slug}/leaderboards/endurance` }]
               : []),
             { label: 'Sweatshop 💦', href: `/${sim.slug}/leaderboards/sweatshop` },
           ],

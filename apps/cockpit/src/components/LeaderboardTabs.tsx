@@ -8,8 +8,8 @@ import { usePathname } from 'next/navigation';
 //   • Hot Lap (Seasonal)         — per-season single-lap boards (season dropdown)
 //   • Hot Stint                  — always-on per-track best 5-lap-average board
 //   • Hot Stint (Seasonal)       — per-season stint boards (season dropdown)
-//   • Hot Lap (Endurance)        — endurance pre-qual board (only once an
-//                                  endurance championship releases a round)
+//   • Endurance Pre-Qual         — endurance pre-qual board (once an
+//                                  endurance round is released or pre-qual opens)
 //   • Hot Stint Qualifying       — pre-season classification board, sourced
 //                                  from classification_status_public (an
 //                                  external bot's data, not this app's own
@@ -60,7 +60,7 @@ export function LeaderboardTabs({
     { label: 'Hot Lap (Seasonal)', href: `/${simSlug}/leaderboards/seasonal`, active: onHotlapSeasonal, show: showSeasonal },
     { label: 'Hot Stint', href: `/${simSlug}/leaderboards/hotstint`, active: onStint, show: true },
     { label: 'Hot Stint (Seasonal)', href: `/${simSlug}/leaderboards/hotstint/seasonal`, active: onStintSeasonal, show: showSeasonal },
-    { label: 'Hot Lap (Endurance)', href: `/${simSlug}/leaderboards/endurance`, active: onEndurance, show: showEndurance },
+    { label: 'Endurance Pre-Qual', href: `/${simSlug}/leaderboards/endurance`, active: onEndurance, show: showEndurance },
     { label: 'Hot Stint Qualifying', href: `/${simSlug}/leaderboards/hotstint-qualifying`, active: onHotStintQualifying, show: showHotStintQualifying },
     { label: '#Jagoff', href: `/${simSlug}/leaderboards/jagoff`, active: onJagoff, show: showJagoff },
     { label: 'Sweatshop 💦', href: `/${simSlug}/leaderboards/sweatshop`, active: onSweatshop, show: true },
