@@ -34,6 +34,8 @@ export function prequalClassForCar(carModelId: number): string {
   return group === 'GTC' ? 'CUP' : group;
 }
 
+type ChampRef = { title: string; slug: string; registration_key: string | null };
+
 type EventRow = {
   id: string;
   championship_id: string;
@@ -43,29 +45,17 @@ type EventRow = {
   laps_counted: number;
   no_time_ms: number;
   class_order: string[];
-  championships: { title: string; slug: string } | { title: string; slug: string }[] | null;
+  championships: ChampRef | ChampRef[] | null;
 };
 
 function one<T>(rel: T | T[] | null): T | null {
   return Array.isArray(rel) ? (rel[0] ?? null) : rel;
 }
 
-// The pre-qual event to show: the most recent one that has opened. null when
-// none has (or the tables don't exist yet — pre-qual is then just "off").
-export async function getCurrentPrequalEvent(): Promise<PrequalEvent | null> {
-  const { data, error } = await supabase
-    .from('prequal_events')
-    .select('id, championship_id, track_key, opens_at, closes_at, laps_counted, no_time_ms, class_order, championships(title, slug)')
-    .lte('opens_at', new Date().toISOString())
-    .order('opens_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    if (error.code !== '42P01') console.error('prequal: loading event failed:', error.message);
-    return null;
-  }
-  if (!data) return null;
-  const r = data as unknown as EventRow;
+const EVENT_COLUMNS =
+  'id, championship_id, track_key, opens_at, closes_at, laps_counted, no_time_ms, class_order, championships!inner(title, slug, registration_key)';
+
+function toEvent(r: EventRow): PrequalEvent {
   const champ = one(r.championships);
   return {
     id: r.id,
@@ -79,6 +69,40 @@ export async function getCurrentPrequalEvent(): Promise<PrequalEvent | null> {
     noTimeMs: r.no_time_ms,
     classOrder: r.class_order,
   };
+}
+
+// The pre-qual event to show: the most recent one that has opened. null when
+// none has (or the tables don't exist yet — pre-qual is then just "off").
+export async function getCurrentPrequalEvent(): Promise<PrequalEvent | null> {
+  const { data, error } = await supabase
+    .from('prequal_events')
+    .select(EVENT_COLUMNS)
+    .lte('opens_at', new Date().toISOString())
+    .order('opens_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (error.code !== '42P01') console.error('prequal: loading event failed:', error.message);
+    return null;
+  }
+  return data ? toEvent(data as unknown as EventRow) : null;
+}
+
+// The pre-qual event whose championship registers under this key — the
+// bot's entry point (it only knows registration keys). Most recent first.
+export async function getPrequalEventByRegistrationKey(registrationKey: string): Promise<PrequalEvent | null> {
+  const { data, error } = await supabase
+    .from('prequal_events')
+    .select(EVENT_COLUMNS)
+    .eq('championships.registration_key', registrationKey)
+    .order('opens_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (error.code !== '42P01') console.error('prequal: loading event by key failed:', error.message);
+    return null;
+  }
+  return data ? toEvent(data as unknown as EventRow) : null;
 }
 
 type RegistrationRow = {

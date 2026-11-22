@@ -31,7 +31,13 @@ type PrequalEventRow = {
   track_key: string;
   opens_at: string;
   closes_at: string;
+  championships: { registration_key: string | null } | { registration_key: string | null }[] | null;
 };
+
+function registrationKeyOf(e: PrequalEventRow): string | null {
+  const c = Array.isArray(e.championships) ? e.championships[0] : e.championships;
+  return c?.registration_key ?? null;
+}
 
 // The events list is tiny and changes about once a season; re-reading it for
 // every result file across every server would be pure waste.
@@ -42,7 +48,7 @@ async function loadEvents(client: SupabaseClient): Promise<PrequalEventRow[]> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.rows;
   const { data, error } = await client
     .from('prequal_events')
-    .select('id, source, server_id, track_key, opens_at, closes_at');
+    .select('id, source, server_id, track_key, opens_at, closes_at, championships(registration_key)');
   if (error) {
     // 42P01 = table missing (migration not applied yet): pre-qual is simply
     // off, not an ingest failure.
@@ -114,7 +120,20 @@ export async function ingestPrequalLaps(
       .upsert(rows, { onConflict: 'event_id,file_key,lap_index', ignoreDuplicates: true })
       .select('lap_index');
     if (error) throw new Error(`prequal_laps insert failed for ${fileKey}: ${error.message}`);
-    recorded += data?.length ?? 0;
+    const added = data?.length ?? 0;
+    recorded += added;
+
+    // New laps can reorder the pre-qual grid, and SRA-Bot writes that order
+    // into the ACCSM entry list (defaultGridPosition) on its next push — so
+    // queue one. Roster changes already queue pushes via the registration
+    // triggers; this covers the grid moving with no roster change, including
+    // the last sessions before the window closes. Best-effort: a failed
+    // enqueue only delays the grid until the next push of any kind.
+    const key = registrationKeyOf(e);
+    if (added > 0 && key) {
+      const { error: enqErr } = await client.rpc('enqueue_entrylist_push', { p_registration_keys: [key] });
+      if (enqErr) console.error(`prequal: enqueue_entrylist_push(${key}) failed: ${enqErr.message}`);
+    }
   }
   return recorded;
 }
