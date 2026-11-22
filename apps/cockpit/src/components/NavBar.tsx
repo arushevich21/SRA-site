@@ -160,15 +160,17 @@ function buildSimNav(sim: SimConfig, championships: ChampionshipContent[]): NavI
   // round. Other sims keep the per-championship list.
   const isEndurance = (c: ChampionshipContent) =>
     (c.formatTag ?? '').trim().toLowerCase() === 'endurance';
-  // Shown for a released endurance round, or for any live endurance event
-  // taking registrations — that page carries its pre-qualifying board, which
-  // has to be reachable from the moment pre-qual opens (the server-side tab
-  // row does the exact check: hasEnduranceReleased).
+  // Shown for a released endurance round, or for any endurance event with a
+  // registration key that isn't concluded — that page carries its
+  // pre-qualifying board, which has to be reachable from the moment pre-qual
+  // opens (the server-side tab row does the exact check: hasEnduranceReleased).
+  // Teaser status deliberately doesn't hide it: pre-qual can open while the
+  // event page is still a teaser (it did, for the Multiclass Enduro).
   const hasEndurance = champsForSim.some(
     (c) =>
       isEndurance(c) &&
       (c.schedule.some((r) => r.hotlapReleased) ||
-        (!!c.registrationKey && !c.concluded && !c.teaserOnly)),
+        (!!c.registrationKey && !c.concluded)),
   );
   const leaderboardItem: NavItem =
     sim.game === 'ACC'
