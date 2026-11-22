@@ -441,10 +441,18 @@ export async function RegisterBody({
         //
         // Only reached when maxTeamSize > 1; a solo championship never renders
         // a teammate picker.
+        //
+        // Only drivers who have signed in to this site (drivers.user_id set by
+        // Discord OAuth). The drivers table also holds ~2,400 rows pre-seeded
+        // from the old members list who have never logged in — they can't see
+        // the entry, withdraw, or fix their own details, so they shouldn't be
+        // pickable. This also keeps an ungraded event's pool under PostgREST's
+        // 1,000-row cap, which previously cut the list off alphabetically.
         let teammateQuery = adminClient
           .from('drivers')
           .select('id, display_name, tier, division_id, is_sralien')
-          .neq('id', driver.id);
+          .neq('id', driver.id)
+          .not('user_id', 'is', null);
 
         if (requiresDivision) {
           teammateQuery = teammateQuery.eq('division_id', driver.division_id);
@@ -492,6 +500,7 @@ export async function RegisterBody({
               allowedCars={champ.allowedCars}
               simSlug={simSlug}
               availableDrivers={availableDrivers}
+              requiresDivision={requiresDivision}
               existingTeamNames={teams.map((t) => t.team_name)}
             />
           </>

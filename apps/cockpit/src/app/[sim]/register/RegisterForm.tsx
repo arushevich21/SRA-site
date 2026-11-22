@@ -21,6 +21,8 @@ type Props = {
   simSlug: string;
   availableDrivers: AvailableDriver[];
   existingTeamNames: string[];
+  // Graded series (GT3 Team Series): teammates must share your division.
+  requiresDivision: boolean;
 };
 
 export default function RegisterForm({
@@ -32,6 +34,7 @@ export default function RegisterForm({
   simSlug,
   availableDrivers,
   existingTeamNames,
+  requiresDivision,
 }: Props) {
   const [state, action, pending] = useActionState<RegisterState, FormData>(
     registerTeam,
@@ -136,13 +139,16 @@ export default function RegisterForm({
             Teammate{maxTeammates > 1 ? 's' : ''}
             {requiredTeammates > 0 && <span className="text-gold"> *</span>}{' '}
             <span className="text-txt-3/50 normal-case tracking-normal">
-              {selected.size}/{maxTeammates} · same division only
+              {selected.size}/{maxTeammates}
+              {requiresDivision ? ' · same division only' : ' · drivers with an SRA site account'}
             </span>
           </label>
 
           {availableDrivers.length === 0 ? (
             <p className="font-mono text-[12px] text-txt-3 px-4 py-4 border border-line">
-              No available drivers in your division right now.
+              {requiresDivision
+                ? 'No available drivers in your division right now.'
+                : 'No available drivers right now — teammates need to sign in to the SRA site once before they can be picked.'}
               {requiredTeammates > 0 && (
                 <>
                   {' '}
