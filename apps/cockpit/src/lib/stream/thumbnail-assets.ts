@@ -51,6 +51,15 @@ export function thumbnailFonts(): Promise<{ name: string; data: ArrayBuffer; wei
   });
 }
 
+// JetBrains Mono SemiBold — the site's label face (font-mono kickers such as
+// "— Standings"), for small tracked-out labels on generated graphics.
+export function labelFont(): Promise<{ name: string; data: ArrayBuffer; weight: 600; style: 'normal' }> {
+  return memo('font:mono', async () => {
+    const buf = await readFile(path.join(FONT_DIR, 'JetBrainsMono-600.woff'));
+    return { name: 'JetBrains Mono', data: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), weight: 600 as const, style: 'normal' as const };
+  });
+}
+
 // The circuit hero photo (the hot-lap boards' splash art), cropped to the
 // thumbnail frame, softened and darkened so white and gold type sits on it.
 export function thumbnailBackdrop(photoPublicPath: string): Promise<string> {
