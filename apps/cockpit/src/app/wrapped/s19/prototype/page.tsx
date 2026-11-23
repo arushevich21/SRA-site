@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { requireAdmin } from '@/lib/require-admin';
 import { getCurrentDriverContext } from '@/lib/current-driver';
 import { getS19Wrapped } from '@/lib/wrapped/s19-prototype';
-import { WrappedPrototype, type Direction } from './WrappedPrototype';
+import { WrappedPrototype } from './WrappedPrototype';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,6 @@ export default async function WrappedPrototypePage({
   await requireAdmin();
   const q = await searchParams;
   const pick = (k: string) => (typeof q[k] === 'string' ? (q[k] as string) : undefined);
-  const direction: Direction = pick('v') === 'b' || pick('v') === 'c' ? (pick('v') as Direction) : 'a';
 
   const me = await getCurrentDriverContext();
   let { roster, card } = await getS19Wrapped(pick('d') ?? me.steamId);
@@ -33,7 +32,7 @@ export default async function WrappedPrototypePage({
         Season 19 Wrapped
       </h1>
       {card ? (
-        <WrappedPrototype card={card} roster={roster} direction={direction} />
+        <WrappedPrototype card={card} roster={roster} />
       ) : (
         <p className="font-sans text-txt-3">No Season 19 race data found.</p>
       )}

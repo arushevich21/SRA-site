@@ -22,6 +22,7 @@ type RawCar = {
   position: number;
   lapsCompleted: number;
   totalTimeMs: number;
+  raceNumber?: number;
   currentDriverSteamId?: string;
   drivers?: { steamId: string; firstName?: string; lastName?: string }[];
 };
@@ -55,7 +56,24 @@ export type WrappedDriverCard = {
   archetypeEvidence: string;
   roundsStarted: number;
   totalRounds: number;
+  /** Season strip: every round in order; position null = didn't start. */
+  rounds: { round: number; code: string; track: string; position: number | null; field: number }[];
+  /** Rivalry chart: both finishing positions per round (null = not classified). */
+  rivalry: { round: number; code: string; me: number | null; them: number | null }[];
+  /** Field plot behind the archetype: everyone's value, the driver's own marked. */
+  field: { label: string; values: number[]; mine: number; higherIsBetter: boolean };
 };
+
+// Three-letter circuit codes for the season strip, F1-graphics style.
+const TRACK_CODES: Record<string, string> = {
+  barcelona: 'BCN', brands_hatch: 'BRH', cota: 'COA', donington: 'DON', hungaroring: 'HUN',
+  imola: 'IMO', indianapolis: 'IND', kyalami: 'KYA', laguna_seca: 'LAG', misano: 'MIS',
+  monza: 'MON', mount_panorama: 'BAT', nurburgring: 'NÜR', oulton_park: 'OUL', paul_ricard: 'PRI',
+  red_bull_ring: 'RBR', silverstone: 'SIL', snetterton: 'SNE', spa: 'SPA', suzuka: 'SUZ',
+  valencia: 'VAL', watkins_glen: 'WGI', zandvoort: 'ZAN', zolder: 'ZOL',
+};
+const trackCode = (key: string) => TRACK_CODES[key] ?? key.slice(0, 3).toUpperCase();
+const trackName = (key: string) => key.split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 
 const steamOf = (car: RawCar) => car.currentDriverSteamId ?? car.drivers?.[0]?.steamId ?? '';
 const bare = (id: string) => id.replace(/^S/, '');
@@ -176,25 +194,38 @@ async function load() {
   // Names + numbers for everyone who raced.
   const raced = new Set<string>();
   const fileNames = new Map<string, string>();
+  // The number on the car in S19 (most-used race number), not today's
+  // profile number — the S19 champion has since moved to #1.
+  const raceNumbers = new Map<string, Map<number, number>>();
   for (const r of rows)
     for (const c of r.results) {
       const id = steamOf(c);
       if (!id) continue;
-      if (r.session_type === 'Race') raced.add(id);
+      if (r.session_type === 'Race') {
+        raced.add(id);
+        if (c.raceNumber != null && c.raceNumber > 0) {
+          const m = raceNumbers.get(id) ?? raceNumbers.set(id, new Map()).get(id)!;
+          m.set(c.raceNumber, (m.get(c.raceNumber) ?? 0) + 1);
+        }
+      }
       const d = c.drivers?.find((x) => x.steamId === id) ?? c.drivers?.[0];
       if (d && !fileNames.has(id)) fileNames.set(id, [d.firstName, d.lastName].filter(Boolean).join(' '));
     }
+  const seasonNumber = (id: string) => {
+    const m = raceNumbers.get(id);
+    return m && m.size ? [...m.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
+  };
   const { data: drivers } = await supabase
     .from('drivers')
     .select('steam_id, first_name, last_name, display_name, driver_number')
     .in('steam_id', [...raced]);
   const people = new Map<string, { name: string; number: number | null }>();
-  for (const id of raced) people.set(id, { name: fileNames.get(id) || id, number: null });
+  for (const id of raced) people.set(id, { name: fileNames.get(id) || id, number: seasonNumber(id) });
   for (const d of drivers ?? []) {
     const full = [d.first_name, d.last_name].filter(Boolean).join(' ').trim();
     people.set(d.steam_id, {
       name: full || (d.display_name ?? '').split('┊')[0].trim() || people.get(d.steam_id)!.name,
-      number: d.driver_number,
+      number: seasonNumber(d.steam_id) ?? d.driver_number,
     });
   }
 
@@ -207,7 +238,7 @@ async function load() {
   };
 }
 
-const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v2'], { revalidate: 3600 });
+const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v3'], { revalidate: 3600 });
 
 export type WrappedRosterEntry = { steamId: string; name: string; division: number };
 
@@ -271,6 +302,38 @@ export async function getS19Wrapped(steamId: string | null): Promise<{
 
   const n = findNemesis(steamId, div.races);
   const me = people.get(steamId);
+
+  const posIn = (race: WrappedRace, id: string) => race.entries.find((e) => e.steamId === id)?.position ?? null;
+  const rounds = div.races.map((race) => ({
+    round: race.round,
+    code: trackCode(race.trackKey),
+    track: trackName(race.trackKey),
+    position: posIn(race, steamId),
+    field: race.entries.length,
+  }));
+  const rivalry = n
+    ? div.races.map((race) => ({
+        round: race.round,
+        code: trackCode(race.trackKey),
+        me: posIn(race, steamId),
+        them: posIn(race, n.steamId),
+      }))
+    : [];
+
+  // The field plot shows the stat the archetype was judged on, against the
+  // same comparison group. Ironman/Racer weren't judged on a spread, so they
+  // show consistency (the most telling general stat) instead.
+  const field: WrappedDriverCard['field'] =
+    archetype.key === 'grinder'
+      ? { label: 'Practice laps, whole league', values: leaguePractice, mine: numbers.practiceLaps, higherIsBetter: true }
+      : archetype.key === 'charger' || archetype.key === 'qualifier'
+        ? { label: `Places gained per race, Division ${division}`, values: divGains, mine: myGain ?? 0, higherIsBetter: true }
+        : {
+            label: `Consistency rating, Division ${division}`,
+            values: divConsistency.map((c) => Math.round(c * 100)),
+            mine: Math.round((myConsistency ?? 0) * 100),
+            higherIsBetter: true,
+          };
   return {
     roster,
     card: {
@@ -295,6 +358,9 @@ export async function getS19Wrapped(steamId: string | null): Promise<{
       archetypeEvidence: evidence[archetype.key],
       roundsStarted,
       totalRounds,
+      rounds,
+      rivalry,
+      field,
     },
   };
 }
