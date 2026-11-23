@@ -209,14 +209,28 @@
 @keyframes wx-road { to { background-position: 0 68px; } }
 @media (prefers-reduced-motion: reduce) { .wx-road::before { animation: none; } }
 
-/* Share card */
-.wx-share {
+/* Share card: a poster. Gold hero on top (who, and what kind of driver),
+   carbon body below with two short lists and the headline numbers. Fills
+   the stage edge to edge, ignoring the slide padding. */
+.wx-poster { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.wx-poster-hero {
+  flex: 0 0 47%;
+  display: flex;
+  flex-direction: column;
+  padding: 50px 24px 20px;
+  background: #e6b53d;
+  color: #0a0b0e;
+}
+.wx-poster-name { font: 800 clamp(20px, 6.5cqw, 28px)/1 var(--font-display); }
+.wx-poster-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px 22px;
   background: #0a0b0e;
   color: #fff;
 }
-.wx-share dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 18px; align-items: baseline; }
-.wx-share dt { font: 500 14px/1.2 var(--font-sans); color: rgba(255, 255, 255, .6); }
-.wx-share dd { font: 800 24px/1.05 var(--font-display); }
-
-/* On the carbon share card a "did not start" board needs light ink. */
-.wx-share .wx-board[data-dns="true"] { color: #fff; border-color: rgba(255, 255, 255, .5); }
+.wx-poster-label { font: 600 13px/1.2 var(--font-sans); color: rgba(255, 255, 255, .55); margin-bottom: 8px; }
+.wx-poster-item { font: 500 clamp(14px, 4.2cqw, 17px)/1.2 var(--font-sans); }
+.wx-poster-item b { font-weight: 800; }
+.wx-poster-stat { font: 800 clamp(24px, 8cqw, 34px)/1 var(--font-display); }

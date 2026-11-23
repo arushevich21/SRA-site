@@ -242,63 +242,88 @@ function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
       ),
     },
     {
-      bg: C.carbon,
-      fg: C.white,
+      // Share card: a poster, not a profile. Gold hero (who + what kind of
+      // driver), then two short lists side by side, then the headline
+      // numbers and the sign-off.
+      bg: C.gold,
+      fg: C.carbon,
       ms: null, // the share card stays up
-      render: () => (
-        <div className="flex flex-col h-full wx-share -mx-[26px] -mb-[30px] px-[26px] pb-[30px]">
-          {/* eslint-disable-next-line @next/next/no-img-element -- static brand lockup */}
-          <img src="/badges/sra-lockup.webp" alt="Sim Racing Alliance" width={132} height={38} className="wx-in" style={d(0)} />
-          <div className="mt-8 flex items-center gap-4 wx-in" style={d(120)}>
-            {card.number != null && (
-              <span style={{ fontSize: 54 }}>
-                <span className="wx-panel">{card.number}</span>
-              </span>
-            )}
-            <span className="font-display font-black text-[34px] leading-[.9]">{card.name}</span>
-          </div>
-          <p className="font-display font-extrabold text-[44px] leading-[.95] mt-6 wx-in" style={{ ...d(220), color: C.gold }}>
-            {card.archetype.title}
-          </p>
-          <div className="grid grid-cols-8 gap-1.5 mt-auto wx-in" style={d(300)} aria-label="Finishing position each round">
-            {card.rounds.map((r) => (
-              <div
-                key={r.round}
-                className="wx-board !border-2 !rounded-[4px] !shadow-none"
-                data-best={r.position != null && r.position === best}
-                data-dns={r.position == null}
-                style={{ fontSize: 0 }}
-              >
-                <b className="!text-[15px]">{r.position != null ? `P${r.position}` : '—'}</b>
-                <small className="!text-[8px] !mt-0.5">{r.code}</small>
+      render: () => {
+        const topRounds = finishes
+          .slice()
+          .sort((a, b) => a.position! - b.position! || a.round - b.round)
+          .slice(0, 3);
+        return (
+          <div className="wx-poster">
+            <div className="wx-poster-hero">
+              <div className="flex items-center gap-3 wx-in" style={d(0)}>
+                {card.number != null && (
+                  <span style={{ fontSize: 'clamp(26px, 9cqw, 40px)' }}>
+                    <span className="wx-panel">{card.number}</span>
+                  </span>
+                )}
+                <span className="wx-poster-name">{card.name}</span>
               </div>
-            ))}
+              <div className="wx-name mt-auto">
+                {card.archetype.title.split(' ').map((w, k) => (
+                  <Line key={k} delay={120 + k * 90}>
+                    {w}
+                  </Line>
+                ))}
+              </div>
+            </div>
+
+            <div className="wx-poster-body">
+              <div className="grid grid-cols-2 gap-5 wx-in" style={d(320)}>
+                <section>
+                  <h3 className="wx-poster-label">Best rounds</h3>
+                  <ol className="flex flex-col gap-1.5">
+                    {topRounds.map((r) => (
+                      <li key={r.round} className="wx-poster-item">
+                        <b>P{r.position}</b> {r.track}
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+                <section>
+                  <h3 className="wx-poster-label">Nemesis</h3>
+                  {nm ? (
+                    <>
+                      <p className="wx-poster-item">
+                        <b>{nm.name}</b>
+                      </p>
+                      <p className="wx-poster-item mt-1.5">
+                        You {nm.ahead}, them {nm.behind}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="wx-poster-item">Nobody, really</p>
+                  )}
+                </section>
+              </div>
+
+              <div className="grid grid-cols-2 gap-5 mt-auto wx-in" style={d(420)}>
+                <div>
+                  <h3 className="wx-poster-label">Distance</h3>
+                  <p className="wx-poster-stat">{fmt(n.km)} km</p>
+                </div>
+                <div>
+                  <h3 className="wx-poster-label">Division {card.division}</h3>
+                  <p className="wx-poster-stat">
+                    {n.races} of {card.totalRounds} rounds
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between mt-6 wx-in" style={d(500)}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- static brand lockup */}
+                <img src="/badges/sra-lockup.webp" alt="Sim Racing Alliance" width={112} height={32} />
+                <span className="text-[12px] text-white/55">Season 19 Wrapped</span>
+              </div>
+            </div>
           </div>
-          <dl className="mt-7 wx-in" style={d(380)}>
-            <dt>Distance</dt>
-            <dd>{fmt(n.km)} km</dd>
-            {best != null && bestRound && (
-              <>
-                <dt>Best finish</dt>
-                <dd>
-                  P{best}, {bestRound.track}
-                </dd>
-              </>
-            )}
-            {nm && (
-              <>
-                <dt>Nemesis</dt>
-                <dd>{nm.name}</dd>
-              </>
-            )}
-            <dt>Rounds</dt>
-            <dd>
-              {n.races} of {card.totalRounds}, Division {card.division}
-            </dd>
-          </dl>
-          <p className="mt-6 text-[13px] text-white/50">simracingalliance.com</p>
-        </div>
-      ),
+        );
+      },
     },
   );
   return slides;
