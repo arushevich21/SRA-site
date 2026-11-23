@@ -119,7 +119,12 @@ export async function updateProfileDetails(
     fallback: `${firstName} ${lastName}`,
   });
 
-  const { error } = await supabase
+  // Service-role write, scoped to the session's own row. Signed-in users have
+  // no write grant on drivers (20261123b_lock_down_driver_writes.sql): the
+  // browser holds a session-bearing Supabase client, so any column a user can
+  // write directly — is_admin, is_champion, discord_id — is a self-escalation.
+  // Every field below was validated above.
+  const { error } = await adminClient
     .from('drivers')
     .update({
       first_name: firstName,
