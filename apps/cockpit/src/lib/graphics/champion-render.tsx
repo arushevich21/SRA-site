@@ -123,7 +123,8 @@ export async function renderChampion(
     thumbnailFonts(),
     thumbnailImage(`/badges/Division ${champs.division}.png`, wide ? 190 : 150, wide ? 120 : 100),
     thumbnailImage('/badges/GT3TS_Logo.png', wide ? 260 : 210, wide ? 120 : 96),
-    thumbnailImage('/badges/SRA_FLAG-17.png', wide ? 110 : 90, wide ? 60 : 48).catch(() => null),
+    // The nav's SRA lockup (flag + wordmark), the same mark as the site header.
+    thumbnailImage('/badges/sra-lockup.webp', wide ? 220 : 180, wide ? 64 : 52).catch(() => null),
     Promise.all(people.map((p) => photo(p.photoUrl, photoW, photoH))),
     Promise.all(people.map((p) => carLogo(p, wide ? 64 : 48))),
   ]);
@@ -358,10 +359,7 @@ export async function renderChampion(
             color: MUTED,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            {sra && <Img image={sra} />}
-            <div style={{ display: 'flex', marginLeft: 16 }}>SIM RACING ALLIANCE</div>
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>{sra && <Img image={sra} />}</div>
           <div style={{ display: 'flex' }}>SIMRACINGALLIANCE.COM</div>
         </div>
       </div>
