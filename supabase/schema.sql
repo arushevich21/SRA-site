@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict db0h3ATt6Wg8pdpaHqxg0AagZ8uNa0CrNyz3Wl3Tjs7ieOhfmbSF4LW3d4gW7Mn
+\restrict Pjh46PkXkCKTJEtlYXpSr1rqEfBhnr30FtjPXeP0RkZUAf6Glt5KneqYsvifnCy
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -588,6 +588,54 @@ $$;
 
 
 --
+-- Name: drivers_champion_number_swap(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.drivers_champion_number_swap() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+declare
+  v_full text;
+begin
+  if new.is_champion then
+    new.reserved_number := old.driver_number;
+    new.driver_number   := 1;
+  else
+    new.driver_number   := old.reserved_number;
+    new.reserved_number := null;
+  end if;
+
+  v_full := trim(concat_ws(' ', new.first_name, new.last_name));
+  if v_full <> '' then
+    new.display_name := v_full || coalesce('┊' || new.driver_number, '');
+  end if;
+  return new;
+end $$;
+
+
+--
+-- Name: drivers_guard_reserved_number(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.drivers_guard_reserved_number() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.driver_number is not null and exists (
+       select 1 from drivers
+       where  reserved_number = new.driver_number
+         and  id <> new.id)
+  then
+    raise exception 'driver_number % is reserved for the reigning champion', new.driver_number
+      using errcode = '23505';
+  end if;
+  return new;
+end $$;
+
+
+--
 -- Name: drivers_overview(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -666,6 +714,28 @@ CREATE FUNCTION public.has_admin_permission(perm text) RETURNS boolean
       select 1 from admin_permissions p
       where p.user_id = (select auth.uid()) and p.permission = perm
     );
+$$;
+
+
+--
+-- Name: prequal_top_laps(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.prequal_top_laps(p_event_id text) RETURNS TABLE(steam_id text, car_model_id integer, lap_ms integer, laps_in_car bigint)
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+  SELECT r.steam_id, r.car_model_id, r.lap_ms, r.laps_in_car
+  FROM (
+    SELECT l.steam_id, l.car_model_id, l.lap_ms,
+           row_number() OVER w AS rn,
+           count(*)     OVER (PARTITION BY l.steam_id, l.car_model_id) AS laps_in_car
+    FROM public.prequal_laps l
+    WHERE l.event_id = p_event_id
+    WINDOW w AS (PARTITION BY l.steam_id, l.car_model_id ORDER BY l.lap_ms)
+  ) r
+  JOIN public.prequal_events e ON e.id = p_event_id
+  WHERE r.rn <= e.laps_counted
 $$;
 
 
@@ -965,6 +1035,23 @@ BEGIN
   RETURN NULL;
 END;
 $$;
+
+
+--
+-- Name: set_champion(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.set_champion(p_driver_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+begin
+  if not exists (select 1 from drivers where id = p_driver_id) then
+    raise exception 'no driver %', p_driver_id;
+  end if;
+  update drivers set is_champion = false where is_champion and id <> p_driver_id;
+  update drivers set is_champion = true  where id = p_driver_id and not is_champion;
+end $$;
 
 
 --
@@ -2342,8 +2429,11 @@ CREATE TABLE public.drivers (
     is_sponsor boolean,
     is_champion boolean DEFAULT false NOT NULL,
     photo_url text,
+    reserved_number integer,
+    CONSTRAINT drivers_champion_runs_one CHECK (((NOT is_champion) OR (driver_number = 1))),
     CONSTRAINT drivers_country_len CHECK (((country IS NULL) OR (char_length(country) = 2))),
-    CONSTRAINT drivers_number_range CHECK (((driver_number IS NULL) OR ((driver_number >= 2) AND (driver_number <= 999)))),
+    CONSTRAINT drivers_number_range CHECK (((driver_number IS NULL) OR ((driver_number >= 2) AND (driver_number <= 999)) OR ((driver_number = 1) AND is_champion))),
+    CONSTRAINT drivers_reserved_number_range CHECK (((reserved_number IS NULL) OR (is_champion AND ((reserved_number >= 2) AND (reserved_number <= 999))))),
     CONSTRAINT drivers_short_name_len CHECK (((short_name IS NULL) OR (char_length((short_name)::text) = 3)))
 );
 
@@ -2786,6 +2876,53 @@ CREATE TABLE public.orientation (
     oriented_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT orientation_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'oriented'::text, 'failed'::text, 'revoked'::text])))
+);
+
+
+--
+-- Name: prequal_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.prequal_events (
+    id text NOT NULL,
+    championship_id uuid NOT NULL,
+    source text NOT NULL,
+    server_id integer NOT NULL,
+    track_key text NOT NULL,
+    opens_at timestamp with time zone NOT NULL,
+    closes_at timestamp with time zone NOT NULL,
+    laps_counted integer DEFAULT 3 NOT NULL,
+    no_time_ms integer DEFAULT 180000 NOT NULL,
+    class_order text[] DEFAULT '{GT3,CUP,GT4}'::text[] NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT prequal_events_check CHECK ((closes_at > opens_at)),
+    CONSTRAINT prequal_events_laps_counted_check CHECK ((laps_counted > 0)),
+    CONSTRAINT prequal_events_no_time_ms_check CHECK ((no_time_ms > 0)),
+    CONSTRAINT prequal_events_server_id_check CHECK ((server_id >= 0)),
+    CONSTRAINT prequal_events_source_check CHECK ((source = ANY (ARRAY['accsm1'::text, 'accsm2'::text])))
+);
+
+
+--
+-- Name: TABLE prequal_events; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.prequal_events IS 'Endurance pre-qualifying windows. Laps from <source> server <server_id> at <track_key> in sessions ending inside [opens_at, closes_at) feed the grid of <championship_id>. Scoring lives in @sra/domain computePrequalStandings.';
+
+
+--
+-- Name: prequal_laps; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.prequal_laps (
+    event_id text NOT NULL,
+    file_key text NOT NULL,
+    lap_index integer NOT NULL,
+    steam_id text NOT NULL,
+    car_model_id integer NOT NULL,
+    lap_ms integer NOT NULL,
+    session_at timestamp with time zone NOT NULL,
+    CONSTRAINT prequal_laps_lap_ms_check CHECK ((lap_ms > 0))
 );
 
 
@@ -3874,6 +4011,22 @@ ALTER TABLE ONLY public.orientation
 
 
 --
+-- Name: prequal_events prequal_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.prequal_events
+    ADD CONSTRAINT prequal_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: prequal_laps prequal_laps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.prequal_laps
+    ADD CONSTRAINT prequal_laps_pkey PRIMARY KEY (event_id, file_key, lap_index);
+
+
+--
 -- Name: ref_times ref_times_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4321,6 +4474,20 @@ CREATE INDEX driver_ratings_driver_id_idx ON public.driver_ratings USING btree (
 
 
 --
+-- Name: drivers_one_champion; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX drivers_one_champion ON public.drivers USING btree (is_champion) WHERE is_champion;
+
+
+--
+-- Name: drivers_reserved_number_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX drivers_reserved_number_key ON public.drivers USING btree (reserved_number) WHERE (reserved_number IS NOT NULL);
+
+
+--
 -- Name: drivers_source_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4346,6 +4513,13 @@ CREATE INDEX orientation_discord_idx ON public.orientation USING btree (discord_
 --
 
 CREATE INDEX orientation_status_idx ON public.orientation USING btree (status);
+
+
+--
+-- Name: prequal_laps_event_driver_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX prequal_laps_event_driver_idx ON public.prequal_laps USING btree (event_id, steam_id, car_model_id, lap_ms);
 
 
 --
@@ -4605,6 +4779,20 @@ CREATE TRIGGER championship_round_division_times_updated_at BEFORE UPDATE ON pub
 --
 
 CREATE TRIGGER championships_updated_at BEFORE UPDATE ON public.championships FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: drivers drivers_champion_number_swap; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER drivers_champion_number_swap BEFORE UPDATE OF is_champion ON public.drivers FOR EACH ROW WHEN ((old.is_champion IS DISTINCT FROM new.is_champion)) EXECUTE FUNCTION public.drivers_champion_number_swap();
+
+
+--
+-- Name: drivers drivers_guard_reserved_number; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER drivers_guard_reserved_number BEFORE INSERT OR UPDATE OF driver_number ON public.drivers FOR EACH ROW EXECUTE FUNCTION public.drivers_guard_reserved_number();
 
 
 --
@@ -4935,6 +5123,22 @@ ALTER TABLE ONLY public.drivers
 
 ALTER TABLE ONLY public.orientation
     ADD CONSTRAINT orientation_driver_id_fkey FOREIGN KEY (driver_id) REFERENCES public.drivers(id);
+
+
+--
+-- Name: prequal_events prequal_events_championship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.prequal_events
+    ADD CONSTRAINT prequal_events_championship_id_fkey FOREIGN KEY (championship_id) REFERENCES public.championships(id) ON DELETE CASCADE;
+
+
+--
+-- Name: prequal_laps prequal_laps_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.prequal_laps
+    ADD CONSTRAINT prequal_laps_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.prequal_events(id) ON DELETE CASCADE;
 
 
 --
@@ -5576,24 +5780,10 @@ CREATE POLICY driver_ratings_select_all ON public.driver_ratings FOR SELECT USIN
 ALTER TABLE public.drivers ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: drivers drivers_insert_own; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY drivers_insert_own ON public.drivers FOR INSERT WITH CHECK ((( SELECT auth.uid() AS uid) = user_id));
-
-
---
 -- Name: drivers drivers_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
 CREATE POLICY drivers_select_own ON public.drivers FOR SELECT USING ((( SELECT auth.uid() AS uid) = user_id));
-
-
---
--- Name: drivers drivers_update_own; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY drivers_update_own ON public.drivers FOR UPDATE USING ((( SELECT auth.uid() AS uid) = user_id));
 
 
 --
@@ -5628,6 +5818,18 @@ CREATE POLICY host_metrics_anon_update ON public.host_metrics FOR UPDATE TO anon
 --
 
 ALTER TABLE public.orientation ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: prequal_events; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.prequal_events ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: prequal_laps; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.prequal_laps ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: ref_times; Type: ROW SECURITY; Schema: public; Owner: -
@@ -6033,5 +6235,5 @@ CREATE POLICY tracks_select_all ON public.tracks FOR SELECT USING (true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict db0h3ATt6Wg8pdpaHqxg0AagZ8uNa0CrNyz3Wl3Tjs7ieOhfmbSF4LW3d4gW7Mn
+\unrestrict Pjh46PkXkCKTJEtlYXpSr1rqEfBhnr30FtjPXeP0RkZUAf6Glt5KneqYsvifnCy
 
