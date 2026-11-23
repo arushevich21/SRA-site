@@ -14,9 +14,9 @@ export function computeDriverDisplayName(input: {
   const full = [input.firstName, input.lastName].filter(Boolean).join(' ').trim();
   if (!full) return input.fallback;
 
-  // The reigning champion always displays #1, regardless of the real number
-  // on file (driver_number stays their permanent number for standings/
-  // registration — see supabase/migrations/20260730_driver_schema_cleanup.sql).
+  // The reigning champion's driver_number is already 1 (their own number is
+  // in reserved_number — 20261123c_champion_runs_number_one.sql); isChampion
+  // stays as a guard so a stale caller can never render their old number.
   //
   // No space anywhere around ┊ — matches the Discord bot's own convention
   // exactly (confirmed against every bot-written display_name in the table,

@@ -81,7 +81,7 @@ export default function NumberBrowser({
               return (
                 <span
                   key={n}
-                  title={`Taken by ${taken.name}`}
+                  title={taken.reserved ? 'Reserved for the champion' : `Taken by ${taken.name}`}
                   className="border border-line/40 px-2 py-2 text-center font-mono text-[13px] tabular-nums text-txt-3/40 line-through cursor-default"
                 >
                   {n}

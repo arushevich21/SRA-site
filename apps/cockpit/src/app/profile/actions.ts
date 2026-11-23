@@ -74,12 +74,6 @@ export async function updateProfileDetails(
   if (shortName.length !== 3) return { error: 'Short name must be exactly 3 characters.' };
   if (country && !isValidCountryCode(country)) return { error: 'Select a valid country.' };
 
-  if (!driverNumberRaw) return { error: 'Driver number is required.' };
-  const driverNumber = Number(driverNumberRaw);
-  if (!Number.isInteger(driverNumber) || driverNumber < 2 || driverNumber > 999) {
-    return { error: 'Driver number must be between 2 and 999.' };
-  }
-
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -98,6 +92,21 @@ export async function updateProfileDetails(
     .eq('user_id', user.id)
     .maybeSingle();
 
+  // The reigning champion runs #1 (stored) with their own number reserved;
+  // both are managed by set_champion() in the DB, never by this form, which
+  // renders the number read-only for them and submits no driver_number.
+  const isChampion = caller?.is_champion === true;
+  let driverNumber: number;
+  if (isChampion) {
+    driverNumber = caller.driver_number as number;
+  } else {
+    if (!driverNumberRaw) return { error: 'Driver number is required.' };
+    driverNumber = Number(driverNumberRaw);
+    if (!Number.isInteger(driverNumber) || driverNumber < 2 || driverNumber > 999) {
+      return { error: 'Driver number must be between 2 and 999.' };
+    }
+  }
+
   const numberChanged = caller?.driver_number != null && driverNumber !== caller.driver_number;
   if (!caller?.is_admin && numberChanged && (await getNumbersLocked())) {
     return {
@@ -105,17 +114,14 @@ export async function updateProfileDetails(
     };
   }
 
-  // No champion-reservation guard needed: #1 isn't a stored number (it's the
-  // is_champion badge), and the champion keeps their own number, protected by
-  // the unique constraint like everyone else's.
-
-  // The reigning D1 champion always displays #1 (see computeDriverDisplayName)
-  // — driver_number below still stores their real permanent number.
+  // A number reserved for the champion's return is rejected by the DB
+  // (drivers_guard_reserved_number, 23505) and lands in the "already taken"
+  // message below, same as any other taken number.
   const displayName = computeDriverDisplayName({
     firstName,
     lastName,
     driverNumber,
-    isChampion: caller?.is_champion ?? false,
+    isChampion,
     fallback: `${firstName} ${lastName}`,
   });
 
@@ -138,7 +144,7 @@ export async function updateProfileDetails(
 
   if (error) {
     if (error.code === UNIQUE_VIOLATION) {
-      return { error: 'That driver number is already taken.' };
+      return { error: 'That driver number is already taken or reserved.' };
     }
     return { error: 'Failed to save. Please try again.' };
   }

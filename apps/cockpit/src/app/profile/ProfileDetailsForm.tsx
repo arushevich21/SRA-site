@@ -11,12 +11,16 @@ export default function ProfileDetailsForm({
   shortName,
   country,
   driverNumber,
+  champion,
 }: {
   firstName: string | null;
   lastName: string | null;
   shortName: string | null;
   country: string | null;
   driverNumber: number | null;
+  // Set while this driver is the reigning champion: they run #1 for the
+  // season and can't change it here (set_champion() in the DB owns it).
+  champion: { reservedNumber: number | null } | null;
 }) {
   const [state, action, pending] = useActionState<ProfileDetailsState, FormData>(
     updateProfileDetails,
@@ -64,27 +68,43 @@ export default function ProfileDetailsForm({
             className="bg-panel-2 border border-line px-4 py-3 font-mono text-[13px] text-txt uppercase placeholder:text-txt-3 focus:outline-none focus:border-gold w-full"
           />
         </div>
-        <div className="flex flex-col gap-2">
-          <label className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3">
-            Driver number (2-999)
-          </label>
-          <input
-            name="driver_number"
-            type="number"
-            min={2}
-            max={999}
-            defaultValue={driverNumber ?? ''}
-            placeholder="e.g. 47"
-            required
-            className="bg-panel-2 border border-line px-4 py-3 font-mono text-[13px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold w-full"
-          />
-          <Link
-            href="/numbers"
-            className="font-mono text-[11px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors"
-          >
-            Browse available numbers →
-          </Link>
-        </div>
+        {champion ? (
+          <div className="flex flex-col gap-2">
+            <span className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3">
+              Driver number
+            </span>
+            <p className="bg-panel-2 border border-gold/40 px-4 py-3 font-mono text-[13px] text-gold">
+              #1 · Champion
+            </p>
+            <p className="font-mono text-[11px] tracking-[.05em] text-txt-3">
+              {champion.reservedNumber != null
+                ? `Your #${champion.reservedNumber} is reserved for your return.`
+                : 'You run #1 while you hold the title.'}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <label className="font-mono text-[11px] tracking-[.25em] uppercase text-txt-3">
+              Driver number (2-999)
+            </label>
+            <input
+              name="driver_number"
+              type="number"
+              min={2}
+              max={999}
+              defaultValue={driverNumber ?? ''}
+              placeholder="e.g. 47"
+              required
+              className="bg-panel-2 border border-line px-4 py-3 font-mono text-[13px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold w-full"
+            />
+            <Link
+              href="/numbers"
+              className="font-mono text-[11px] tracking-[.15em] uppercase text-gold hover:text-gold-soft transition-colors"
+            >
+              Browse available numbers →
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">

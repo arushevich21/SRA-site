@@ -27,7 +27,7 @@ export default async function ProfilePage({
   const { data: driver } = await supabase
     .from('drivers')
     .select(
-      'id, display_name, avatar_url, photo_url, steam_id, steam_verified, discord_id, is_admin, first_name, last_name, short_name, country, driver_number'
+      'id, display_name, avatar_url, photo_url, steam_id, steam_verified, discord_id, is_admin, first_name, last_name, short_name, country, driver_number, reserved_number, is_champion'
     )
     .eq('user_id', user.id)
     .maybeSingle();
@@ -162,7 +162,12 @@ export default async function ProfilePage({
           lastName={driver?.last_name ?? null}
           shortName={driver?.short_name ?? null}
           country={driver?.country ?? null}
-          driverNumber={pickedNumber ?? driver?.driver_number ?? null}
+          driverNumber={
+            driver?.is_champion ? driver.driver_number : (pickedNumber ?? driver?.driver_number ?? null)
+          }
+          champion={
+            driver?.is_champion ? { reservedNumber: driver.reserved_number ?? null } : null
+          }
         />
       </div>
 
