@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getSeasonChampions } from '@/lib/graphics/season-champions';
+import { getDivisionChampions } from '@/lib/graphics/season-champions';
 import {
   championFileName,
   renderChampion,
@@ -33,8 +33,7 @@ export async function GET(
   const query = request.nextUrl.searchParams;
   const format: ChampionFormat = query.get('format') === 'wide' ? 'wide' : 'square';
 
-  const all = await getSeasonChampions(registrationKey);
-  const champs = all.find((c) => c.division === division);
+  const champs = await getDivisionChampions(registrationKey, division);
   if (!champs || (kind === 'team' && !champs.team)) {
     return NextResponse.json({ error: 'no champion for that division/title' }, { status: 404 });
   }

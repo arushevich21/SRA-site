@@ -38,26 +38,32 @@ export type DivisionChampions = {
 
 const bare = (id: string) => id.replace(/^S/, '');
 
-async function load(registrationKey: string): Promise<DivisionChampions[]> {
-  const { data: targets, error } = await supabase
+async function divisionTargets(registrationKey: string) {
+  const { data, error } = await supabase
     .from('championship_accsm_targets')
     .select('emperor_championship_id, division_id')
     .eq('registration_key', registrationKey)
     .order('division_id');
   if (error) throw new Error(error.message);
+  return (data ?? []).map((t) => ({ champId: t.emperor_championship_id as string, division: t.division_id as number }));
+}
 
-  const out: DivisionChampions[] = [];
-  // Sequential on purpose: ACCSM rate-limits per IP (see emperor-standings.ts).
-  for (const t of targets ?? []) {
-    const champId = t.emperor_championship_id as string;
+// One division's champions. Cached per division, so a single graphic costs
+// one ACCSM request (it rate-limits 5 per 20s per IP — fetching all four
+// divisions for every graphic tripped it).
+async function loadDivision(registrationKey: string, division: number): Promise<DivisionChampions | null> {
+  const target = (await divisionTargets(registrationKey)).find((t) => t.division === division);
+  if (!target) return null;
+  const champId = target.champId;
+  {
     const res = await getAccStandings(champId);
-    if (!res.ok) throw new Error(`Standings for division ${t.division_id}: ${res.error}`);
+    if (!res.ok) throw new Error(`Standings for division ${division}: ${res.error}`);
     // Already SRA-scored: team totals are re-scored with each driver's own
     // drop round (applyIndividualTeamDrops inside getAccStandings), and
     // points are net of penalties — the same figures the standings page shows.
     const drivers = Object.values(res.data.driverStandings).flat().sort((a, b) => a.position - b.position);
     const teams = Object.values(res.data.teamStandings).flat().sort((a, b) => a.position - b.position);
-    if (drivers.length === 0) continue;
+    if (drivers.length === 0) return null;
 
     const { data: sessions } = await supabase
       .from('acc_race_sessions')
@@ -66,8 +72,9 @@ async function load(registrationKey: string): Promise<DivisionChampions[]> {
       .eq('session_type', 'Race');
     const finishes = new Map<string, number[]>();
     const cars = new Map<string, Map<number, number>>();
+    const raceNumbers = new Map<string, Map<number, number>>();
     for (const s of sessions ?? []) {
-      for (const car of s.results as { position: number; carModel?: number; currentDriverSteamId?: string; drivers?: { steamId: string }[] }[]) {
+      for (const car of s.results as { position: number; carModel?: number; raceNumber?: number; currentDriverSteamId?: string; drivers?: { steamId: string }[] }[]) {
         const id = car.currentDriverSteamId ?? car.drivers?.[0]?.steamId;
         if (!id) continue;
         (finishes.get(id) ?? finishes.set(id, []).get(id)!).push(car.position);
@@ -75,12 +82,18 @@ async function load(registrationKey: string): Promise<DivisionChampions[]> {
           const c = cars.get(id) ?? cars.set(id, new Map()).get(id)!;
           c.set(car.carModel, (c.get(car.carModel) ?? 0) + 1);
         }
+        if (car.raceNumber != null && car.raceNumber > 0) {
+          const n = raceNumbers.get(id) ?? raceNumbers.set(id, new Map()).get(id)!;
+          n.set(car.raceNumber, (n.get(car.raceNumber) ?? 0) + 1);
+        }
       }
     }
-    const mainCar = (id: string) => {
-      const c = cars.get(id);
-      return c ? [...c.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
-    };
+    const mostUsed = (m: Map<number, number> | undefined) =>
+      m && m.size > 0 ? [...m.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
+    const mainCar = (id: string) => mostUsed(cars.get(id));
+    // The number they raced that season, not today's profile number: a
+    // champion now runs #1 (and anyone can change number between seasons),
+    // but the S19 graphic should show what was on the car in S19.
 
     const champ = drivers[0];
     const teamName = teams[0]?.teamName ?? null;
@@ -98,7 +111,7 @@ async function load(registrationKey: string): Promise<DivisionChampions[]> {
       return {
         steamId,
         name: full || fallbackName,
-        number: r?.driver_number ?? null,
+        number: mostUsed(raceNumbers.get(steamId)) ?? r?.driver_number ?? null,
         photoUrl: r?.photo_url ?? null,
         carModelId: mainCar(steamId),
       };
@@ -106,8 +119,8 @@ async function load(registrationKey: string): Promise<DivisionChampions[]> {
 
     const champId_ = bare(champ.steamId);
     const champFinishes = finishes.get(champId_) ?? [];
-    out.push({
-      division: t.division_id as number,
+    return {
+      division,
       driver: {
         ...person(champId_, champ.driverName),
         points: champ.points,
@@ -128,10 +141,19 @@ async function load(registrationKey: string): Promise<DivisionChampions[]> {
             ),
           }
         : null,
-    });
+    };
   }
-  return out;
 }
 
 // A finished season doesn't change; a day's cache keeps ACCSM out of it.
-export const getSeasonChampions = unstable_cache(load, ['season-champions-v2'], { revalidate: 86_400 });
+export const getDivisionChampions = unstable_cache(loadDivision, ['division-champions-v1'], { revalidate: 86_400 });
+
+/** Every division's champions, in division order. Sequential: one ACCSM call at a time. */
+export async function getSeasonChampions(registrationKey: string): Promise<DivisionChampions[]> {
+  const out: DivisionChampions[] = [];
+  for (const t of await divisionTargets(registrationKey)) {
+    const c = await getDivisionChampions(registrationKey, t.division);
+    if (c) out.push(c);
+  }
+  return out;
+}
