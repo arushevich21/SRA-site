@@ -2,7 +2,12 @@ import 'server-only';
 import { ImageResponse } from 'next/og';
 import sharp from 'sharp';
 import { accCarManufacturerIconName } from '@sra/domain';
-import { labelFont, thumbnailFonts, thumbnailImage, type ThumbImage } from '@/lib/stream/thumbnail-assets';
+import {
+  labelFont,
+  thumbnailFonts,
+  thumbnailImage,
+  type ThumbImage,
+} from '@/lib/stream/thumbnail-assets';
 import type { ChampionDriver, DivisionChampions } from './season-champions';
 
 // Champion graphics for a finished season: one per division per title
@@ -16,7 +21,9 @@ import type { ChampionDriver, DivisionChampions } from './season-champions';
 // Layout is fixed columns with explicit coordinates: Satori's flex sizing is
 // unreliable once text has to shrink, so nothing here depends on it.
 
-export type ChampionKind = 'driver' | 'silver' | 'team';
+// 'gold-silver': the division's Gold (overall) and Silver drivers' champions
+// together on one image, laid out like the teams' graphic.
+export type ChampionKind = 'driver' | 'silver' | 'team' | 'gold-silver';
 export type ChampionFormat = 'square' | 'wide';
 
 const SIZE: Record<ChampionFormat, { w: number; h: number }> = {
@@ -42,8 +49,20 @@ const SHADOW = '0 6px 24px rgba(0,0,0,0.6)';
 const DRIVERS_TITLE = 'DRIVERS’ CHAMPIONSHIP';
 const TEAMS_TITLE = 'TEAMS’ CHAMPIONSHIP';
 
-export function championFileName(season: number, division: number, kind: ChampionKind, format: ChampionFormat) {
-  const title = kind === 'driver' ? 'Drivers' : kind === 'silver' ? 'Silver' : 'Teams';
+export function championFileName(
+  season: number,
+  division: number,
+  kind: ChampionKind,
+  format: ChampionFormat
+) {
+  const title =
+    kind === 'driver'
+      ? 'Drivers'
+      : kind === 'silver'
+        ? 'Silver'
+        : kind === 'gold-silver'
+          ? 'Gold_Silver'
+          : 'Teams';
   return `SRA_S${season}_D${division}_${title}_Champion${format === 'wide' ? '_16x9' : ''}.png`;
 }
 
@@ -65,7 +84,9 @@ async function photo(url: string | null, w: number, h: number): Promise<string |
 
 function carLogo(d: ChampionDriver, box: number): Promise<ThumbImage | null> {
   const icon = d.carModelId != null ? accCarManufacturerIconName(d.carModelId) : null;
-  return icon ? thumbnailImage(`/car-logos/${icon}.svg`, box, box).catch(() => null) : Promise.resolve(null);
+  return icon
+    ? thumbnailImage(`/car-logos/${icon}.svg`, box, box).catch(() => null)
+    : Promise.resolve(null);
 }
 
 function Img({ image }: { image: ThumbImage }) {
@@ -98,8 +119,21 @@ function Plate({ children, size, bg = GOLD }: { children: string; size: number; 
 function Stat({ value, label, size }: { value: string; label: string; size: number }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', marginRight: Math.round(size * 0.9) }}>
-      <div style={{ display: 'flex', fontSize: size, fontWeight: 900, lineHeight: 1, color: '#fff' }}>{value}</div>
-      <div style={{ display: 'flex', fontSize: Math.round(size * 0.32), fontWeight: 700, letterSpacing: 3, color: MUTED, marginTop: 6 }}>
+      <div
+        style={{ display: 'flex', fontSize: size, fontWeight: 900, lineHeight: 1, color: '#fff' }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          fontSize: Math.round(size * 0.32),
+          fontWeight: 700,
+          letterSpacing: 3,
+          color: MUTED,
+          marginTop: 6,
+        }}
+      >
         {label}
       </div>
     </div>
@@ -110,16 +144,23 @@ export async function renderChampion(
   season: number,
   champs: DivisionChampions,
   kind: ChampionKind,
-  format: ChampionFormat,
+  format: ChampionFormat
 ): Promise<ImageResponse> {
   const { w, h } = SIZE[format];
   const wide = format === 'wide';
   const team = kind === 'team' ? champs.team : null;
   if (kind === 'team' && !team) throw new Error('no team championship in this division');
-  if (kind === 'silver' && !champs.silver) throw new Error('no Silver championship in this division');
+  const pair = kind === 'gold-silver';
+  if ((kind === 'silver' || pair) && !champs.silver)
+    throw new Error('no Silver championship in this division');
   const driver = kind === 'silver' ? champs.silver! : champs.driver;
   const theme: Theme = kind === 'silver' ? THEME.silver : THEME.gold;
-  const people = team ? team.drivers : [driver];
+  const people = team ? team.drivers : pair ? [champs.driver, champs.silver!] : [driver];
+  // Two portraits (teams' pair, or Gold + Silver) share one layout.
+  const multi = !!team || pair;
+  // Gold + Silver: each portrait framed in its own tier's colour.
+  const themeOf = (i: number): Theme => (pair ? (i === 0 ? THEME.gold : THEME.silver) : theme);
+  const tierOf = (i: number) => (i === 0 ? 'GOLD' : 'SILVER');
 
   const PAD = wide ? 80 : 60;
   const TOP = wide ? 210 : 190;
@@ -129,13 +170,17 @@ export async function renderChampion(
   const colH = wide ? 730 : 640;
   // Team: two portraits — side by side on wide, stacked on square.
   const gap = 20;
-  const photoW = Math.round(team && wide ? (colW - gap) / 2 : colW);
-  const photoH = Math.round(team && !wide ? (colH - gap) / 2 : colH);
+  const photoW = Math.round(multi && wide ? (colW - gap) / 2 : colW);
+  const photoH = Math.round(multi && !wide ? (colH - gap) / 2 : colH);
 
   const [display, mono, badge, series, sra, photos, logos] = await Promise.all([
     thumbnailFonts(),
     labelFont(),
-    thumbnailImage(`/badges/Division ${champs.division}${kind === 'silver' ? ' Silver' : ''}.png`, wide ? 190 : 150, wide ? 120 : 100),
+    thumbnailImage(
+      `/badges/Division ${champs.division}${kind === 'silver' ? ' Silver' : ''}.png`,
+      wide ? 190 : 150,
+      wide ? 120 : 100
+    ),
     thumbnailImage('/badges/GT3TS_Logo.png', wide ? 260 : 210, wide ? 120 : 96),
     // The nav's SRA lockup (flag + wordmark), the same mark as the site header.
     thumbnailImage('/badges/sra-lockup.webp', wide ? 220 : 180, wide ? 64 : 52).catch(() => null),
@@ -148,7 +193,7 @@ export async function renderChampion(
   // longest word fits the column and the whole title fits on two lines.
   const longest = Math.max(...title.split(/\s+/).map((x) => x.length));
   const titleSize = Math.round(
-    Math.min(wide ? 140 : 100, textW / (longest * 0.52), (textW * 2) / (title.length * 0.52)),
+    Math.min(wide ? 140 : 100, textW / (longest * 0.52), (textW * 2) / (title.length * 0.52))
   );
 
   const stats: [string, string][] = team
@@ -173,6 +218,7 @@ export async function renderChampion(
     const src = photos[i];
     const numStr = p.number != null ? String(p.number) : 'SRA';
     const fadeH = Math.min(Math.round(photoH * 0.5), 220);
+    const pTheme = themeOf(i);
     return (
       <div
         key={p.steamId}
@@ -181,7 +227,7 @@ export async function renderChampion(
           position: 'relative',
           width: photoW,
           height: photoH,
-          border: `3px solid ${theme.accent}`,
+          border: `3px solid ${pTheme.accent}`,
           background: 'linear-gradient(160deg, #1b1e26 0%, #0c0e12 100%)',
           overflow: 'hidden',
         }}
@@ -201,9 +247,11 @@ export async function renderChampion(
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: Math.round(Math.min(photoH * 0.7, photoW / (Math.max(numStr.length, 2) * 0.52))),
+              fontSize: Math.round(
+                Math.min(photoH * 0.7, photoW / (Math.max(numStr.length, 2) * 0.52))
+              ),
               fontWeight: 900,
-              color: `rgba(${theme.rgb},0.28)`,
+              color: `rgba(${pTheme.rgb},0.28)`,
               transform: 'skewX(-10deg)',
               lineHeight: 1,
             }}
@@ -226,14 +274,37 @@ export async function renderChampion(
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {team && (
-              <div style={{ display: 'flex', fontSize: wide ? 38 : 30, fontWeight: 900, color: '#fff', lineHeight: 1, marginBottom: 10 }}>
+            {pair && (
+              <div
+                style={{
+                  display: 'flex',
+                  fontSize: wide ? 24 : 18,
+                  fontWeight: 900,
+                  letterSpacing: 4,
+                  color: pTheme.accent,
+                  marginBottom: 6,
+                }}
+              >
+                {tierOf(i)}
+              </div>
+            )}
+            {multi && (
+              <div
+                style={{
+                  display: 'flex',
+                  fontSize: wide ? 38 : 30,
+                  fontWeight: 900,
+                  color: '#fff',
+                  lineHeight: 1,
+                  marginBottom: 10,
+                }}
+              >
                 {p.name.toUpperCase()}
               </div>
             )}
             {p.number != null && (
               <div style={{ display: 'flex' }}>
-                <Plate size={wide ? 36 : 28} bg={theme.accent}>{`#${p.number}`}</Plate>
+                <Plate size={wide ? 36 : 28} bg={pTheme.accent}>{`#${p.number}`}</Plate>
               </div>
             )}
           </div>
@@ -244,103 +315,183 @@ export async function renderChampion(
   };
 
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: w,
+        height: h,
+        display: 'flex',
+        position: 'relative',
+        fontFamily: '"Saira Condensed"',
+        color: '#fff',
+        background: `radial-gradient(900px 700px at ${wide ? '78%' : '80%'} 0%, rgba(${theme.rgb},0.22), transparent 65%), linear-gradient(180deg, #0d0f13 0%, ${CARBON} 100%)`,
+      }}
+    >
+      {/* Diagonal gold light band, as on the site background. */}
       <div
         style={{
-          width: w,
+          position: 'absolute',
+          top: -200,
+          left: wide ? 980 : 540,
+          width: wide ? 160 : 120,
+          height: h + 400,
+          background: `linear-gradient(180deg, rgba(${theme.rgb},0.14), rgba(${theme.rgb},0.02))`,
+          transform: 'rotate(18deg)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: 10,
           height: h,
+          background: theme.accent,
+        }}
+      />
+
+      {/* Header */}
+      <div style={{ position: 'absolute', top: wide ? 48 : 40, left: PAD, display: 'flex' }}>
+        <Img image={badge} />
+      </div>
+      <div style={{ position: 'absolute', top: wide ? 48 : 40, right: PAD, display: 'flex' }}>
+        <Img image={series} />
+      </div>
+
+      {/* Portrait column */}
+      <div
+        style={{
+          position: 'absolute',
+          left: colX,
+          top: TOP,
+          width: colW,
+          height: colH,
           display: 'flex',
-          position: 'relative',
-          fontFamily: '"Saira Condensed"',
-          color: '#fff',
-          background: `radial-gradient(900px 700px at ${wide ? '78%' : '80%'} 0%, rgba(${theme.rgb},0.22), transparent 65%), linear-gradient(180deg, #0d0f13 0%, ${CARBON} 100%)`,
+          flexDirection: multi && !wide ? 'column' : 'row',
+          justifyContent: 'space-between',
         }}
       >
-        {/* Diagonal gold light band, as on the site background. */}
-        <div
-          style={{
-            position: 'absolute',
-            top: -200,
-            left: wide ? 980 : 540,
-            width: wide ? 160 : 120,
-            height: h + 400,
-            background: `linear-gradient(180deg, rgba(${theme.rgb},0.14), rgba(${theme.rgb},0.02))`,
-            transform: 'rotate(18deg)',
-          }}
-        />
-        <div style={{ position: 'absolute', top: 0, left: 0, width: 10, height: h, background: theme.accent }} />
+        {people.map((_, i) => portrait(i))}
+      </div>
 
-        {/* Header */}
-        <div style={{ position: 'absolute', top: wide ? 48 : 40, left: PAD, display: 'flex' }}>
-          <Img image={badge} />
-        </div>
-        <div style={{ position: 'absolute', top: wide ? 48 : 40, right: PAD, display: 'flex' }}>
-          <Img image={series} />
-        </div>
-
-        {/* Portrait column */}
-        <div
-          style={{
-            position: 'absolute',
-            left: colX,
-            top: TOP,
-            width: colW,
-            height: colH,
-            display: 'flex',
-            flexDirection: team && !wide ? 'column' : 'row',
-            justifyContent: 'space-between',
-          }}
-        >
-          {people.map((_, i) => portrait(i))}
-        </div>
-
-        {/* Text column: header block top, name middle, stats bottom. */}
-        <div
-          style={{
-            position: 'absolute',
-            left: PAD,
-            top: TOP,
-            width: textW,
-            height: colH,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', width: textW }}>
-            {/* Site kicker style ("— Standings"): mono, gold, tracked out. */}
-            <div
-              style={{
-                display: 'flex',
-                fontFamily: '"JetBrains Mono"',
-                fontSize: wide ? 26 : 20,
-                fontWeight: 600,
-                letterSpacing: wide ? 7 : 5,
-                color: theme.accent,
-              }}
-            >
-              {`— SEASON ${season} · DIVISION ${champs.division}`}
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                fontSize: wide ? 176 : 118,
-                fontWeight: 900,
-                lineHeight: 0.9,
-                color: theme.accent,
-                letterSpacing: 2,
-                transform: 'skewX(-8deg)',
-                textShadow: SHADOW,
-                marginTop: 10,
-              }}
-            >
-              CHAMPION
-            </div>
-            <div style={{ display: 'flex', fontSize: wide ? 38 : 26, fontWeight: 900, letterSpacing: wide ? 7 : 5, color: theme.soft, marginTop: 8 }}>
-              {team ? TEAMS_TITLE : kind === 'silver' ? 'SILVER CHAMPIONSHIP' : DRIVERS_TITLE}
-            </div>
+      {/* Text column: header block top, name middle, stats bottom. */}
+      <div
+        style={{
+          position: 'absolute',
+          left: PAD,
+          top: TOP,
+          width: textW,
+          height: colH,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', width: textW }}>
+          {/* Site kicker style ("— Standings"): mono, gold, tracked out. */}
+          <div
+            style={{
+              display: 'flex',
+              fontFamily: '"JetBrains Mono"',
+              fontSize: wide ? 26 : 20,
+              fontWeight: 600,
+              letterSpacing: wide ? 7 : 5,
+              color: theme.accent,
+            }}
+          >
+            {`— SEASON ${season} · DIVISION ${champs.division}`}
           </div>
+          <div
+            style={{
+              display: 'flex',
+              fontSize: wide ? 176 : pair ? 104 : 118, // "CHAMPIONS" is one letter longer
+              fontWeight: 900,
+              lineHeight: 0.9,
+              color: theme.accent,
+              letterSpacing: 2,
+              transform: 'skewX(-8deg)',
+              textShadow: SHADOW,
+              marginTop: 10,
+            }}
+          >
+            {pair ? 'CHAMPIONS' : 'CHAMPION'}
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              fontSize: wide ? 38 : 26,
+              fontWeight: 900,
+              letterSpacing: wide ? 7 : 5,
+              color: theme.soft,
+              marginTop: 8,
+            }}
+          >
+            {team
+              ? TEAMS_TITLE
+              : kind === 'silver'
+                ? 'SILVER CHAMPIONSHIP'
+                : pair
+                  ? 'GOLD & SILVER DRIVERS'
+                  : DRIVERS_TITLE}
+          </div>
+        </div>
 
+        {pair ? (
+          <div style={{ display: 'flex', flexDirection: 'column', width: textW }}>
+            {[champs.driver, champs.silver!].map((c, i) => {
+              const n = c.name.toUpperCase();
+              const longestWord = Math.max(...n.split(/\s+/).map((x) => x.length));
+              const size = Math.round(
+                Math.min(wide ? 92 : 62, textW / (Math.max(longestWord, n.length * 0.62) * 0.52))
+              );
+              return (
+                <div
+                  key={c.steamId}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    marginTop: i === 0 ? 0 : wide ? 34 : 24,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      fontSize: wide ? 28 : 20,
+                      fontWeight: 900,
+                      letterSpacing: 5,
+                      color: themeOf(i).accent,
+                    }}
+                  >
+                    {tierOf(i)}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      fontSize: size,
+                      fontWeight: 900,
+                      lineHeight: 0.95,
+                      color: '#fff',
+                      textShadow: SHADOW,
+                    }}
+                  >
+                    {n}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      fontSize: wide ? 30 : 22,
+                      fontWeight: 700,
+                      color: MUTED,
+                      marginTop: 6,
+                      letterSpacing: 2,
+                    }}
+                  >
+                    {`${c.points} PTS   +${c.margin}${i === 1 ? `   P${c.overallPosition} OVERALL` : ''}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', width: textW }}>
             <div
               style={{
@@ -357,41 +508,49 @@ export async function renderChampion(
               {title}
             </div>
             {!team && driver.teamName && (
-              <div style={{ display: 'flex', fontSize: wide ? 32 : 24, fontWeight: 700, color: MUTED, marginTop: 10, letterSpacing: 2 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  fontSize: wide ? 32 : 24,
+                  fontWeight: 700,
+                  color: MUTED,
+                  marginTop: 10,
+                  letterSpacing: 2,
+                }}
+              >
                 {driver.teamName.toUpperCase()}
               </div>
             )}
           </div>
+        )}
 
-          <div style={{ display: 'flex', width: textW }}>
-            {stats.map(([v, l]) => (
-              <Stat key={l} value={v} label={l} size={wide ? 76 : 52} />
-            ))}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            position: 'absolute',
-            left: PAD,
-            top: h - (wide ? 100 : 84),
-            width: w - 2 * PAD,
-            height: wide ? 60 : 52,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: wide ? 28 : 22,
-            fontWeight: 700,
-            letterSpacing: 4,
-            color: MUTED,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center' }}>{sra && <Img image={sra} />}</div>
-          <div style={{ display: 'flex' }}>SIMRACINGALLIANCE.COM</div>
+        <div style={{ display: 'flex', width: textW }}>
+          {!pair &&
+            stats.map(([v, l]) => <Stat key={l} value={v} label={l} size={wide ? 76 : 52} />)}
         </div>
       </div>
-    ),
-    { width: w, height: h, fonts: [...display, mono] },
+
+      {/* Footer */}
+      <div
+        style={{
+          position: 'absolute',
+          left: PAD,
+          top: h - (wide ? 100 : 84),
+          width: w - 2 * PAD,
+          height: wide ? 60 : 52,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: wide ? 28 : 22,
+          fontWeight: 700,
+          letterSpacing: 4,
+          color: MUTED,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center' }}>{sra && <Img image={sra} />}</div>
+        <div style={{ display: 'flex' }}>SIMRACINGALLIANCE.COM</div>
+      </div>
+    </div>,
+    { width: w, height: h, fonts: [...display, mono] }
   );
 }

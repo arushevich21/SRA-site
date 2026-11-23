@@ -36,18 +36,22 @@ export default async function AdminChampionGraphicsPage({
       >
         ← Go back
       </Link>
-      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">— Admin</span>
+      <span className="block font-mono text-[15px] tracking-[.3em] uppercase text-gold mb-5">
+        — Admin
+      </span>
       <h1 className="font-display font-black text-[clamp(36px,5vw,56px)] uppercase leading-[.9] tracking-[-1px] text-txt mb-4">
         Season {seasonNo} Champions
       </h1>
       <p className="font-mono text-[12px] text-txt-3 mb-10 max-w-[900px] leading-relaxed">
-        Drivers’ (overall), Silver and teams’ champions per division, from the final standings as SRA scores them (each
-        driver’s own drop round). A driver’s broadcast photo is used when they’ve uploaded one; otherwise
-        their race number fills the frame. Click a card for the full PNG; “Download” saves it named for the
-        title. Square is 1080×1080, 16:9 is 1920×1080.
+        Drivers’ (overall), Silver and teams’ champions per division, from the final standings as
+        SRA scores them (each driver’s own drop round). A driver’s broadcast photo is used when
+        they’ve uploaded one; otherwise their race number fills the frame. Click a card for the full
+        PNG; “Download” saves it named for the title. Square is 1080×1080, 16:9 is 1920×1080.
       </p>
 
-      {error && <p className="font-mono text-[12px] text-red-400 mb-8">Couldn’t load standings: {error}</p>}
+      {error && (
+        <p className="font-mono text-[12px] text-red-400 mb-8">Couldn’t load standings: {error}</p>
+      )}
 
       <div className="flex flex-col gap-12">
         {champions.map((c) => (
@@ -61,14 +65,17 @@ export default async function AdminChampionGraphicsPage({
               </span>
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-              {(['driver', 'silver', 'team'] as const)
-                .filter((kind) => kind === 'driver' || (kind === 'silver' ? c.silver : c.team))
+              {(['driver', 'silver', 'gold-silver', 'team'] as const)
+                .filter((kind) => kind === 'driver' || (kind === 'team' ? c.team : c.silver))
                 .flatMap((kind) =>
                   (['square', 'wide'] as const).map((format) => {
                     const href = `/graphics/champions/${key}/${c.division}/${kind}${format === 'wide' ? '?format=wide' : ''}`;
-                    const label = `${kind === 'driver' ? 'Drivers’' : kind === 'silver' ? 'Silver' : 'Teams’'} · ${format === 'wide' ? '16:9' : 'Square'}`;
+                    const label = `${kind === 'driver' ? 'Drivers’' : kind === 'silver' ? 'Silver' : kind === 'gold-silver' ? 'Gold & Silver' : 'Teams’'} · ${format === 'wide' ? '16:9' : 'Square'}`;
                     return (
-                      <div key={`${kind}-${format}`} className="border border-white/10 bg-white/[.03]">
+                      <div
+                        key={`${kind}-${format}`}
+                        className="border border-white/10 bg-white/[.03]"
+                      >
                         <a href={href} target="_blank" rel="noreferrer" className="block">
                           {/* eslint-disable-next-line @next/next/no-img-element -- dynamic PNG from our own route */}
                           <img
@@ -91,7 +98,7 @@ export default async function AdminChampionGraphicsPage({
                         </div>
                       </div>
                     );
-                  }),
+                  })
                 )}
             </div>
           </div>
