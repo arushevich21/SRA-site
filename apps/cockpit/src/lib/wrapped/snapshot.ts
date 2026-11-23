@@ -74,11 +74,16 @@ export async function generateSnapshot(): Promise<{ cards: number }> {
 export async function getSnapshotStatus(): Promise<
   { cards: number; generatedAt: string | null } | { error: string }
 > {
+  // A real GET, not `head: true`: a HEAD request has no body, so a missing
+  // table came back as error-free with a null count and read as "no snapshot
+  // yet" when the migration hadn't been run at all.
   const { count, error } = await supabase
     .from('wrapped_cards')
-    .select('steam_id', { count: 'exact', head: true })
-    .eq('season', WRAPPED_SEASON);
-  if (error) return { error: error.message };
+    .select('steam_id', { count: 'exact' })
+    .eq('season', WRAPPED_SEASON)
+    .limit(1);
+  if (error) return { error: error.message || error.code || 'unknown error' };
+  if (count == null) return { error: 'wrapped_cards could not be read' };
   const { data } = await supabase
     .from('wrapped_seasons')
     .select('generated_at')

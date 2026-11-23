@@ -17,7 +17,11 @@ export function GenerateButton() {
       <p role="status" className="font-sans text-[13px]">
         {result?.ok && <span className="text-green-400">Stored {result.cards} cards.</span>}
         {result && !result.ok && (
-          <span className="text-red-400">Couldn’t generate: {result.error}. Check the migration has been run.</span>
+          <span className="text-red-400">
+            Couldn’t generate: {result.error}.
+            {/relation .* does not exist|wrapped_/i.test(result.error) &&
+              ' Run supabase/migrations/20261124_wrapped.sql first.'}
+          </span>
         )}
       </p>
     </form>
