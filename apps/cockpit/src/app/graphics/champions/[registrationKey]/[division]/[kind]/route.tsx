@@ -39,7 +39,10 @@ export async function GET(
   }
 
   const image = await renderChampion(season, champs, kind as ChampionKind, format);
-  image.headers.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+  // Browsers always revalidate (an hour's max-age kept showing stale art on
+  // /admin/champion-graphics after a design change); the CDN keeps a day and
+  // is purged on every deploy anyway.
+  image.headers.set('Cache-Control', 'public, max-age=0, must-revalidate, s-maxage=86400');
   if (query.get('download')) {
     image.headers.set(
       'Content-Disposition',
