@@ -36,7 +36,7 @@ const ADMIN_SECTIONS: {
         label: 'Champion Graphics',
         href: '/admin/champion-graphics',
         description:
-          'Drivers’ and teams’ champion for each division of a finished season, square (Discord/Instagram) and 16:9 (stream). Standings as SRA scores them; uses broadcast photos where drivers uploaded one.',
+          'Drivers’, Silver and teams’ champion for each division of a finished season, square (Discord/Instagram) and 16:9 (stream). Standings as SRA scores them; uses broadcast photos where drivers uploaded one.',
       },
     ],
   },

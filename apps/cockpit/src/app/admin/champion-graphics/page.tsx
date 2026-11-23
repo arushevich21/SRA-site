@@ -41,7 +41,7 @@ export default async function AdminChampionGraphicsPage({
         Season {seasonNo} Champions
       </h1>
       <p className="font-mono text-[12px] text-txt-3 mb-10 max-w-[900px] leading-relaxed">
-        Drivers’ and teams’ champions per division, from the final standings as SRA scores them (each
+        Drivers’ (overall), Silver and teams’ champions per division, from the final standings as SRA scores them (each
         driver’s own drop round). A driver’s broadcast photo is used when they’ve uploaded one; otherwise
         their race number fills the frame. Click a card for the full PNG; “Download” saves it named for the
         title. Square is 1080×1080, 16:9 is 1920×1080.
@@ -56,16 +56,17 @@ export default async function AdminChampionGraphicsPage({
               Division {c.division}
               <span className="ml-3 font-mono text-[11px] tracking-[.15em] text-txt-3 normal-case">
                 {c.driver.name}
+                {c.silver ? ` · Silver: ${c.silver.name}` : ''}
                 {c.team ? ` · ${c.team.name}` : ''}
               </span>
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
-              {(['driver', 'team'] as const)
-                .filter((kind) => kind === 'driver' || c.team)
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+              {(['driver', 'silver', 'team'] as const)
+                .filter((kind) => kind === 'driver' || (kind === 'silver' ? c.silver : c.team))
                 .flatMap((kind) =>
                   (['square', 'wide'] as const).map((format) => {
                     const href = `/graphics/champions/${key}/${c.division}/${kind}${format === 'wide' ? '?format=wide' : ''}`;
-                    const label = `${kind === 'driver' ? 'Drivers’' : 'Teams’'} · ${format === 'wide' ? '16:9' : 'Square'}`;
+                    const label = `${kind === 'driver' ? 'Drivers’' : kind === 'silver' ? 'Silver' : 'Teams’'} · ${format === 'wide' ? '16:9' : 'Square'}`;
                     return (
                       <div key={`${kind}-${format}`} className="border border-white/10 bg-white/[.03]">
                         <a href={href} target="_blank" rel="noreferrer" className="block">

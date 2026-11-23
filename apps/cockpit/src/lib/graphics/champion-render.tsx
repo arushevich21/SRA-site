@@ -16,7 +16,7 @@ import type { ChampionDriver, DivisionChampions } from './season-champions';
 // Layout is fixed columns with explicit coordinates: Satori's flex sizing is
 // unreliable once text has to shrink, so nothing here depends on it.
 
-export type ChampionKind = 'driver' | 'team';
+export type ChampionKind = 'driver' | 'silver' | 'team';
 export type ChampionFormat = 'square' | 'wide';
 
 const SIZE: Record<ChampionFormat, { w: number; h: number }> = {
@@ -26,6 +26,16 @@ const SIZE: Record<ChampionFormat, { w: number; h: number }> = {
 
 const GOLD = '#e6b53d';
 const GOLD_SOFT = '#f2cf73';
+const SILVER = '#c9d1dc';
+const SILVER_SOFT = '#e6eaf0';
+
+// Accent per title: gold for the overall (Gold) drivers' and the teams'
+// championship, silver for the Silver championship.
+const THEME = {
+  gold: { accent: GOLD, soft: GOLD_SOFT, rgb: '230,181,61' },
+  silver: { accent: SILVER, soft: SILVER_SOFT, rgb: '201,209,220' },
+} as const;
+type Theme = (typeof THEME)[keyof typeof THEME];
 const CARBON = '#0a0b0e';
 const MUTED = '#8a92a0';
 const SHADOW = '0 6px 24px rgba(0,0,0,0.6)';
@@ -33,7 +43,8 @@ const DRIVERS_TITLE = 'DRIVERS’ CHAMPIONSHIP';
 const TEAMS_TITLE = 'TEAMS’ CHAMPIONSHIP';
 
 export function championFileName(season: number, division: number, kind: ChampionKind, format: ChampionFormat) {
-  return `SRA_S${season}_D${division}_${kind === 'driver' ? 'Drivers' : 'Teams'}_Champion${format === 'wide' ? '_16x9' : ''}.png`;
+  const title = kind === 'driver' ? 'Drivers' : kind === 'silver' ? 'Silver' : 'Teams';
+  return `SRA_S${season}_D${division}_${title}_Champion${format === 'wide' ? '_16x9' : ''}.png`;
 }
 
 // A driver's broadcast photo (Supabase storage), cover-cropped to a box.
@@ -64,12 +75,12 @@ function Img({ image }: { image: ThumbImage }) {
 
 // Skewed plate, the site's button shape. The whole plate leans, text included
 // — reads as italic, same as the race thumbnails (the face has no italic).
-function Plate({ children, size }: { children: string; size: number }) {
+function Plate({ children, size, bg = GOLD }: { children: string; size: number; bg?: string }) {
   return (
     <div
       style={{
         display: 'flex',
-        background: GOLD,
+        background: bg,
         color: CARBON,
         fontSize: size,
         fontWeight: 900,
@@ -105,7 +116,9 @@ export async function renderChampion(
   const wide = format === 'wide';
   const team = kind === 'team' ? champs.team : null;
   if (kind === 'team' && !team) throw new Error('no team championship in this division');
-  const driver = champs.driver;
+  if (kind === 'silver' && !champs.silver) throw new Error('no Silver championship in this division');
+  const driver = kind === 'silver' ? champs.silver! : champs.driver;
+  const theme: Theme = kind === 'silver' ? THEME.silver : THEME.gold;
   const people = team ? team.drivers : [driver];
 
   const PAD = wide ? 80 : 60;
@@ -122,7 +135,7 @@ export async function renderChampion(
   const [display, mono, badge, series, sra, photos, logos] = await Promise.all([
     thumbnailFonts(),
     labelFont(),
-    thumbnailImage(`/badges/Division ${champs.division}.png`, wide ? 190 : 150, wide ? 120 : 100),
+    thumbnailImage(`/badges/Division ${champs.division}${kind === 'silver' ? ' Silver' : ''}.png`, wide ? 190 : 150, wide ? 120 : 100),
     thumbnailImage('/badges/GT3TS_Logo.png', wide ? 260 : 210, wide ? 120 : 96),
     // The nav's SRA lockup (flag + wordmark), the same mark as the site header.
     thumbnailImage('/badges/sra-lockup.webp', wide ? 220 : 180, wide ? 64 : 52).catch(() => null),
@@ -147,7 +160,11 @@ export async function renderChampion(
     : [
         [String(driver.points), 'POINTS'],
         [`+${driver.margin}`, 'MARGIN'],
-        [String(driver.wins), driver.wins === 1 ? 'WIN' : 'WINS'],
+        // Silver: where they finished in the whole division says more than a
+        // win count that's usually 0.
+        kind === 'silver'
+          ? [`P${driver.overallPosition}`, 'OVERALL']
+          : [String(driver.wins), driver.wins === 1 ? 'WIN' : 'WINS'],
         [String(driver.podiums), 'PODIUMS'],
       ];
 
@@ -164,7 +181,7 @@ export async function renderChampion(
           position: 'relative',
           width: photoW,
           height: photoH,
-          border: `3px solid ${GOLD}`,
+          border: `3px solid ${theme.accent}`,
           background: 'linear-gradient(160deg, #1b1e26 0%, #0c0e12 100%)',
           overflow: 'hidden',
         }}
@@ -186,7 +203,7 @@ export async function renderChampion(
               justifyContent: 'center',
               fontSize: Math.round(Math.min(photoH * 0.7, photoW / (Math.max(numStr.length, 2) * 0.52))),
               fontWeight: 900,
-              color: 'rgba(230,181,61,0.28)',
+              color: `rgba(${theme.rgb},0.28)`,
               transform: 'skewX(-10deg)',
               lineHeight: 1,
             }}
@@ -216,7 +233,7 @@ export async function renderChampion(
             )}
             {p.number != null && (
               <div style={{ display: 'flex' }}>
-                <Plate size={wide ? 36 : 28}>{`#${p.number}`}</Plate>
+                <Plate size={wide ? 36 : 28} bg={theme.accent}>{`#${p.number}`}</Plate>
               </div>
             )}
           </div>
@@ -236,7 +253,7 @@ export async function renderChampion(
           position: 'relative',
           fontFamily: '"Saira Condensed"',
           color: '#fff',
-          background: `radial-gradient(900px 700px at ${wide ? '78%' : '80%'} 0%, rgba(230,181,61,0.22), transparent 65%), linear-gradient(180deg, #0d0f13 0%, ${CARBON} 100%)`,
+          background: `radial-gradient(900px 700px at ${wide ? '78%' : '80%'} 0%, rgba(${theme.rgb},0.22), transparent 65%), linear-gradient(180deg, #0d0f13 0%, ${CARBON} 100%)`,
         }}
       >
         {/* Diagonal gold light band, as on the site background. */}
@@ -247,11 +264,11 @@ export async function renderChampion(
             left: wide ? 980 : 540,
             width: wide ? 160 : 120,
             height: h + 400,
-            background: 'linear-gradient(180deg, rgba(230,181,61,0.14), rgba(230,181,61,0.02))',
+            background: `linear-gradient(180deg, rgba(${theme.rgb},0.14), rgba(${theme.rgb},0.02))`,
             transform: 'rotate(18deg)',
           }}
         />
-        <div style={{ position: 'absolute', top: 0, left: 0, width: 10, height: h, background: GOLD }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, width: 10, height: h, background: theme.accent }} />
 
         {/* Header */}
         <div style={{ position: 'absolute', top: wide ? 48 : 40, left: PAD, display: 'flex' }}>
@@ -299,7 +316,7 @@ export async function renderChampion(
                 fontSize: wide ? 26 : 20,
                 fontWeight: 600,
                 letterSpacing: wide ? 7 : 5,
-                color: GOLD,
+                color: theme.accent,
               }}
             >
               {`— SEASON ${season} · DIVISION ${champs.division}`}
@@ -310,7 +327,7 @@ export async function renderChampion(
                 fontSize: wide ? 176 : 118,
                 fontWeight: 900,
                 lineHeight: 0.9,
-                color: GOLD,
+                color: theme.accent,
                 letterSpacing: 2,
                 transform: 'skewX(-8deg)',
                 textShadow: SHADOW,
@@ -319,8 +336,8 @@ export async function renderChampion(
             >
               CHAMPION
             </div>
-            <div style={{ display: 'flex', fontSize: wide ? 38 : 26, fontWeight: 900, letterSpacing: wide ? 7 : 5, color: GOLD_SOFT, marginTop: 8 }}>
-              {team ? TEAMS_TITLE : DRIVERS_TITLE}
+            <div style={{ display: 'flex', fontSize: wide ? 38 : 26, fontWeight: 900, letterSpacing: wide ? 7 : 5, color: theme.soft, marginTop: 8 }}>
+              {team ? TEAMS_TITLE : kind === 'silver' ? 'SILVER CHAMPIONSHIP' : DRIVERS_TITLE}
             </div>
           </div>
 
