@@ -52,6 +52,53 @@ function CountUp({ to, run }: { to: number; run: boolean }) {
   return <>{fmt(v)}</>;
 }
 
+// The season as one line: finishing position per round, best finish at the
+// top of the driver's own range. Every driver's line is a different shape —
+// the poster's signature. Gaps where a round wasn't started.
+function SeasonTrace({ rounds }: { rounds: WrappedDriverCard['rounds'] }) {
+  const W = 320;
+  const H = 96;
+  const padX = 10;
+  const top = 26; // room for the best-finish label
+  const bottom = 26; // room for the worst-finish label
+  const pts = rounds
+    .map((r, i) => ({ i, p: r.position }))
+    .filter((q): q is { i: number; p: number } => q.p != null);
+  if (pts.length < 2) return null;
+  const best = Math.min(...pts.map((q) => q.p));
+  const worst = Math.max(...pts.map((q) => q.p));
+  const span = Math.max(worst - best, 1);
+  const x = (i: number) => padX + (i * (W - 2 * padX)) / Math.max(1, rounds.length - 1);
+  const y = (p: number) => top + ((p - best) / span) * (H - top - bottom);
+  // Consecutive rounds join solid; a skipped round is bridged with a faint
+  // dashed segment, so the season still reads as one line.
+  const segs = pts.slice(1).map((q, k) => ({ a: pts[k], b: q, gap: q.i - pts[k].i > 1 }));
+  const bestQ = pts.find((q) => q.p === best)!;
+  const worstQ = pts.find((q) => q.p === worst)!;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full block overflow-visible" role="img" aria-label={`Finishes by round: ${rounds.map((r) => (r.position != null ? `P${r.position}` : 'did not start')).join(', ')}`}>
+      {segs.map((sg, k) => (
+        <line
+          key={k}
+          x1={x(sg.a.i)} y1={y(sg.a.p)} x2={x(sg.b.i)} y2={y(sg.b.p)}
+          stroke="#E6B53D"
+          strokeWidth={sg.gap ? 2 : 4}
+          strokeLinecap="round"
+          strokeDasharray={sg.gap ? '2 7' : undefined}
+          opacity={sg.gap ? 0.55 : 1}
+        />
+      ))}
+      {pts.map((q) => (
+        <circle key={q.i} cx={x(q.i)} cy={y(q.p)} r={q === bestQ ? 7 : 4} fill={q === bestQ ? '#E6B53D' : '#0A0B0E'} stroke="#E6B53D" strokeWidth="2.5" />
+      ))}
+      <text x={x(bestQ.i)} y={y(best) - 13} textAnchor="middle" className="wx-trace-label">P{best}</text>
+      {worst !== best && (
+        <text x={x(worstQ.i)} y={y(worst) + 24} textAnchor="middle" className="wx-trace-label wx-trace-low">P{worst}</text>
+      )}
+    </svg>
+  );
+}
+
 function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
   const n = card.numbers;
   const finishes = card.rounds.filter((r) => r.position != null);
@@ -302,20 +349,14 @@ function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
                 </section>
               </div>
 
-              <div className="grid grid-cols-2 gap-5 mt-auto wx-in" style={d(420)}>
-                <div>
-                  <h3 className="wx-poster-label">Distance</h3>
-                  <p className="wx-poster-stat">{fmt(n.km)} km</p>
-                </div>
-                <div>
-                  <h3 className="wx-poster-label">Division {card.division}</h3>
-                  <p className="wx-poster-stat">
-                    {n.races} of {card.totalRounds} rounds
-                  </p>
-                </div>
+              <div className="mt-auto wx-in" style={d(420)}>
+                <SeasonTrace rounds={card.rounds} />
+                <p className="wx-poster-sum mt-3">
+                  <b>{fmt(n.km)} km</b> across {n.races} {n.races === 1 ? 'round' : 'rounds'} in Division {card.division}
+                </p>
               </div>
 
-              <div className="flex items-center justify-between mt-6 wx-in" style={d(500)}>
+              <div className="flex items-center justify-between mt-5 wx-in" style={d(500)}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- static brand lockup */}
                 <img src="/badges/sra-lockup.webp" alt="Sim Racing Alliance" width={112} height={32} />
                 <span className="text-[12px] text-white/55">Season 19 Wrapped</span>

@@ -116,54 +116,81 @@ export function percentileOf(value: number, field: number[]): number {
   return field.filter((v) => v <= value).length / field.length;
 }
 
-export type ArchetypeKey = 'metronome' | 'grinder' | 'charger' | 'qualifier' | 'ironman' | 'racer';
+/**
+ * Places better the second half of the season averaged than the first
+ * (positive = improved). Rounds split in two by index; rounds not started
+ * (null) are skipped. Needs two finishes in each half.
+ */
+export function finishTrend(positions: (number | null)[]): number | null {
+  const mid = Math.ceil(positions.length / 2);
+  const firstHalf = positions.slice(0, mid).filter((p): p is number => p != null);
+  const secondHalf = positions.slice(mid).filter((p): p is number => p != null);
+  if (firstHalf.length < 2 || secondHalf.length < 2) return null;
+  const avg = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  return avg(firstHalf) - avg(secondHalf);
+}
 
-export type ArchetypeInput = {
-  roundsStarted: number;
-  totalRounds: number;
-  /** Percentiles within the driver's comparison group, 0..1. */
-  consistencyPct: number;
-  /** Positions gained qualifying → finish, percentile (higher = gains more). */
-  gainPct: number;
-  /** Positions lost qualifying → finish, percentile (higher = loses more). */
-  lossPct: number;
-  practicePct: number;
-};
+/** Standard deviation of finishing positions. Needs three finishes. */
+export function finishSpread(positions: (number | null)[]): number | null {
+  const xs = positions.filter((p): p is number => p != null);
+  if (xs.length < 3) return null;
+  const mean = xs.reduce((s, x) => s + x, 0) / xs.length;
+  return Math.sqrt(xs.reduce((s, x) => s + (x - mean) ** 2, 0) / xs.length);
+}
+
+export type ArchetypeKey =
+  | 'frontrunner'
+  | 'metronome'
+  | 'charger'
+  | 'qualifier'
+  | 'bloomer'
+  | 'wildcard'
+  | 'grinder'
+  | 'racer';
+
+/** Percentile of each trait within the driver's comparison group, 0..1. Missing = no data. */
+export type ArchetypeTraits = Partial<Record<Exclude<ArchetypeKey, 'racer'>, number>>;
+
+export type ArchetypeInput = { racesStarted: number; traits: ArchetypeTraits };
 
 export type Archetype = { key: ArchetypeKey; title: string; line: string };
 
 const ARCHETYPES: Record<ArchetypeKey, Omit<Archetype, 'key'>> = {
-  metronome: { title: 'The Metronome', line: 'Lap after lap, the same number. Nobody in your division was steadier.' },
-  grinder: { title: 'The Grinder', line: 'You put in the laps before the lights went out. Few in the league practiced more.' },
+  frontrunner: { title: 'The Front-Runner', line: 'When the flag dropped, you were usually near the sharp end.' },
+  metronome: { title: 'The Metronome', line: 'Lap after lap, the same number. Hard to find anyone steadier.' },
   charger: { title: 'The Charger', line: 'Wherever you started, you finished further up. Sundays were for passing.' },
   qualifier: { title: 'The Qualifier', line: 'One lap, flat out. Saturday was your day.' },
-  ironman: { title: 'The Ironman', line: 'Every round, on the grid. A full season, start to finish.' },
-  racer: { title: 'The Racer', line: 'Out there every week, in the thick of it.' },
+  bloomer: { title: 'The Late Bloomer', line: 'Slow start, strong finish. You found something halfway through.' },
+  wildcard: { title: 'The Wildcard', line: 'Nobody knew which version of you would show up. Including you.' },
+  grinder: { title: 'The Grinder', line: 'You put in the laps before the lights went out. Few in the league practiced more.' },
+  racer: { title: 'The Racer', line: 'Out there when it counted.' },
 };
 
-/** A trait has to beat this share of the group to define you. */
-const ARCHETYPE_BAR = 0.85;
+// Exact ties resolve in this order, so the same data always gives the same card.
+const TIE_ORDER: Exclude<ArchetypeKey, 'racer'>[] = [
+  'frontrunner',
+  'metronome',
+  'charger',
+  'qualifier',
+  'bloomer',
+  'wildcard',
+  'grinder',
+];
 
 /**
- * Most extreme trait that clears the bar wins; exact ties resolve in the
- * order listed (metronome, grinder, charger, qualifier). Otherwise a full
- * season is an Ironman, and everyone else is a Racer.
+ * Everyone with a real season (3+ races) gets the trait they rank highest
+ * on within their group — no minimum bar. A bar left 41% of S19 drivers on
+ * the generic fallback; a personality card has to say something about
+ * everyone. The Racer is only for a season too short to read.
  */
 export function pickArchetype(input: ArchetypeInput): Archetype {
-  const traits: [ArchetypeKey, number][] = [
-    ['metronome', input.consistencyPct],
-    ['grinder', input.practicePct],
-    ['charger', input.gainPct],
-    ['qualifier', input.lossPct],
-  ];
-  let best: [ArchetypeKey, number] | null = null;
-  for (const t of traits) {
-    if (t[1] >= ARCHETYPE_BAR && (!best || t[1] > best[1])) best = t;
+  let best: [Exclude<ArchetypeKey, 'racer'>, number] | null = null;
+  if (input.racesStarted >= 3) {
+    for (const key of TIE_ORDER) {
+      const v = input.traits[key];
+      if (v != null && (!best || v > best[1])) best = [key, v];
+    }
   }
-  const key: ArchetypeKey = best
-    ? best[0]
-    : input.roundsStarted >= input.totalRounds
-      ? 'ironman'
-      : 'racer';
+  const key: ArchetypeKey = best ? best[0] : 'racer';
   return { key, ...ARCHETYPES[key] };
 }

@@ -233,4 +233,7 @@
 .wx-poster-label { font: 600 13px/1.2 var(--font-sans); color: rgba(255, 255, 255, .55); margin-bottom: 8px; }
 .wx-poster-item { font: 500 clamp(14px, 4.2cqw, 17px)/1.2 var(--font-sans); }
 .wx-poster-item b { font-weight: 800; }
-.wx-poster-stat { font: 800 clamp(24px, 8cqw, 34px)/1 var(--font-display); }
+.wx-poster-sum { font: 500 clamp(14px, 4.2cqw, 17px)/1.3 var(--font-sans); color: rgba(255, 255, 255, .75); }
+.wx-poster-sum b { font: 800 1.35em/1 var(--font-display); color: #fff; margin-right: .15em; }
+.wx-trace-label { font: 800 17px var(--font-display); fill: #fff; }
+.wx-trace-low { fill: rgba(255, 255, 255, .55); }

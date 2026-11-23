@@ -5,6 +5,9 @@ import {
   percentileOf,
   pickArchetype,
   seasonNumbers,
+  finishTrend,
+  finishSpread,
+  type ArchetypeKey,
   type Archetype,
   type SeasonNumbers,
   type WrappedRace,
@@ -73,7 +76,12 @@ const TRACK_CODES: Record<string, string> = {
   valencia: 'VAL', watkins_glen: 'WGI', zandvoort: 'ZAN', zolder: 'ZOL',
 };
 const trackCode = (key: string) => TRACK_CODES[key] ?? key.slice(0, 3).toUpperCase();
-const trackName = (key: string) => key.split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+// What drivers call the circuit, where that differs from the key.
+const TRACK_NAMES: Record<string, string> = {
+  mount_panorama: 'Bathurst', cota: 'COTA', spa: 'Spa', nurburgring: 'Nürburgring',
+};
+const trackName = (key: string) =>
+  TRACK_NAMES[key] ?? key.split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 
 const steamOf = (car: RawCar) => car.currentDriverSteamId ?? car.drivers?.[0]?.steamId ?? '';
 const bare = (id: string) => id.replace(/^S/, '');
@@ -238,7 +246,7 @@ async function load() {
   };
 }
 
-const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v3'], { revalidate: 3600 });
+const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v4'], { revalidate: 3600 });
 
 export type WrappedRosterEntry = { steamId: string; name: string; division: number };
 
@@ -271,34 +279,69 @@ export async function getS19Wrapped(steamId: string | null): Promise<{
   const practicePct = percentileOf(numbers.practiceLaps, leaguePractice);
 
   const avg = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const positionsOf = (id: string) =>
+    div.races.map((race) => race.entries.find((e) => e.steamId === id)?.position ?? null);
+  const finishesOf = (id: string) => positionsOf(id).filter((p): p is number => p != null);
   const avgGain = (id: string) => {
     const g = div.gains.get(id) ?? [];
     return g.length >= 3 ? avg(g) : null;
   };
-  const divGains = divIds.map(avgGain).filter((x): x is number => x != null);
-  const myGain = avgGain(steamId);
-  const divConsistency = divIds.map((id) => consistency.get(id)).filter((x): x is number => x != null);
-  const myConsistency = consistency.get(steamId);
+
+  // Every trait, as a "natural" stat (what the card shows) and a direction:
+  // the archetype percentile is "how much MORE of this trait than the rest of
+  // the division". Everything is judged within the driver's own division.
+  type TraitKey = Exclude<ArchetypeKey, 'racer'>;
+  const TRAITS: Record<TraitKey, { stat: (id: string) => number | null; more: 1 | -1; label: string }> = {
+    frontrunner: {
+      stat: (id) => (finishesOf(id).length >= 3 ? avg(finishesOf(id)) : null),
+      more: -1,
+      label: `Average finishing position, Division ${division}`,
+    },
+    metronome: { stat: (id) => consistency.get(id) ?? null, more: 1, label: `Consistency rating, Division ${division}` },
+    charger: { stat: avgGain, more: 1, label: `Places gained per race from qualifying, Division ${division}` },
+    qualifier: { stat: avgGain, more: -1, label: `Places gained per race from qualifying, Division ${division}` },
+    bloomer: { stat: (id) => finishTrend(positionsOf(id)), more: 1, label: `Places better in the second half, Division ${division}` },
+    wildcard: { stat: (id) => finishSpread(positionsOf(id)), more: 1, label: `Spread of finishing positions, Division ${division}` },
+    grinder: { stat: (id) => (divisionOf.get(id) === division ? (practice.get(id) ?? 0) : null), more: 1, label: `Practice laps, Division ${division}` },
+  };
+  const traitData = Object.fromEntries(
+    (Object.keys(TRAITS) as TraitKey[]).map((k) => {
+      const t = TRAITS[k];
+      const group = divIds.map(t.stat).filter((x): x is number => x != null);
+      const mine = t.stat(steamId);
+      const pct = mine != null ? percentileOf(mine * t.more, group.map((x) => x * t.more)) : undefined;
+      // Rank within the division on this trait: 1 = the most of it.
+      const rank = mine != null ? 1 + group.filter((x) => x * t.more > mine * t.more).length : null;
+      return [k, { group, mine, pct, rank }];
+    }),
+  ) as Record<TraitKey, { group: number[]; mine: number | null; pct: number | undefined; rank: number | null }>;
 
   const roundsStarted = numbers.races;
   const totalRounds = div.races.length;
   const archetype = pickArchetype({
-    roundsStarted,
-    totalRounds,
-    consistencyPct: myConsistency != null ? percentileOf(myConsistency, divConsistency) : 0,
-    gainPct: myGain != null ? percentileOf(myGain, divGains) : 0,
-    lossPct: myGain != null ? percentileOf(-myGain, divGains.map((g) => -g)) : 0,
-    practicePct,
+    racesStarted: roundsStarted,
+    traits: Object.fromEntries((Object.keys(traitData) as TraitKey[]).map((k) => [k, traitData[k].pct])),
   });
 
-  const evidence: Record<string, string> = {
-    metronome: `Consistency rating ${Math.round((myConsistency ?? 0) * 100)}/100 — top ${Math.max(1, Math.round((1 - percentileOf(myConsistency ?? 0, divConsistency)) * 100))}% of Division ${division}`,
-    grinder: `${numbers.practiceLaps.toLocaleString('en-US')} practice laps — more than ${Math.round(practicePct * 100)}% of the league`,
-    charger: `+${(myGain ?? 0).toFixed(1)} places per race, qualifying to flag`,
-    qualifier: `${(myGain ?? 0).toFixed(1)} places per race, qualifying to flag`,
-    ironman: `${roundsStarted} of ${totalRounds} rounds started`,
-    racer: `${roundsStarted} of ${totalRounds} rounds started`,
+  const evidenceFor = (k: ArchetypeKey): string => {
+    if (k === 'racer') return `${roundsStarted} of ${totalRounds} rounds started`;
+    const { mine, rank, group } = traitData[k];
+    const of = `${rank} of ${group.length} in Division ${division}`;
+    const m = mine ?? 0;
+    switch (k) {
+      case 'frontrunner': return `Average finish of P${m.toFixed(1)}, ${of}`;
+      case 'metronome': return `Consistency rating of ${Math.round(m * 100)}, ${of}`;
+      case 'charger': return `${m >= 0 ? '+' : ''}${m.toFixed(1)} places a race from qualifying, ${of}`;
+      case 'qualifier': return `Qualified ${Math.abs(m).toFixed(1)} places ahead of where you finished, ${of}`;
+      case 'bloomer': return `${m.toFixed(1)} places better in the second half, ${of}`;
+      case 'wildcard': {
+        const f = finishesOf(steamId);
+        return `Finishes anywhere from P${Math.min(...f)} to P${Math.max(...f)}, ${of}`;
+      }
+      case 'grinder': return `${Math.round(m).toLocaleString('en-US')} practice laps, ${of}`;
+    }
   };
+  const evidence = { [archetype.key]: evidenceFor(archetype.key) };
 
   const n = findNemesis(steamId, div.races);
   const me = people.get(steamId);
@@ -320,20 +363,15 @@ export async function getS19Wrapped(steamId: string | null): Promise<{
       }))
     : [];
 
-  // The field plot shows the stat the archetype was judged on, against the
-  // same comparison group. Ironman/Racer weren't judged on a spread, so they
-  // show consistency (the most telling general stat) instead.
-  const field: WrappedDriverCard['field'] =
-    archetype.key === 'grinder'
-      ? { label: 'Practice laps, whole league', values: leaguePractice, mine: numbers.practiceLaps, higherIsBetter: true }
-      : archetype.key === 'charger' || archetype.key === 'qualifier'
-        ? { label: `Places gained per race, Division ${division}`, values: divGains, mine: myGain ?? 0, higherIsBetter: true }
-        : {
-            label: `Consistency rating, Division ${division}`,
-            values: divConsistency.map((c) => Math.round(c * 100)),
-            mine: Math.round((myConsistency ?? 0) * 100),
-            higherIsBetter: true,
-          };
+  // The stat the archetype was judged on, against the same group. The Racer
+  // wasn't judged on anything, so it shows average finish.
+  const fieldKey: TraitKey = archetype.key === 'racer' ? 'frontrunner' : archetype.key;
+  const field: WrappedDriverCard['field'] = {
+    label: TRAITS[fieldKey].label,
+    values: traitData[fieldKey].group,
+    mine: traitData[fieldKey].mine ?? 0,
+    higherIsBetter: TRAITS[fieldKey].more === 1,
+  };
   return {
     roster,
     card: {

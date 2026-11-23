@@ -4,6 +4,8 @@ import {
   findNemesis,
   pickArchetype,
   percentileOf,
+  finishTrend,
+  finishSpread,
   type WrappedRace,
 } from './wrapped.js';
 
@@ -95,22 +97,45 @@ describe('percentileOf', () => {
 });
 
 describe('pickArchetype', () => {
-  const base = { roundsStarted: 6, totalRounds: 8, consistencyPct: 0.5, gainPct: 0.5, lossPct: 0.5, practicePct: 0.5 };
+  const traits = { frontrunner: 0.5, metronome: 0.5, charger: 0.5, qualifier: 0.5, bloomer: 0.5, wildcard: 0.5, grinder: 0.5 };
 
-  it('takes the most extreme trait when it clears the bar', () => {
-    expect(pickArchetype({ ...base, consistencyPct: 0.95, practicePct: 0.9 }).key).toBe('metronome');
-    expect(pickArchetype({ ...base, practicePct: 0.97 }).key).toBe('grinder');
-    expect(pickArchetype({ ...base, gainPct: 0.9 }).key).toBe('charger');
-    expect(pickArchetype({ ...base, lossPct: 0.92 }).key).toBe('qualifier');
+  it('gives everyone with a real season their strongest trait — no bar to clear', () => {
+    expect(pickArchetype({ racesStarted: 6, traits: { ...traits, grinder: 0.97 } }).key).toBe('grinder');
+    expect(pickArchetype({ racesStarted: 6, traits: { ...traits, wildcard: 0.61 } }).key).toBe('wildcard');
+    expect(pickArchetype({ racesStarted: 6, traits: { ...traits, bloomer: 0.7, charger: 0.69 } }).key).toBe('bloomer');
   });
 
-  it('falls back to ironman for a full season, then racer', () => {
-    expect(pickArchetype({ ...base, roundsStarted: 8 }).key).toBe('ironman');
-    expect(pickArchetype(base).key).toBe('racer');
+  it('ignores traits with no data rather than treating them as zero', () => {
+    expect(pickArchetype({ racesStarted: 5, traits: { charger: 0.3 } }).key).toBe('charger');
+  });
+
+  it('is The Racer only with fewer than 3 races, or no trait data at all', () => {
+    expect(pickArchetype({ racesStarted: 2, traits: { ...traits, grinder: 1 } }).key).toBe('racer');
+    expect(pickArchetype({ racesStarted: 8, traits: {} }).key).toBe('racer');
   });
 
   it('resolves exact ties in a fixed order so the same data always gives the same card', () => {
-    const tie = { ...base, consistencyPct: 0.9, gainPct: 0.9 };
-    expect(pickArchetype(tie).key).toBe('metronome');
+    expect(pickArchetype({ racesStarted: 8, traits }).key).toBe('frontrunner');
+    expect(pickArchetype({ racesStarted: 8, traits: { metronome: 0.9, charger: 0.9 } }).key).toBe('metronome');
+  });
+});
+
+describe('finishTrend', () => {
+  it('is how many places better the second half averaged than the first', () => {
+    // first half avg 10, second half avg 4 → improved by 6
+    expect(finishTrend([12, 8, 10, 10, 4, 5, 3, 4])).toBe(6);
+  });
+  it('skips rounds not started and needs two finishes in each half', () => {
+    expect(finishTrend([5, null, 7, null, 2, 4, null, null])).toBe(3);
+    expect(finishTrend([5, null, null, null, 2, 4, 1, 3])).toBeNull();
+  });
+});
+
+describe('finishSpread', () => {
+  it('is the standard deviation of finishing positions', () => {
+    expect(finishSpread([2, 4, 4, 4, 5, 5, 7, 9])).toBe(2);
+  });
+  it('needs at least three finishes', () => {
+    expect(finishSpread([1, null, 3])).toBeNull();
   });
 });
