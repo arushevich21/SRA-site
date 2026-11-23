@@ -17,7 +17,7 @@ import './wrapped.css';
 // pausing the animation pauses the story). Tap right/left to skip, hold to
 // pause, ← → and space on a keyboard.
 
-const C = {
+export const C = {
   gold: '#E6B53D',
   red: '#E04040',
   cobalt: '#2337C6',
@@ -27,27 +27,27 @@ const C = {
   purple: '#6A2FD6', // the purple sector
 };
 
-type SlideDef = { bg: string; fg: string; ms: number | null; render: () => ReactNode };
+export type SlideDef = { bg: string; fg: string; ms: number | null; render: () => ReactNode };
 
-const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
-const d = (ms: number): CSSProperties => ({ '--d': `${ms}ms` }) as CSSProperties;
+export const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
+export const d = (ms: number): CSSProperties => ({ '--d': `${ms}ms` }) as CSSProperties;
 
 // Every slide is laid out on one fixed canvas and scaled to the space it
 // gets (like a phone screen), so the layout never reflows or overflows.
-const CANVAS_W = 440;
-const CANVAS_H = 782; // 9:16
+export const CANVAS_W = 440;
+export const CANVAS_H = 782; // 9:16
 
 // Display names sized so their longest word fits the canvas on one line, and
 // hyphenated words never break at the hyphen ("Front-Runner" wrapped to 3
 // lines). Saira Condensed Black runs ~0.46em per glyph.
-const nb = (w: string) => w.replace(/-/g, '‑');
-function fitName(text: string, max = 104): CSSProperties {
+export const nb = (w: string) => w.replace(/-/g, '‑');
+export function fitName(text: string, max = 104): CSSProperties {
   const longest = Math.max(...text.split(' ').map((w) => w.length));
   return { fontSize: Math.floor(Math.min(max, (CANVAS_W - 52) / (longest * 0.46))) };
 }
 
 // A line of display type revealed out of its own line box.
-function Line({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+export function Line({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
   return (
     <span className="wx-line">
       <span style={d(delay)}>{children}</span>
@@ -55,7 +55,7 @@ function Line({ children, delay = 0 }: { children: ReactNode; delay?: number }) 
   );
 }
 
-function CountUp({ to, run }: { to: number; run: boolean }) {
+export function CountUp({ to, run }: { to: number; run: boolean }) {
   const [v, setV] = useState(run ? 0 : to);
   useEffect(() => {
     if (!run) return setV(to);
@@ -764,15 +764,22 @@ export type WrappedShare = { url: string; imageUrl: string };
  * slide, share / download / replay controls appear under the card (outside
  * the canvas, so they never end up in the poster image).
  */
-export function WrappedStory({
-  card,
+export function StoryPlayer({
+  build,
+  label,
   share,
   onStart,
+  extra,
 }: {
-  card: WrappedDriverCard;
+  /** The slides; `motion` is false under prefers-reduced-motion. */
+  build: (motion: boolean) => SlideDef[];
+  /** Accessible name, and the title when sharing. */
+  label: string;
   share?: WrappedShare;
   /** Called once when the story is first shown (e.g. to mark it seen). */
   onStart?: () => void;
+  /** More actions for the end of the story (e.g. a link to the league's). */
+  extra?: ReactNode;
 }) {
   const [reduced, setReduced] = useState(false);
   const [i, setI] = useState(0);
@@ -798,7 +805,7 @@ export function WrappedStory({
     // Once per mount, by design.
   }, []);
 
-  const slides = buildSlides(card, !reduced);
+  const slides = build(!reduced);
   const slide = slides[i];
   const last = slides.length - 1;
 
@@ -845,7 +852,7 @@ export function WrappedStory({
 
   const shareLink = async () => {
     if (!share) return;
-    const title = `${card.name}'s Season 19 Wrapped`;
+    const title = label;
     // Share paths are site-relative; the clipboard and share sheet need a full URL.
     const url = new URL(share.url, window.location.origin).toString();
     try {
@@ -878,7 +885,7 @@ export function WrappedStory({
         }}
         onContextMenu={(e) => e.preventDefault()}
         aria-roledescription="story"
-        aria-label={`${card.name}'s Season 19 Wrapped`}
+        aria-label={label}
       >
         <div
           className="wx-canvas"
@@ -943,7 +950,31 @@ export function WrappedStory({
         <button type="button" onClick={replay} className="wx-action" tabIndex={atEnd ? 0 : -1}>
           Watch again
         </button>
+        {extra}
       </div>
     </div>
+  );
+}
+
+/** A driver's own Season 19 story. */
+export function WrappedStory({
+  card,
+  share,
+  onStart,
+  extra,
+}: {
+  card: WrappedDriverCard;
+  share?: WrappedShare;
+  onStart?: () => void;
+  extra?: ReactNode;
+}) {
+  return (
+    <StoryPlayer
+      build={(motion) => buildSlides(card, motion)}
+      label={`${card.name}'s Season 19 Wrapped`}
+      share={share}
+      onStart={onStart}
+      extra={extra}
+    />
   );
 }

@@ -2,7 +2,8 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { supabase } from '@/lib/supabase';
 import { getS19Wrapped } from './s19-prototype';
-import type { WrappedDriverCard } from './card';
+import type { LeagueWrapped, WrappedDriverCard } from './card';
+import { buildLeague } from './league';
 
 // Season Wrapped snapshot: every driver's card computed once and stored
 // (wrapped_cards), so the public pages never recompute from live tables.
@@ -13,25 +14,26 @@ export const WRAPPED_SEASON = 'acc-gt3-s19';
 
 export { WRAPPED_UNTIL, wrappedLive } from './card';
 
-export type WrappedSummary = {
-  drivers: number;
-  races: number;
-  laps: number;
-  km: number;
-  hours: number;
-  sweatiest: { name: string; laps: number } | null;
-};
-
 const token = () => randomBytes(16).toString('base64url');
 
-/** Build every S19 card from live data and upsert the snapshot. Admin-only caller. */
-export async function generateSnapshot(): Promise<{ cards: number }> {
+async function allCards(): Promise<WrappedDriverCard[]> {
   const { roster } = await getS19Wrapped(null);
   const cards: WrappedDriverCard[] = [];
   for (const r of roster) {
     const { card } = await getS19Wrapped(r.steamId);
     if (card) cards.push(card);
   }
+  return cards;
+}
+
+/** The league story built live (admin preview before/without a snapshot). */
+export async function buildLeagueLive(): Promise<LeagueWrapped> {
+  return buildLeague(WRAPPED_SEASON, await allCards());
+}
+
+/** Build every S19 card from live data and upsert the snapshot. Admin-only caller. */
+export async function generateSnapshot(): Promise<{ cards: number }> {
+  const cards = await allCards();
 
   // Keep existing share tokens: regenerating must not break links people
   // have already posted.
@@ -60,18 +62,7 @@ export async function generateSnapshot(): Promise<{ cards: number }> {
     if (error) throw new Error(error.message);
   }
 
-  const sweat = cards
-    .map((c) => c.easterEggs.find((e) => e.kind === 'sweat'))
-    .find((e): e is Extract<WrappedDriverCard['easterEggs'][number], { kind: 'sweat' }> => !!e);
-  const sweatCard = cards.find((c) => c.easterEggs.some((e) => e.kind === 'sweat'));
-  const summary: WrappedSummary = {
-    drivers: cards.length,
-    races: cards.reduce((n, c) => n + c.numbers.races, 0),
-    laps: cards.reduce((n, c) => n + c.numbers.laps, 0),
-    km: Math.round(cards.reduce((n, c) => n + c.numbers.km, 0)),
-    hours: Math.round(cards.reduce((n, c) => n + c.numbers.hours, 0)),
-    sweatiest: sweat && sweatCard ? { name: sweatCard.name, laps: sweat.laps } : null,
-  };
+  const summary = await buildLeague(WRAPPED_SEASON, cards);
   const { error: sErr } = await supabase
     .from('wrapped_seasons')
     .upsert({ season: WRAPPED_SEASON, summary, generated_at: now }, { onConflict: 'season' });
@@ -96,13 +87,13 @@ export async function getSnapshotStatus(): Promise<
   return { cards: count ?? 0, generatedAt: (data?.generated_at as string | undefined) ?? null };
 }
 
-export async function getSummary(): Promise<WrappedSummary | null> {
+export async function getSummary(): Promise<LeagueWrapped | null> {
   const { data } = await supabase
     .from('wrapped_seasons')
     .select('summary')
     .eq('season', WRAPPED_SEASON)
     .maybeSingle();
-  return (data?.summary as WrappedSummary | undefined) ?? null;
+  return (data?.summary as LeagueWrapped | undefined) ?? null;
 }
 
 /** A driver's own card. Callers pass the SteamID from the signed-in session only. */

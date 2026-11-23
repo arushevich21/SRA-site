@@ -20,7 +20,7 @@ export function WrappedHomeCard() {
       ? { href: '/wrapped/s19', label: 'Watch yours' }
       : state.state === 'signed-out'
         ? { href: '/auth/login', label: 'Sign in to watch yours' }
-        : { href: '/wrapped/s19', label: 'See the season' };
+        : { href: '/wrapped/s19/league', label: 'Watch the season' };
 
   return (
     <section className="px-5 sm:px-7 py-10">
@@ -32,7 +32,7 @@ export function WrappedHomeCard() {
           <p className="font-sans text-[16px] mt-2 max-w-[52ch]">
             {ready
               ? 'Your distance, your best rounds, your nemesis, and what kind of driver you were.'
-              : 'Every GT3 Team Series driver gets their season as a story: distance, best rounds, nemesis and more.'}
+              : 'The GT3 Team Series season as a story: the numbers, the standouts, and our champions.'}
           </p>
         </div>
         {cta.href === '/auth/login' ? (

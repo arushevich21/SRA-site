@@ -87,3 +87,27 @@ export function wrappedLive(now = Date.now()): boolean {
 export type WrappedPromptState =
   | { state: 'off' | 'signed-out' | 'no-card' }
   | { state: 'ready'; seen: boolean; name: string; number: number | null };
+
+/** The league's season as a story: the series as a whole, and its champions. */
+export type LeagueWrapped = {
+  drivers: number;
+  starts: number;
+  rounds: number;
+  divisions: number;
+  laps: number;
+  km: number;
+  hours: number;
+  mostWins: { names: string[]; wins: number } | null;
+  purpleKing: { name: string; purple: number } | null;
+  sweatiest: { name: string; laps: number } | null;
+  /** Drivers who raced 6+ rounds without a penalty point or warning. */
+  spotless: number;
+  /** Smallest drivers' title margin across the divisions. */
+  closest: { division: number; margin: number; champion: string } | null;
+  champions: {
+    division: number;
+    driver: { name: string; number: number | null; points: number; margin: number; wins: number };
+    silver: { name: string; number: number | null; overall: number } | null;
+    team: { name: string; drivers: string[]; points: number; margin: number } | null;
+  }[];
+};
