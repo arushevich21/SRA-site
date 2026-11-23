@@ -134,7 +134,7 @@ export type Archetype = { key: ArchetypeKey; title: string; line: string };
 
 const ARCHETYPES: Record<ArchetypeKey, Omit<Archetype, 'key'>> = {
   metronome: { title: 'The Metronome', line: 'Lap after lap, the same number. Nobody in your division was steadier.' },
-  grinder: { title: 'The Grinder', line: 'You put in the laps before the lights went out. Few in the league practised more.' },
+  grinder: { title: 'The Grinder', line: 'You put in the laps before the lights went out. Few in the league practiced more.' },
   charger: { title: 'The Charger', line: 'Wherever you started, you finished further up. Sundays were for passing.' },
   qualifier: { title: 'The Qualifier', line: 'One lap, flat out. Saturday was your day.' },
   ironman: { title: 'The Ironman', line: 'Every round, on the grid. A full season, start to finish.' },

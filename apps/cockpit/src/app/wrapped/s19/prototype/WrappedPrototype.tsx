@@ -1,368 +1,385 @@
 'use client';
 
-import { useCallback, useEffect, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { WrappedDriverCard, WrappedRosterEntry } from '@/lib/wrapped/s19-prototype';
 import './wrapped.css';
 
-const SLIDES = 3;
-const GOLD = '#e6b53d';
-const MUTED = 'rgba(233,235,239,.32)';
+// Season 19 Wrapped — story prototype. Each slide is one idea on a full-bleed
+// colour field; setup slides ask, reveal slides answer. Slides advance on a
+// timer (the progress bar IS the timer: its animation ending moves on, so
+// pausing the animation pauses the story). Tap right/left to skip, hold to
+// pause, ← → and space on a keyboard.
 
-const fmt = (n: number, digits = 0) =>
-  n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const C = {
+  gold: '#E6B53D',
+  red: '#E04040',
+  cobalt: '#2337C6',
+  green: '#0D6B4C',
+  white: '#FFFFFF',
+  carbon: '#0A0B0E',
+};
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const m = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setReduced(m.matches);
-    const on = () => setReduced(m.matches);
-    m.addEventListener('change', on);
-    return () => m.removeEventListener('change', on);
-  }, []);
-  return reduced;
+type SlideDef = { bg: string; fg: string; ms: number | null; render: () => ReactNode };
+
+const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
+const d = (ms: number): CSSProperties => ({ '--d': `${ms}ms` }) as CSSProperties;
+
+// A line of display type revealed out of its own line box.
+function Line({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  return (
+    <span className="wx-line">
+      <span style={d(delay)}>{children}</span>
+    </span>
+  );
 }
 
-// Counts up in step with the hero's rise (starts with it, 900ms ease-out).
-function CountUp({ value, digits = 0, run }: { value: number; digits?: number; run: boolean }) {
-  const [shown, setShown] = useState(run ? 0 : value);
+function CountUp({ to, run }: { to: number; run: boolean }) {
+  const [v, setV] = useState(run ? 0 : to);
   useEffect(() => {
-    if (!run) {
-      setShown(value);
-      return;
-    }
+    if (!run) return setV(to);
     let raf = 0;
-    let start: number | null = null;
+    let t0: number | null = null;
     const tick = (t: number) => {
-      start ??= t;
-      const p = Math.min((t - start - 160) / 900, 1);
-      setShown(value * (1 - Math.pow(1 - Math.max(p, 0), 3)));
+      t0 ??= t;
+      const p = Math.min((t - t0) / 1400, 1);
+      setV(to * (1 - Math.pow(1 - p, 4)));
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [value, run]);
-  return <>{fmt(shown, digits)}</>;
+  }, [to, run]);
+  return <>{fmt(v)}</>;
 }
 
-const at = (ms: number, rise?: number): CSSProperties =>
-  ({ '--d': `${ms}ms`, ...(rise != null ? { '--rise': `${rise}px` } : {}) }) as CSSProperties;
-
-// ── Charts ──────────────────────────────────────────────────────────────────
-
-// Season strip: one bar per round, taller = better finish; best round in gold.
-function SeasonStrip({ rounds }: { rounds: WrappedDriverCard['rounds'] }) {
-  const W = 380;
-  const H = 190;
-  const base = 158;
-  const maxBar = 118;
-  const col = W / rounds.length;
-  const finishes = rounds.map((r) => r.position).filter((p): p is number => p != null);
-  const best = finishes.length ? Math.min(...finishes) : null;
-  // Scale to the driver's own range, not the 35-car field — against the whole
-  // grid, P1 and P3 were indistinguishable. Floor of P8 so a season of P1–P2
-  // doesn't make a P2 look like a disaster.
-  const worst = Math.max(8, ...finishes);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Finishing position each round: ${rounds.map((r) => `${r.track} ${r.position != null ? `P${r.position}` : 'did not start'}`).join(', ')}`}>
-      <line x1="0" x2={W} y1={base} y2={base} stroke="var(--color-line-2)" strokeWidth="1" />
-      {rounds.map((r, i) => {
-        const cx = col * i + col / 2;
-        const bw = Math.min(26, col * 0.5);
-        if (r.position == null)
-          return (
-            <g key={r.round}>
-              <line x1={cx - bw / 2} x2={cx + bw / 2} y1={base - 1} y2={base - 1} stroke={MUTED} strokeDasharray="3 3" />
-              <text x={cx} y={base - 10} textAnchor="middle" className="wr-axis">DNS</text>
-              <text x={cx} y={H - 12} textAnchor="middle" className="wr-axis">{r.code}</text>
-            </g>
-          );
-        const h = Math.max(8, (1 - ((r.position - 1) / worst) * 0.9) * maxBar);
-        const isBest = r.position === best;
-        return (
-          <g key={r.round}>
-            <rect
-              className="wr-bar"
-              style={{ '--i': i } as CSSProperties}
-              x={cx - bw / 2}
-              y={base - h}
-              width={bw}
-              height={h}
-              fill={isBest ? GOLD : MUTED}
-            />
-            <text x={cx} y={base - h - 7} textAnchor="middle" className="wr-val" style={isBest ? { fill: GOLD } : undefined}>
-              P{r.position}
-            </text>
-            <text x={cx} y={H - 12} textAnchor="middle" className="wr-axis">{r.code}</text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-// Rivalry: both drivers' finishing positions across the season, P1 at the top.
-// A hairline joins the pair on rounds they finished side by side.
-function RivalryChart({ rivalry, them }: { rivalry: WrappedDriverCard['rivalry']; them: string }) {
-  const W = 380;
-  const H = 200;
-  const L = 30;
-  const R = 12;
-  const T = 14;
-  const B = 34;
-  const all = rivalry.flatMap((r) => [r.me, r.them]).filter((p): p is number => p != null);
-  const maxPos = Math.max(2, ...all);
-  const x = (i: number) => L + (i * (W - L - R)) / Math.max(1, rivalry.length - 1);
-  const y = (p: number) => T + ((p - 1) / (maxPos - 1)) * (H - T - B);
-  const path = (key: 'me' | 'them') => {
-    let d = '';
-    let pen = false;
-    rivalry.forEach((r, i) => {
-      const p = r[key];
-      if (p == null) {
-        pen = false;
-        return;
-      }
-      d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)} ${y(p).toFixed(1)} `;
-      pen = true;
-    });
-    return d.trim();
-  };
-  return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Your finishing position and ${them}'s, round by round`}>
-        <text x={L - 8} y={y(1) + 3} textAnchor="end" className="wr-axis">P1</text>
-        <text x={L - 8} y={y(maxPos) + 3} textAnchor="end" className="wr-axis">P{maxPos}</text>
-        {rivalry.map((r, i) => (
-          <g key={r.round}>
-            <line x1={x(i)} x2={x(i)} y1={T} y2={H - B} stroke="var(--color-line)" strokeWidth="1" />
-            <text x={x(i)} y={H - 12} textAnchor="middle" className="wr-axis">{r.code}</text>
-            {r.me != null && r.them != null && Math.abs(r.me - r.them) === 1 && (
-              <line className="wr-dot" x1={x(i)} x2={x(i)} y1={y(r.me)} y2={y(r.them)} stroke="#fff" strokeWidth="2" />
-            )}
-          </g>
-        ))}
-        <path className="wr-line" d={path('them')} pathLength={1} fill="none" stroke={MUTED} strokeWidth="2" strokeLinejoin="round" />
-        <path className="wr-line" d={path('me')} pathLength={1} fill="none" stroke={GOLD} strokeWidth="3" strokeLinejoin="round" />
-        {rivalry.map((r, i) => (
-          <g key={`d${r.round}`} className="wr-dot">
-            {r.them != null && <circle cx={x(i)} cy={y(r.them)} r="3.5" fill="#0e1014" stroke={MUTED} strokeWidth="2" />}
-            {r.me != null && <circle cx={x(i)} cy={y(r.me)} r="4.5" fill={GOLD} />}
-          </g>
-        ))}
-      </svg>
-      <div className="flex gap-5 mt-1 font-mono text-[9.5px] tracking-[.16em] uppercase text-txt-3">
-        <span className="flex items-center gap-2"><i className="inline-block w-4 h-[3px]" style={{ background: GOLD }} />You</span>
-        <span className="flex items-center gap-2"><i className="inline-block w-4 h-[2px]" style={{ background: MUTED }} />{them}</span>
-      </div>
-    </div>
-  );
-}
-
-// Field plot: every driver in the comparison group as a dot (stacked where
-// they'd overlap), the driver as a gold dot that lands last.
-function FieldPlot({ field }: { field: WrappedDriverCard['field'] }) {
-  const W = 380;
-  const H = 150;
-  const L = 10;
-  const R = 10;
-  const axisY = 118;
-  const lo = Math.min(field.mine, ...field.values);
-  const hi = Math.max(field.mine, ...field.values);
-  const span = hi - lo || 1;
-  const x = (v: number) => L + ((v - lo) / span) * (W - L - R);
-  const bins = new Map<number, number>();
-  const dots = field.values.map((v) => {
-    const bx = Math.round(x(v) / 8);
-    const k = bins.get(bx) ?? 0;
-    bins.set(bx, k + 1);
-    return { cx: bx * 8, cy: axisY - 8 - k * 7 };
-  });
-  const youX = x(field.mine);
-  const label = (v: number) => (Number.isInteger(v) ? fmt(v) : v.toFixed(1));
-  return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`${field.label}: you ${label(field.mine)}, field from ${label(lo)} to ${label(hi)}`}>
-        <line x1={L} x2={W - R} y1={axisY} y2={axisY} stroke="var(--color-line-2)" />
-        <g className="wr-field">
-          {dots.map((d, i) => (
-            <circle key={i} cx={d.cx} cy={d.cy} r="3" fill={MUTED} />
-          ))}
-        </g>
-        <g className="wr-you">
-          <line x1={youX} x2={youX} y1={26} y2={axisY} stroke={GOLD} strokeWidth="1.5" />
-          <circle cx={youX} cy={26} r="6" fill={GOLD} />
-          <text x={youX} y={12} textAnchor="middle" className="wr-val" style={{ fill: GOLD }}>
-            YOU · {label(field.mine)}
-          </text>
-        </g>
-        <text x={L} y={axisY + 16} className="wr-axis">{label(lo)}</text>
-        <text x={W - R} y={axisY + 16} textAnchor="end" className="wr-axis">{label(hi)}</text>
-      </svg>
-      <p className="font-mono text-[9.5px] tracking-[.16em] uppercase text-txt-3 mt-1">{field.label}</p>
-    </div>
-  );
-}
-
-// ── Slides ──────────────────────────────────────────────────────────────────
-
-function Slide({ card, index, animate }: { card: WrappedDriverCard; index: number; animate: boolean }) {
+function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
   const n = card.numbers;
-  const kicker = (text: string) => (
-    <span className="wr-kicker wr-fade" style={at(0)}>
-      {text}
-    </span>
-  );
+  const finishes = card.rounds.filter((r) => r.position != null);
+  const best = finishes.length ? Math.min(...finishes.map((r) => r.position!)) : null;
+  const bestRound = card.rounds.find((r) => r.position === best);
+  const minutes = Math.round(n.hours * 60);
+  const nm = card.nemesis;
 
-  if (index === 0) {
-    const minutes = Math.round(n.hours * 60);
-    return (
-      <>
-        {kicker('Season 19 in numbers')}
-        <div className="flex-1 flex items-center">
-          <SeasonStrip rounds={card.rounds} />
-        </div>
-        <div className="wr-hero wr-rise" style={at(160, 28)}>
-          <CountUp value={n.km} run={animate} />
-          <small> km</small>
-        </div>
-        <p className="wr-support wr-rise mt-2" style={at(280, 10)}>
-          {card.distanceCompare}
-        </p>
-        <div className="grid grid-cols-4 gap-3 mt-5 wr-rise" style={at(360, 8)}>
-          {[
-            [`${n.races}/${card.totalRounds}`, 'Rounds'],
-            [fmt(n.laps), 'Race laps'],
-            [`${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}`, 'On track'],
-            [fmt(n.practiceLaps), 'Practice'],
-          ].map(([v, l]) => (
-            <div key={l} className="wr-cell">
-              <b>{v}</b>
-              <small>{l}</small>
-            </div>
-          ))}
-        </div>
-      </>
-    );
-  }
-
-  if (index === 1) {
-    const nm = card.nemesis;
-    if (!nm)
-      return (
+  const slides: SlideDef[] = [
+    {
+      bg: C.gold,
+      fg: C.carbon,
+      ms: 4200,
+      render: () => (
         <>
-          {kicker('Your nemesis')}
-          <p className="wr-support mt-auto">Nobody finished next to you twice. A lone wolf.</p>
+          <div className="wx-kerb wx-sweep" style={{ ...d(0), top: '26%' }} aria-hidden="true" />
+          <div className="mt-auto">
+            {card.number != null && (
+              <div className="wx-in mb-6" style={{ ...d(250), fontSize: 64 }}>
+                <span className="wx-panel">{card.number}</span>
+              </div>
+            )}
+            <p className="wx-say">
+              <Line delay={350}>{card.name},</Line>
+              <Line delay={450}>your Season 19</Line>
+              <Line delay={550}>is in.</Line>
+            </p>
+          </div>
         </>
-      );
-    return (
-      <>
-        {kicker('Your nemesis')}
-        <div className="flex-1 flex items-center wr-fade" style={at(80)}>
-          <div className="w-full">
-            <RivalryChart rivalry={card.rivalry} them={nm.name} />
-          </div>
-        </div>
-        <div className="wr-hero wr-rise" style={at(160, 28)}>
-          {nm.name}
-          {nm.number != null && <small> #{nm.number}</small>}
-        </div>
-        <p className="wr-support wr-rise mt-2" style={at(280, 10)}>
-          You finished side by side {nm.sideBySide} {nm.sideBySide === 1 ? 'time' : 'times'}.
+      ),
+    },
+    {
+      bg: C.red,
+      fg: C.white,
+      ms: 3200,
+      render: () => (
+        <p className="wx-say my-auto">
+          <Line>You put in some</Line>
+          <Line delay={100}>serious miles.</Line>
         </p>
-        <div className="grid grid-cols-2 gap-3 mt-5 wr-rise" style={at(360, 8)}>
-          <div className="wr-cell">
-            <b>{nm.ahead}</b>
-            <small>Times you were ahead</small>
+      ),
+    },
+    {
+      bg: C.cobalt,
+      fg: C.white,
+      ms: 6500,
+      render: () => (
+        <>
+          <div className="wx-road" aria-hidden="true" />
+          <div className="relative mt-[18%]">
+            <div className="wx-big">
+              <Line>
+                <CountUp to={n.km} run={motion} />
+              </Line>
+            </div>
+            <div className="wx-say mt-1">
+              <Line delay={120}>kilometers</Line>
+            </div>
+            <p className="wx-body mt-6 wx-in" style={d(500)}>
+              {card.distanceCompare} {fmt(n.laps)} race laps in {Math.floor(minutes / 60)} hours {minutes % 60}{' '}
+              minutes.
+            </p>
           </div>
-          <div className="wr-cell">
-            <b>{nm.behind}</b>
-            <small>Times they were ahead</small>
+        </>
+      ),
+    },
+    {
+      bg: C.white,
+      fg: C.carbon,
+      ms: 7500,
+      render: () => (
+        <>
+          <p className="wx-say">
+            <Line>Every round,</Line>
+            <Line delay={100}>on the board.</Line>
+          </p>
+          <div className="grid grid-cols-4 gap-3 mt-8">
+            {card.rounds.map((r, i) => {
+              const tilt = ((i * 7) % 5) - 2;
+              return (
+                <div
+                  key={r.round}
+                  className="wx-board wx-drop"
+                  data-best={r.position != null && r.position === best}
+                  data-dns={r.position == null}
+                  style={{ ...d(300 + i * 70), '--r': `${tilt}deg` } as CSSProperties}
+                  aria-label={`${r.track}: ${r.position != null ? `P${r.position}` : 'did not start'}`}
+                >
+                  <b>{r.position != null ? `P${r.position}` : '—'}</b>
+                  <small>{r.code}</small>
+                </div>
+              );
+            })}
           </div>
-        </div>
-      </>
+          {bestRound && (
+            <p className="wx-body mt-auto wx-in" style={d(1100)}>
+              {best === 1 ? 'Best of all: ' : 'Your best: '}
+              <strong>
+                P{best} at {bestRound.track}
+              </strong>
+              {finishes.filter((r) => r.position === best).length > 1
+                ? `, and you did it ${finishes.filter((r) => r.position === best).length} times.`
+                : '.'}
+            </p>
+          )}
+        </>
+      ),
+    },
+  ];
+
+  if (nm) {
+    slides.push(
+      {
+        bg: C.green,
+        fg: C.white,
+        ms: 3200,
+        render: () => (
+          <p className="wx-say my-auto">
+            <Line>One driver kept</Line>
+            <Line delay={100}>turning up in</Line>
+            <Line delay={200}>your mirrors.</Line>
+          </p>
+        ),
+      },
+      {
+        bg: C.red,
+        fg: C.white,
+        ms: 7000,
+        render: () => (
+          <>
+            <div className="flex justify-center mt-4 wx-in" style={d(0)}>
+              <div className="wx-mirror">{nm.number != null ? nm.number : '?'}</div>
+            </div>
+            <div className="mt-auto">
+              <div className="wx-name">
+                {nm.name.split(' ').map((w, i) => (
+                  <Line key={i} delay={250 + i * 100}>
+                    {w}
+                  </Line>
+                ))}
+              </div>
+              <p className="wx-body mt-5 wx-in" style={d(650)}>
+                Side by side at the flag {nm.sideBySide} {nm.sideBySide === 1 ? 'time' : 'times'}. Head to head, you
+                finished ahead {nm.ahead} {nm.ahead === 1 ? 'time' : 'times'}, they did {nm.behind}.
+              </p>
+            </div>
+          </>
+        ),
+      },
     );
   }
 
-  return (
-    <>
-      {kicker('Your Season 19 was')}
-      <div className="flex-1 flex items-center">
-        <div className="w-full">
-          <FieldPlot field={card.field} />
+  slides.push(
+    {
+      bg: C.cobalt,
+      fg: C.white,
+      ms: 3000,
+      render: () => (
+        <p className="wx-say my-auto">
+          <Line>So what kind of</Line>
+          <Line delay={100}>driver were you?</Line>
+        </p>
+      ),
+    },
+    {
+      bg: C.gold,
+      fg: C.carbon,
+      ms: 7000,
+      render: () => (
+        <>
+          <div className="wx-kerb wx-sweep" style={{ ...d(0), bottom: '6%' }} aria-hidden="true" />
+          <div className="mt-[22%]">
+            <div className="wx-name">
+              {card.archetype.title.split(' ').map((w, i) => (
+                <Line key={i} delay={120 + i * 110}>
+                  {w}
+                </Line>
+              ))}
+            </div>
+            <p className="wx-body mt-5 wx-in" style={d(550)}>
+              {card.archetype.line}
+            </p>
+            <p className="wx-body mt-3 font-bold wx-in" style={d(700)}>
+              {card.archetypeEvidence.replace(' — ', ': ')}.
+            </p>
+          </div>
+        </>
+      ),
+    },
+    {
+      bg: C.carbon,
+      fg: C.white,
+      ms: null, // the share card stays up
+      render: () => (
+        <div className="flex flex-col h-full wx-share -mx-[26px] -mb-[30px] px-[26px] pb-[30px]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- static brand lockup */}
+          <img src="/badges/sra-lockup.webp" alt="Sim Racing Alliance" width={132} height={38} className="wx-in" style={d(0)} />
+          <div className="mt-8 flex items-center gap-4 wx-in" style={d(120)}>
+            {card.number != null && (
+              <span style={{ fontSize: 54 }}>
+                <span className="wx-panel">{card.number}</span>
+              </span>
+            )}
+            <span className="font-display font-black text-[34px] leading-[.9]">{card.name}</span>
+          </div>
+          <p className="font-display font-extrabold text-[44px] leading-[.95] mt-6 wx-in" style={{ ...d(220), color: C.gold }}>
+            {card.archetype.title}
+          </p>
+          <div className="grid grid-cols-8 gap-1.5 mt-auto wx-in" style={d(300)} aria-label="Finishing position each round">
+            {card.rounds.map((r) => (
+              <div
+                key={r.round}
+                className="wx-board !border-2 !rounded-[4px] !shadow-none"
+                data-best={r.position != null && r.position === best}
+                data-dns={r.position == null}
+                style={{ fontSize: 0 }}
+              >
+                <b className="!text-[15px]">{r.position != null ? `P${r.position}` : '—'}</b>
+                <small className="!text-[8px] !mt-0.5">{r.code}</small>
+              </div>
+            ))}
+          </div>
+          <dl className="mt-7 wx-in" style={d(380)}>
+            <dt>Distance</dt>
+            <dd>{fmt(n.km)} km</dd>
+            {best != null && bestRound && (
+              <>
+                <dt>Best finish</dt>
+                <dd>
+                  P{best}, {bestRound.track}
+                </dd>
+              </>
+            )}
+            {nm && (
+              <>
+                <dt>Nemesis</dt>
+                <dd>{nm.name}</dd>
+              </>
+            )}
+            <dt>Rounds</dt>
+            <dd>
+              {n.races} of {card.totalRounds}, Division {card.division}
+            </dd>
+          </dl>
+          <p className="mt-6 text-[13px] text-white/50">simracingalliance.com</p>
         </div>
-      </div>
-      <div className="wr-hero wr-rise" style={at(160, 28)}>
-        {card.archetype.title}
-      </div>
-      <p className="wr-support wr-rise mt-2" style={at(280, 10)}>
-        {card.archetype.line}
-      </p>
-      <div className="mt-5 wr-rise" style={at(360, 8)}>
-        <div className="wr-cell">
-          <small className="!mt-0 mb-1">The number behind it</small>
-          <b className="!text-[17px] !leading-snug !not-italic !font-sans !font-semibold">{card.archetypeEvidence}</b>
-        </div>
-      </div>
-    </>
+      ),
+    },
   );
+  return slides;
 }
 
 export function WrappedPrototype({ card, roster }: { card: WrappedDriverCard; roster: WrappedRosterEntry[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const reduced = useReducedMotion();
-  const [slide, setSlide] = useState(0);
-  // Forward plays the build-up; going back shows the slide settled.
-  const [forward, setForward] = useState(true);
+  const [reduced, setReduced] = useState(false);
+  const [i, setI] = useState(0);
+  const [held, setHeld] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [run, setRun] = useState(0); // remount key: replay / driver change
+  const press = useRef<{ t: number; x: number } | null>(null);
 
-  const go = useCallback((delta: number) => {
-    setSlide((s) => {
-      const next = Math.min(SLIDES - 1, Math.max(0, s + delta));
-      if (next !== s) setForward(delta > 0);
-      return next;
-    });
+  useEffect(() => {
+    const m = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduced(m.matches);
   }, []);
+
+  const slides = buildSlides(card, !reduced);
+  const slide = slides[i];
+  const last = slides.length - 1;
+
+  const go = useCallback((delta: number) => setI((s) => Math.min(last, Math.max(0, s + delta))), [last]);
+
+  useEffect(() => {
+    setI(0);
+    setRun((r) => r + 1);
+  }, [card.steamId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('select, input')) return;
       if (e.key === 'ArrowRight') go(1);
-      if (e.key === 'ArrowLeft') go(-1);
+      else if (e.key === 'ArrowLeft') go(-1);
+      else if (e.key === ' ') {
+        e.preventDefault();
+        setPaused((p) => !p);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [go]);
 
-  // New driver: restart from the first slide.
-  useEffect(() => {
-    setSlide(0);
-    setForward(true);
-  }, [card.steamId]);
+  // Tap = skip (left third back, rest forward). Hold = pause while held.
+  const onDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    press.current = { t: performance.now(), x: e.clientX };
+    setHeld(true);
+  };
+  const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const p = press.current;
+    press.current = null;
+    setHeld(false);
+    if (!p || performance.now() - p.t > 250) return; // it was a hold
+    const box = e.currentTarget.getBoundingClientRect();
+    go(p.x - box.left < box.width / 3 ? -1 : 1);
+  };
 
   const pickDriver = (steamId: string) => {
     const q = new URLSearchParams(params.toString());
     q.set('d', steamId);
     router.replace(`${pathname}?${q.toString()}`, { scroll: false });
   };
-
   const divisions = [...new Set(roster.map((r) => r.division))];
-  const animate = forward && !reduced;
+  const frozen = held || paused;
 
   return (
     <div className="flex flex-col lg:flex-row gap-10 items-start">
-      <aside className="w-full lg:w-[300px] shrink-0 flex flex-col gap-6">
+      <aside className="w-full lg:w-[280px] shrink-0 flex flex-col gap-5">
         <div>
-          <label htmlFor="wr-driver" className="block font-mono text-[11px] tracking-[.25em] uppercase text-txt-3 mb-3">
-            Driver
+          <label htmlFor="wr-driver" className="block font-sans text-[13px] font-semibold text-txt-2 mb-2">
+            Preview as
           </label>
           <select
             id="wr-driver"
             value={card.steamId}
             onChange={(e) => pickDriver(e.target.value)}
-            className="w-full bg-panel-2 text-txt border border-line px-3 py-2.5 font-mono text-[13px] focus:outline-none focus:border-gold"
+            className="w-full bg-panel-2 text-txt border border-line px-3 py-2.5 font-sans text-[14px] focus:outline-none focus:border-gold"
           >
             {divisions.map((div) => (
               <optgroup key={div} label={`Division ${div}`}>
@@ -378,48 +395,60 @@ export function WrappedPrototype({ card, roster }: { card: WrappedDriverCard; ro
           </select>
         </div>
         <p className="font-sans text-[13px] text-txt-3 leading-relaxed">
-          Tap the right or left side of the card, or use ← →. Prototype: 3 of the planned 12 slides, live S19
-          data, admins only. Style: broadcast type, editorial restraint; gold marks only your own data.
+          Tap the right of the story to skip ahead, the left to go back. Hold to pause, or press space. Admins only;
+          live Season 19 data.
         </p>
+        <button
+          type="button"
+          onClick={() => {
+            setI(0);
+            setPaused(false);
+            setRun((r) => r + 1);
+          }}
+          className="self-start font-sans text-[14px] font-semibold text-gold hover:text-gold-soft"
+        >
+          Replay from the start
+        </button>
       </aside>
 
       <div className="w-full flex justify-center">
-        <div className="wr-frame">
-          <div
-            key={`${card.steamId}-${slide}`}
-            className={`absolute inset-0 flex flex-col p-6 pt-5 ${animate ? '' : 'wr-instant'}`}
-            style={{ containerType: 'inline-size' }}
-          >
-            <div className="wr-progress" aria-hidden="true">
-              {Array.from({ length: SLIDES }, (_, i) => (
-                <span key={i} data-on={i <= slide} />
-              ))}
-            </div>
-            <div className="flex justify-between items-baseline mt-3 mb-6 font-mono text-[10px] tracking-[.2em] uppercase text-txt-3">
-              <span>SRA · S19 Wrapped</span>
-              <span>
-                Div {card.division} · {card.name}
-                {card.number != null ? ` #${card.number}` : ''}
+        <div
+          className={`wx-stage ${frozen ? 'wx-held' : ''}`}
+          style={{ background: slide.bg, color: slide.fg }}
+          onPointerDown={onDown}
+          onPointerUp={onUp}
+          onPointerLeave={() => {
+            press.current = null;
+            setHeld(false);
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+          aria-roledescription="story"
+        >
+          <div className="wx-progress" aria-hidden="true">
+            {slides.map((s, k) => (
+              <span key={`${run}-${k}`} data-state={k < i ? 'done' : k === i ? 'now' : 'next'}>
+                <i
+                  style={{ '--dur': `${s.ms ?? 1}ms` } as CSSProperties}
+                  onAnimationEnd={() => k === i && s.ms != null && go(1)}
+                />
               </span>
-            </div>
-            <div className="flex-1 flex flex-col min-h-0" aria-live="polite">
-              <Slide card={card} index={slide} animate={animate} />
-            </div>
+            ))}
           </div>
           <button
             type="button"
-            aria-label="Previous slide"
-            disabled={slide === 0}
-            onClick={() => go(-1)}
-            className="absolute inset-y-0 left-0 w-1/3 z-10 cursor-w-resize disabled:cursor-default"
-          />
-          <button
-            type="button"
-            aria-label="Next slide"
-            disabled={slide === SLIDES - 1}
-            onClick={() => go(1)}
-            className="absolute inset-y-0 right-0 w-2/3 z-10 cursor-e-resize disabled:cursor-default"
-          />
+            className="wx-pause"
+            onClick={() => setPaused((p) => !p)}
+            aria-label={paused ? 'Play story' : 'Pause story'}
+          >
+            {paused ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="1.5" width="3" height="11" fill="currentColor" /><rect x="8.5" y="1.5" width="3" height="11" fill="currentColor" /></svg>
+            )}
+          </button>
+          <div key={`${run}-${i}`} className="wx-slide" aria-live="polite">
+            {slide.render()}
+          </div>
         </div>
       </div>
     </div>

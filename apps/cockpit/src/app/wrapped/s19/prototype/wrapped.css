@@ -1,100 +1,222 @@
-/* Season 19 Wrapped — prototype, chosen direction: broadcast type with
-   editorial restraint. Italic condensed display type for the hero; hairline
-   rules, grey labels, and gold used for one thing only — the driver's own
-   data point in each slide's chart.
+/* Season 19 Wrapped — "pit wall" prototype.
+   Story mechanics like a year-in-review: full-bleed colour fields that change
+   per slide, setup → reveal pacing, timed progress bars, tap / hold.
+   Visual language comes from the paddock: pit boards, kerbs, the number
+   panel, the mirror. One idea per slide; type does the work.
 
-   Choreography (one entrance per slide; the frame itself is static):
-     kicker   decoration  0ms    fade only
-     chart    support     80ms   per-chart build (see below), ≤ 700ms
-     hero     lead        160ms  fade + 28px rise, 640ms
-     support  support     280ms  fade + 10px rise   (gap 120)
-     detail   support     360ms  fade + 8px rise    (gap 80 — shrinking)
-   Chart builds:
-     season strip  bars grow from the baseline, left → right in round order
-                   (order carries meaning: it's the season), 35ms apart
-     rivalry       both lines draw together (one object), dots land at the end
-     field plot    the field fades in together, your dot lands after it
-   Going back skips the build-up (.wr-instant). Reduced motion: opacity only,
-   everything together. */
+   Palette: gold #E6B53D · kerb red #E04040 · cobalt #2337C6 · racing green
+   #0D6B4C · white · carbon #0A0B0E (share card only). */
 
-.wr-frame {
+.wx-stage {
   position: relative;
-  width: min(100%, calc((100dvh - 220px) * 9 / 16), 430px);
+  width: min(100%, calc((100dvh - 180px) * 9 / 16), 440px);
   aspect-ratio: 9 / 16;
   overflow: hidden;
+  border-radius: 18px;
   isolation: isolate;
   user-select: none;
-  background:
-    radial-gradient(120% 60% at 100% 0%, rgba(230, 181, 61, .07), transparent 60%),
-    #0e1014;
-  outline: 1px solid var(--color-line);
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  container-type: inline-size;
+  transition: background-color 380ms ease;
 }
 
-.wr-rise { animation: wr-rise 640ms cubic-bezier(.16, 1, .3, 1) both; animation-delay: var(--d, 0ms); }
-.wr-fade { animation: wr-fade 480ms ease-out both; animation-delay: var(--d, 0ms); }
-
-@keyframes wr-rise { from { opacity: 0; transform: translateY(var(--rise, 12px)); } to { opacity: 1; transform: none; } }
-@keyframes wr-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes wr-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-@keyframes wr-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-@keyframes wr-land { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
-
-/* Charts */
-.wr-bar {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: wr-grow 520ms cubic-bezier(.16, 1, .3, 1) both;
-  animation-delay: calc(80ms + var(--i, 0) * 35ms);
-}
-.wr-line {
-  stroke-dasharray: 1;
-  animation: wr-draw 700ms cubic-bezier(.45, 0, .2, 1) both;
-  animation-delay: 80ms;
-}
-.wr-dot { animation: wr-fade 260ms ease-out both; animation-delay: 700ms; }
-.wr-field { animation: wr-fade 420ms ease-out both; animation-delay: 80ms; }
-.wr-you {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: wr-land 420ms cubic-bezier(.16, 1, .3, 1) both;
-  animation-delay: 420ms;
+.wx-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 64px 26px 30px;
 }
 
-.wr-instant :is(.wr-rise, .wr-fade, .wr-bar, .wr-line, .wr-dot, .wr-field, .wr-you) { animation: none; }
+/* ── progress ─────────────────────────────────────────────────────────── */
+.wx-progress {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  left: 14px;
+  right: 56px;
+  display: flex;
+  gap: 4px;
+}
+.wx-progress > span {
+  flex: 1;
+  height: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 28%, transparent);
+  overflow: hidden;
+}
+.wx-progress > span > i {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transform-origin: left;
+  transform: scaleX(0);
+}
+.wx-progress > span[data-state="done"] > i { transform: scaleX(1); }
+.wx-progress > span[data-state="now"] > i {
+  animation: wx-timer var(--dur, 6s) linear forwards;
+}
+@keyframes wx-timer { to { transform: scaleX(1); } }
+
+.wx-pause {
+  position: absolute;
+  z-index: 4;
+  top: 6px;
+  right: 8px;
+  width: 40px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: inherit;
+}
+.wx-pause:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+
+/* Hold-to-pause (and the pause button) stop the clock only. Freezing the
+   entrances too left a slide blank when someone paused and then tapped to
+   the next one. */
+.wx-held .wx-progress i { animation-play-state: paused; }
+
+/* ── type ─────────────────────────────────────────────────────────────── */
+.wx-say {
+  font: 800 clamp(30px, 10.5cqw, 46px)/1.02 var(--font-display);
+  letter-spacing: -.5px;
+  text-wrap: balance;
+}
+.wx-big {
+  font: 900 clamp(76px, 27cqw, 132px)/.84 var(--font-display);
+  letter-spacing: -3px;
+}
+.wx-name {
+  font: 900 clamp(60px, 21cqw, 104px)/.86 var(--font-display);
+  letter-spacing: -2px;
+  text-wrap: balance;
+}
+.wx-body {
+  font: 500 17px/1.4 var(--font-sans);
+  max-width: 30ch;
+  text-wrap: pretty;
+}
+
+/* ── entrances ────────────────────────────────────────────────────────────
+   Lead (the reveal) comes up out of its own line box — the line is a mask,
+   so it reads as being revealed rather than floating in. Support follows. */
+.wx-line { display: block; overflow: hidden; padding-bottom: .06em; margin-bottom: -.06em; }
+.wx-line > span {
+  display: inline-block;
+  animation: wx-up 720ms cubic-bezier(.2, .9, .1, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.wx-in { animation: wx-in 520ms cubic-bezier(.2, .9, .1, 1) both; animation-delay: var(--d, 0ms); }
+.wx-drop {
+  animation: wx-drop 560ms cubic-bezier(.3, 1.4, .5, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.wx-sweep { animation: wx-sweep 900ms cubic-bezier(.2, .9, .1, 1) both; animation-delay: var(--d, 0ms); }
+
+@keyframes wx-up { from { transform: translateY(105%); } to { transform: none; } }
+@keyframes wx-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes wx-drop { from { opacity: 0; transform: translateY(-70px) rotate(var(--r, 0deg)); } to { opacity: 1; transform: rotate(var(--r, 0deg)); } }
+@keyframes wx-sweep { from { transform: translateX(-110%) rotate(-12deg); } to { transform: rotate(-12deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(.wr-rise, .wr-fade, .wr-bar, .wr-line, .wr-dot, .wr-field, .wr-you) {
-    animation: wr-fade 200ms ease-out both;
-    animation-delay: 0ms;
-  }
-  .wr-line { stroke-dasharray: none; }
+  .wx-line > span, .wx-in, .wx-drop, .wx-sweep { animation: wx-fade 1ms both; }
+  .wx-stage { transition: none; }
+}
+@keyframes wx-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── paddock graphics ─────────────────────────────────────────────────── */
+
+/* Kerb: the red/white sawtooth band from a corner apex. */
+.wx-kerb {
+  position: absolute;
+  left: -20%;
+  width: 140%;
+  height: 46px;
+  background: repeating-linear-gradient(90deg, #e04040 0 44px, #fff 44px 88px);
+  transform: rotate(-12deg);
 }
 
-/* progress */
-.wr-progress { display: flex; gap: 4px; }
-.wr-progress > span { flex: 1; height: 2px; background: rgba(255, 255, 255, .16); }
-.wr-progress > span[data-on="true"] { background: var(--color-txt); }
-
-/* type */
-.wr-kicker {
-  display: block;
-  font: 500 11px/1.4 var(--font-mono);
-  letter-spacing: .3em;
-  text-transform: uppercase;
-  color: var(--color-txt-3);
-  border-bottom: 1px solid var(--color-line-2);
-  padding-bottom: 10px;
+/* Number panel: the race number as it sits on the door. */
+.wx-panel {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.6em;
+  padding: .06em .22em 0;
+  background: #fff;
+  color: #0a0b0e;
+  border-radius: .12em;
+  font: 900 1em/1 var(--font-display);
+  letter-spacing: -.02em;
+  box-shadow: 0 0 0 .06em #0a0b0e;
 }
-.wr-hero {
-  font: italic 900 clamp(44px, 14cqw, 72px)/.86 var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: -1px;
+
+/* Pit board: black board, white border, position over circuit. */
+.wx-board {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  aspect-ratio: 1 / 1.08;
+  background: #0a0b0e;
+  color: #fff;
+  border: 3px solid #fff;
+  border-radius: 6px;
+  box-shadow: 0 6px 0 rgba(10, 11, 14, .18);
+  transform: rotate(var(--r, 0deg));
+}
+.wx-board b { font: 900 clamp(26px, 9cqw, 40px)/.9 var(--font-display); }
+.wx-board small { font: 700 clamp(11px, 3.2cqw, 14px)/1 var(--font-display); letter-spacing: .04em; opacity: .75; margin-top: 4px; }
+.wx-board[data-best="true"] { background: #e6b53d; color: #0a0b0e; border-color: #0a0b0e; }
+.wx-board[data-dns="true"] { background: transparent; color: #0a0b0e; border-style: dashed; border-color: #0a0b0e; box-shadow: none; }
+
+/* Mirror: the rival's number, framed in a door mirror. */
+.wx-mirror {
+  display: grid;
+  place-items: center;
+  width: 78%;
+  aspect-ratio: 2.1 / 1;
+  border-radius: 46% 54% 40% 60% / 58% 52% 48% 42%;
+  background: radial-gradient(120% 120% at 30% 20%, #3a4150, #11141a 70%);
+  border: 10px solid #0a0b0e;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .25);
+  color: #fff;
+  font: 900 clamp(52px, 17cqw, 84px)/1 var(--font-display);
+  transform: rotate(-4deg);
+}
+
+/* Road dashes for the distance reveal. */
+.wx-road {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 30%;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, .18));
+  overflow: hidden;
+}
+.wx-road::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -20%;
+  width: 10px;
+  height: 140%;
+  margin-left: -5px;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .9) 0 34px, transparent 34px 68px);
+  transform: perspective(240px) rotateX(58deg);
+  transform-origin: bottom;
+  animation: wx-road 900ms linear infinite;
+}
+@keyframes wx-road { to { background-position: 0 68px; } }
+@media (prefers-reduced-motion: reduce) { .wx-road::before { animation: none; } }
+
+/* Share card */
+.wx-share {
+  background: #0a0b0e;
   color: #fff;
 }
-.wr-hero small { font-size: .45em; letter-spacing: 0; color: var(--color-txt-2); }
-.wr-support { font: 400 16px/1.45 var(--font-sans); color: var(--color-txt-2); text-wrap: pretty; }
-.wr-cell { border-top: 1px solid var(--color-line-2); padding-top: 8px; }
-.wr-cell b { display: block; font: italic 900 26px/1 var(--font-display); color: #fff; }
-.wr-cell small { display: block; margin-top: 3px; font: 500 9.5px/1.3 var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--color-txt-3); }
-.wr-axis { font: 500 9px var(--font-mono); letter-spacing: .12em; fill: var(--color-txt-3); }
-.wr-val { font: italic 900 13px var(--font-display); fill: var(--color-txt-2); }
+.wx-share dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 18px; align-items: baseline; }
+.wx-share dt { font: 500 14px/1.2 var(--font-sans); color: rgba(255, 255, 255, .6); }
+.wx-share dd { font: 800 24px/1.05 var(--font-display); }
+
+/* On the carbon share card a "did not start" board needs light ink. */
+.wx-share .wx-board[data-dns="true"] { color: #fff; border-color: rgba(255, 255, 255, .5); }
