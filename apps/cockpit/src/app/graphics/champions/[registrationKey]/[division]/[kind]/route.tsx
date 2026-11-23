@@ -11,6 +11,7 @@ import {
 //
 //   /graphics/champions/acc-gt3-s19/1/driver               square 1080×1080
 //   /graphics/champions/acc-gt3-s19/1/silver               Silver championship
+//   /graphics/champions/acc-gt3-s19/1/gold-silver          Gold + Silver drivers together
 //   /graphics/champions/acc-gt3-s19/1/team?format=wide     1920×1080
 //   …?download=1                                           as an attachment
 //
@@ -20,22 +21,32 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ registrationKey: string; division: string; kind: string }> },
+  { params }: { params: Promise<{ registrationKey: string; division: string; kind: string }> }
 ) {
   const { registrationKey, division: divisionRaw, kind } = await params;
   const division = Number(divisionRaw);
   const season = Number(/-s(\d+)$/.exec(registrationKey)?.[1]);
   if (!Number.isInteger(division) || !Number.isInteger(season)) {
-    return NextResponse.json({ error: 'expected /graphics/champions/<key ending -sN>/<division>/<driver|silver|team>' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'expected /graphics/champions/<key ending -sN>/<division>/<driver|silver|team>' },
+      { status: 400 }
+    );
   }
-  if (kind !== 'driver' && kind !== 'silver' && kind !== 'team') {
-    return NextResponse.json({ error: 'kind must be driver, silver or team' }, { status: 400 });
+  if (kind !== 'driver' && kind !== 'silver' && kind !== 'team' && kind !== 'gold-silver') {
+    return NextResponse.json(
+      { error: 'kind must be driver, silver, gold-silver or team' },
+      { status: 400 }
+    );
   }
   const query = request.nextUrl.searchParams;
   const format: ChampionFormat = query.get('format') === 'wide' ? 'wide' : 'square';
 
   const champs = await getDivisionChampions(registrationKey, division);
-  if (!champs || (kind === 'team' && !champs.team) || (kind === 'silver' && !champs.silver)) {
+  if (
+    !champs ||
+    (kind === 'team' && !champs.team) ||
+    ((kind === 'silver' || kind === 'gold-silver') && !champs.silver)
+  ) {
     return NextResponse.json({ error: 'no champion for that division/title' }, { status: 404 });
   }
 
@@ -47,7 +58,7 @@ export async function GET(
   if (query.get('download')) {
     image.headers.set(
       'Content-Disposition',
-      `attachment; filename="${championFileName(season, division, kind as ChampionKind, format)}"`,
+      `attachment; filename="${championFileName(season, division, kind as ChampionKind, format)}"`
     );
   }
   return image;
