@@ -36,7 +36,6 @@ export function WrappedRecap({
             <p className="font-sans text-[16px] mb-4">
               Raced this season? Sign in to watch your own.
             </p>
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- starts the Discord OAuth redirect; <Link> would prefetch it */}
             <a
               href="/auth/login"
               className="inline-block font-sans font-semibold text-[15px] bg-carbon text-white rounded-full px-6 py-3 hover:bg-black"
