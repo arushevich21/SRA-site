@@ -2,7 +2,7 @@ import 'server-only';
 import { ImageResponse } from 'next/og';
 import sharp from 'sharp';
 import { accCarManufacturerIconName } from '@sra/domain';
-import { thumbnailFonts, thumbnailImage, type ThumbImage } from '@/lib/stream/thumbnail-assets';
+import { labelFont, thumbnailFonts, thumbnailImage, type ThumbImage } from '@/lib/stream/thumbnail-assets';
 import type { ChampionDriver, DivisionChampions } from './season-champions';
 
 // Champion graphics for a finished season: one per division per title
@@ -119,8 +119,9 @@ export async function renderChampion(
   const photoW = Math.round(team && wide ? (colW - gap) / 2 : colW);
   const photoH = Math.round(team && !wide ? (colH - gap) / 2 : colH);
 
-  const [fonts, badge, series, sra, photos, logos] = await Promise.all([
+  const [display, mono, badge, series, sra, photos, logos] = await Promise.all([
     thumbnailFonts(),
+    labelFont(),
     thumbnailImage(`/badges/Division ${champs.division}.png`, wide ? 190 : 150, wide ? 120 : 100),
     thumbnailImage('/badges/GT3TS_Logo.png', wide ? 260 : 210, wide ? 120 : 96),
     // The nav's SRA lockup (flag + wordmark), the same mark as the site header.
@@ -290,8 +291,18 @@ export async function renderChampion(
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', width: textW }}>
-            <div style={{ display: 'flex', fontSize: wide ? 34 : 26, fontWeight: 700, letterSpacing: 6, color: MUTED }}>
-              {`SEASON ${season} · DIVISION ${champs.division}`}
+            {/* Site kicker style ("— Standings"): mono, gold, tracked out. */}
+            <div
+              style={{
+                display: 'flex',
+                fontFamily: '"JetBrains Mono"',
+                fontSize: wide ? 26 : 20,
+                fontWeight: 600,
+                letterSpacing: wide ? 7 : 5,
+                color: GOLD,
+              }}
+            >
+              {`— SEASON ${season} · DIVISION ${champs.division}`}
             </div>
             <div
               style={{
@@ -364,6 +375,6 @@ export async function renderChampion(
         </div>
       </div>
     ),
-    { width: w, height: h, fonts },
+    { width: w, height: h, fonts: [...display, mono] },
   );
 }
