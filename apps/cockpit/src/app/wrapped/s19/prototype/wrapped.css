@@ -1,0 +1,158 @@
+/* Season 19 Wrapped — prototype. Three visual directions share one slide
+   structure; only the skin changes (wr-a broadcast, wr-b editorial,
+   wr-c telemetry).
+
+   Choreography (one entrance per slide; the frame itself is static):
+     kicker   decoration  0ms    fade only
+     hero     lead        60ms   fade + 28px rise, 640ms
+     support  support     200ms  fade + 10px rise   (gap 140)
+     detail   support     290ms  fade + 8px rise    (gap 90 — shrinking)
+   Going back skips the build-up (.wr-instant). Reduced motion: opacity only,
+   all together. */
+
+.wr-frame {
+  position: relative;
+  width: min(100%, calc((100dvh - 220px) * 9 / 16), 430px);
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  isolation: isolate;
+  user-select: none;
+}
+
+.wr-rise {
+  animation: wr-rise 640ms cubic-bezier(.16, 1, .3, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.wr-fade {
+  animation: wr-fade 480ms ease-out both;
+  animation-delay: var(--d, 0ms);
+}
+.wr-instant .wr-rise,
+.wr-instant .wr-fade {
+  animation: none;
+}
+
+@keyframes wr-rise {
+  from { opacity: 0; transform: translateY(var(--rise, 12px)); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes wr-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wr-rise,
+  .wr-fade {
+    animation: wr-fade 200ms ease-out both;
+    animation-delay: 0ms;
+  }
+}
+
+/* progress segments */
+.wr-progress { display: flex; gap: 4px; }
+.wr-progress > span { flex: 1; height: 3px; background: rgba(255, 255, 255, .18); }
+.wr-progress > span[data-on="true"] { background: var(--wr-progress, var(--color-gold)); }
+
+/* ── A · Broadcast: TV graphics package ─────────────────────────────── */
+.wr-a {
+  --wr-progress: var(--color-gold);
+  background:
+    linear-gradient(115deg, transparent 58%, rgba(230, 181, 61, .14) 58%, rgba(230, 181, 61, .14) 64%, transparent 64%),
+    radial-gradient(120% 70% at 100% 0%, rgba(224, 64, 64, .22), transparent 60%),
+    #0a0b0e;
+  border-left: 6px solid #e04040;
+}
+.wr-a .wr-kicker {
+  display: inline-block;
+  background: #e04040;
+  color: #fff;
+  padding: 6px 12px;
+  transform: skewX(-12deg);
+  font: 800 13px/1 var(--font-display);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.wr-a .wr-kicker > span { display: inline-block; transform: skewX(12deg); }
+.wr-a .wr-hero {
+  font: italic 900 clamp(56px, 18cqw, 96px)/.86 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: -1px;
+  color: #fff;
+}
+.wr-a .wr-hero em { font-style: inherit; color: var(--color-gold); }
+.wr-a .wr-plate {
+  display: inline-block;
+  background: var(--color-gold);
+  color: var(--color-carbon);
+  padding: 4px 14px;
+  transform: skewX(-12deg);
+  font: 900 22px/1.1 var(--font-display);
+}
+.wr-a .wr-plate > span { display: inline-block; transform: skewX(12deg); }
+.wr-a .wr-support { font: 600 17px/1.35 var(--font-sans); color: var(--color-txt); }
+.wr-a .wr-cell { border-top: 2px solid rgba(255, 255, 255, .12); padding-top: 8px; }
+.wr-a .wr-cell b { display: block; font: italic 900 30px/1 var(--font-display); color: #fff; }
+.wr-a .wr-cell small { font: 700 11px/1.2 var(--font-display); letter-spacing: .16em; text-transform: uppercase; color: var(--color-txt-3); }
+
+/* ── B · Editorial: magazine spread ─────────────────────────────────── */
+.wr-b {
+  --wr-progress: var(--color-txt);
+  background: #0e1014;
+  outline: 1px solid var(--color-line);
+}
+.wr-b .wr-kicker {
+  font: 500 11px/1.4 var(--font-mono);
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+  border-bottom: 1px solid var(--color-line-2);
+  padding-bottom: 10px;
+  display: block;
+}
+.wr-b .wr-hero {
+  font: 800 clamp(64px, 22cqw, 120px)/.82 var(--font-display);
+  letter-spacing: -3px;
+  color: var(--color-txt);
+}
+.wr-b .wr-hero em { font-style: normal; color: var(--color-gold); }
+.wr-b .wr-plate { font: 500 12px/1 var(--font-mono); letter-spacing: .2em; color: var(--color-txt-3); }
+.wr-b .wr-support { font: 400 19px/1.45 var(--font-sans); color: var(--color-txt-2); text-wrap: pretty; }
+.wr-b .wr-cell { border-top: 1px solid var(--color-line-2); padding-top: 10px; }
+.wr-b .wr-cell b { display: block; font: 700 28px/1 var(--font-display); color: var(--color-txt); }
+.wr-b .wr-cell small { font: 500 10px/1.3 var(--font-mono); letter-spacing: .2em; text-transform: uppercase; color: var(--color-txt-3); }
+
+/* ── C · Telemetry: timing screen ───────────────────────────────────── */
+.wr-c {
+  --wr-progress: #36e0c8;
+  background:
+    linear-gradient(rgba(54, 224, 200, .06) 1px, transparent 1px) 0 0 / 100% 24px,
+    linear-gradient(90deg, rgba(54, 224, 200, .06) 1px, transparent 1px) 0 0 / 24px 100%,
+    #07090c;
+  outline: 1px solid rgba(54, 224, 200, .25);
+}
+.wr-c .wr-kicker {
+  font: 600 11px/1 var(--font-mono);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: #36e0c8;
+}
+.wr-c .wr-kicker::before { content: "▸ "; }
+.wr-c .wr-hero {
+  font: 700 clamp(48px, 15cqw, 84px)/.9 var(--font-mono);
+  letter-spacing: -2px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.wr-c .wr-hero em { font-style: normal; color: var(--color-purple); }
+.wr-c .wr-plate {
+  display: inline-block;
+  border: 1px solid var(--color-purple);
+  color: var(--color-purple);
+  padding: 4px 8px;
+  font: 600 13px/1 var(--font-mono);
+}
+.wr-c .wr-support { font: 400 14px/1.5 var(--font-mono); color: var(--color-txt-2); }
+.wr-c .wr-cell { background: rgba(255, 255, 255, .03); border-left: 3px solid var(--bar, #36e0c8); padding: 8px 10px; }
+.wr-c .wr-cell b { display: block; font: 700 22px/1 var(--font-mono); color: #fff; font-variant-numeric: tabular-nums; }
+.wr-c .wr-cell small { font: 500 10px/1.3 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--color-txt-3); }
