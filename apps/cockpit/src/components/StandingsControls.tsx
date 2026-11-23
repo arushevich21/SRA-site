@@ -23,7 +23,7 @@ import {
 // shared across views (lib/emperor-standings.ts), so prefetching costs ACCSM
 // nothing extra.
 
-const TAB_BASE = 'relative px-4 py-2 border-b-2 transition-all';
+const TAB_BASE = 'relative px-4 py-2 border-b-2 transition-colors';
 const PILL_BASE =
   'relative font-mono text-[11px] tracking-[.2em] uppercase px-3 py-1.5 border transition-colors';
 

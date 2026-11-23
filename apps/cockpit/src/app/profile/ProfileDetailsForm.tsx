@@ -126,12 +126,12 @@ export default function ProfileDetailsForm({
       </div>
 
       {state?.error && (
-        <p className="font-mono text-[11px] tracking-[.15em] uppercase text-red-400">
+        <p role="alert" className="font-mono text-[11px] tracking-[.15em] uppercase text-red-400">
           {state.error}
         </p>
       )}
       {state?.success && (
-        <p className="font-mono text-[11px] tracking-[.15em] uppercase text-green-400">
+        <p role="status" className="font-mono text-[11px] tracking-[.15em] uppercase text-green-400">
           Profile saved.
         </p>
       )}

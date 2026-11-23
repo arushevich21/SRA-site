@@ -21,7 +21,7 @@ function DigitBlock({ value, label, delayS }: { value: number; label: string; de
   return (
     <div className="flex-1 text-center border border-line bg-panel px-1.5 py-4">
       <span
-        className="block font-mono font-bold text-[38px] text-txt tabular-nums tracking-[.01em] animate-[hsq-glow_2.6s_ease-in-out_infinite]"
+        className="block font-mono font-bold text-[38px] text-txt tabular-nums tracking-[.01em] animate-[hsq-glow_2.6s_ease-in-out_infinite] motion-reduce:animate-none"
         style={{ animationDelay: `${delayS}s` }}
       >
         {pad2(value)}

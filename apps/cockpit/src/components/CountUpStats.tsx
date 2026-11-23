@@ -17,6 +17,11 @@ function useCountUp(target: number): number {
   const startRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // Reduced motion: show the real number straight away, no count.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setCurrent(target);
+      return;
+    }
     let frame: number;
     function tick(timestamp: number) {
       if (startRef.current == null) startRef.current = timestamp;
@@ -39,11 +44,18 @@ function StatItem({ stat }: { stat: Stat }) {
 
   return (
     <span className="font-mono text-[15px] tracking-[.2em] uppercase text-txt-2">
-      <span className="text-gold font-bold tabular-nums">
-        {Math.round(current).toLocaleString('en-US')}
-        {suffix}
-      </span>{' '}
-      {stat.label}
+      {/* The animated figure starts at 0 (server render included), so assistive
+          tech and crawlers read the real value from the sr-only copy instead. */}
+      <span className="sr-only">
+        {stat.value} {stat.label}
+      </span>
+      <span aria-hidden="true">
+        <span className="text-gold font-bold tabular-nums">
+          {Math.round(current).toLocaleString('en-US')}
+          {suffix}
+        </span>{' '}
+        {stat.label}
+      </span>
     </span>
   );
 }
