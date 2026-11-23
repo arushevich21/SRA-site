@@ -239,19 +239,19 @@ function HamburgerIcon({ open }: { open: boolean }) {
     <div className="w-5 h-[18px] flex flex-col justify-between">
       <span
         className={[
-          'block h-[2px] bg-txt transition-all duration-200 origin-center',
+          'block h-[2px] bg-txt transition-[translate,rotate,scale,opacity] duration-200 motion-reduce:transition-none origin-center',
           open ? 'translate-y-[8px] rotate-45' : '',
         ].join(' ')}
       />
       <span
         className={[
-          'block h-[2px] bg-txt transition-all duration-200',
+          'block h-[2px] bg-txt transition-[translate,rotate,scale,opacity] duration-200 motion-reduce:transition-none',
           open ? 'opacity-0 scale-x-0' : '',
         ].join(' ')}
       />
       <span
         className={[
-          'block h-[2px] bg-txt transition-all duration-200 origin-center',
+          'block h-[2px] bg-txt transition-[translate,rotate,scale,opacity] duration-200 motion-reduce:transition-none origin-center',
           open ? '-translate-y-[8px] -rotate-45' : '',
         ].join(' ')}
       />

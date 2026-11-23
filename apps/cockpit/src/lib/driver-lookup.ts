@@ -46,7 +46,7 @@ export async function getDriverInfoBySteamIds(
 
   const { data, error } = await supabase
     .from('drivers')
-    .select('steam_id, driver_number, country, is_champion, is_sralien, division_id, tier, display_name')
+    .select('steam_id, driver_number, country, is_sralien, division_id, tier, display_name')
     .in('steam_id', unique);
 
   if (error) {
@@ -58,13 +58,9 @@ export async function getDriverInfoBySteamIds(
     (data ?? []).map((r) => [
       r.steam_id as string,
       {
-        // The reigning D1 champion always displays #1 on leaderboards,
-        // regardless of their real registered number (which stays in
-        // driver_number for standings/registration — see
-        // supabase/migrations/20260730_driver_schema_cleanup.sql and
-        // lib/driver-display-name.ts, which applies the same override to
-        // the profile display_name).
-        driverNumber: r.is_champion ? 1 : (r.driver_number as number | null),
+        // The reigning champion's driver_number is stored as 1 (see
+        // 20261123c_champion_runs_number_one.sql), so no override here.
+        driverNumber: r.driver_number as number | null,
         country: r.country as string | null,
         isSralien: r.is_sralien as boolean,
         division: r.division_id as number | null,

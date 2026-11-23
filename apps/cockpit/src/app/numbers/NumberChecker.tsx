@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 
-export type TakenEntry = { name: string; champion: boolean };
+// reserved: the champion's own number, held while they run #1 — taken, but
+// shown without a name so the champion reads as #1 only.
+export type TakenEntry = { name: string; champion: boolean; reserved: boolean };
 
 type Result =
   | { kind: 'available' | 'taken' | 'champion' | 'invalid'; msg: string }
@@ -48,6 +50,13 @@ export default function NumberChecker({
       return;
     }
     const entry = takenMap[n];
+    if (entry?.reserved) {
+      setResult({
+        kind: 'taken',
+        msg: `#${n} is reserved for the reigning champion's return.`,
+      });
+      return;
+    }
     if (entry) {
       setResult({ kind: 'taken', msg: `#${n} is taken by ${entry.name}.` });
       return;
@@ -76,16 +85,19 @@ export default function NumberChecker({
         autoComplete="off"
         value={value}
         onChange={(e) => check(e.target.value)}
-        placeholder="e.g. 24"
+        placeholder="e.g. 24…"
         className="bg-panel-2 border border-line px-4 py-3 font-mono text-[15px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold w-full"
       />
-      {result && (
-        <p className={`mt-4 font-mono text-[13px] leading-relaxed ${color}`}>
-          {result.kind === 'available' && '✓ '}
-          {result.kind === 'taken' && '✕ '}
-          {result.msg}
-        </p>
-      )}
+      {/* Always mounted so screen readers hear each new answer as it changes. */}
+      <div aria-live="polite">
+        {result && (
+          <p className={`mt-4 font-mono text-[13px] leading-relaxed ${color}`}>
+            {result.kind === 'available' && '✓ '}
+            {result.kind === 'taken' && '✕ '}
+            {result.msg}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

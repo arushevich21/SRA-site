@@ -33,6 +33,12 @@ const ADMIN_SECTIONS: {
           'YouTube/Twitch thumbnail for every round × division of the series on air — division badge, circuit map, weather, partner strip. Preview and download; nothing is uploaded automatically.',
       },
       {
+        label: 'Champion Graphics',
+        href: '/admin/champion-graphics',
+        description:
+          'Drivers’, Silver and teams’ champion for each division of a finished season, square (Discord/Instagram) and 16:9 (stream). Standings as SRA scores them; uses broadcast photos where drivers uploaded one.',
+      },
+      {
         label: 'Season 19 Wrapped',
         href: '/admin/wrapped',
         description:

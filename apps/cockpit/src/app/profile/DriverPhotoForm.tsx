@@ -95,10 +95,10 @@ export default function DriverPhotoForm({ photoUrl }: { photoUrl: string | null 
         )}
 
         {state?.error && (
-          <p className="font-mono text-[12px] text-red-400 mt-3">{state.error}</p>
+          <p role="alert" className="font-mono text-[12px] text-red-400 mt-3">{state.error}</p>
         )}
         {state?.success && !state.error && (
-          <p className="font-mono text-[11px] tracking-[.2em] uppercase text-green-400 mt-3">
+          <p role="status" className="font-mono text-[11px] tracking-[.2em] uppercase text-green-400 mt-3">
             Saved
           </p>
         )}

@@ -41,11 +41,59 @@
 
 html {
   scroll-behavior: smooth;
+  /* Dark-only site: native scrollbars, date pickers and form controls render
+     dark instead of flashing light-theme chrome. */
+  color-scheme: dark;
+  /* The fixed nav is 76px tall (main's pt-[76px]); keep anchor jumps and
+     keyboard focus from landing underneath it. */
+  scroll-padding-top: 92px;
+  -webkit-tap-highlight-color: rgba(230, 181, 61, .15);
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* No double-tap-to-zoom delay on anything tappable. */
+a, button, input, select, textarea, label, summary, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Keyboard focus: one gold ring everywhere instead of the browser's blue
+   default. :focus-visible only, so mouse clicks don't draw it. Text inputs
+   keep their own focus:border-gold treatment. */
+:where(a, button, summary, [role="button"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+/* iOS Safari zooms the page when a focused input's text is under 16px. Form
+   fields here are 13–15px, so every tap on a form zoomed in. Touch only —
+   desktop keeps the designed size. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Skip link: hidden until a keyboard user tabs to it, first thing on the page. */
+.skip-link {
+  position: fixed;
+  left: 16px;
+  top: -100px;
+  /* Above the fixed nav (z-[100], later in the DOM) so the logo doesn't cover it. */
+  z-index: 10000;
+  padding: 10px 16px;
+  background: var(--color-gold);
+  color: var(--color-carbon);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.skip-link:focus-visible {
+  top: 16px;
 }
 
 /* ── atmospheric background ────────────────────────────────────────── */
@@ -225,6 +273,17 @@ body::after {
    becomes a plain horizontally scrollable row, so on a narrow screen every
    partner is still reachable rather than clipped off behind overflow-hidden. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  /* Infinite loops: the shaking "clean", the pulsing live dots (class and the
+     inline-style ones on championship/server cards), the deadline glow. The
+     dot stays visible and coloured; it just stops pulsing. */
+  .shake,
+  .live-dot,
+  [style*="live-pulse"] {
+    animation: none !important;
+  }
   .marquee-viewport {
     overflow-x: auto;
     scrollbar-width: thin;

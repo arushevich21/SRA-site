@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Hanken_Grotesk, Saira_Condensed, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import NavBar from '@/components/NavBar';
@@ -40,6 +40,12 @@ export const metadata: Metadata = {
   description: 'Competitive multi-sim racing league — ACC, LMU, AC EVO and beyond.',
 };
 
+// Phone browser chrome (status bar / toolbar) matches the carbon background.
+export const viewport: Viewport = {
+  themeColor: '#0a0b0e',
+  colorScheme: 'dark',
+};
+
 export default async function RootLayout({
   children,
 }: {
@@ -55,8 +61,13 @@ export default async function RootLayout({
       className={`${hanken.variable} ${saira.variable} ${mono.variable}`}
     >
       <body className="bg-carbon text-txt font-sans antialiased overflow-x-hidden min-h-screen flex flex-col">
+        <a href="#main" className="skip-link">
+          Skip to content
+        </a>
         <NavBar championships={championships} />
-        <main className="pt-[76px] flex-1">{children}</main>
+        <main id="main" tabIndex={-1} className="pt-[76px] flex-1 outline-none">
+          {children}
+        </main>
         <SponsorsCarousel />
         <Footer />
         <WrappedPrompt />
