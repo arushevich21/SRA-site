@@ -26,6 +26,7 @@ type RawCar = {
   lapsCompleted: number;
   totalTimeMs: number;
   raceNumber?: number;
+  carModel?: number;
   currentDriverSteamId?: string;
   drivers?: { steamId: string; firstName?: string; lastName?: string }[];
 };
@@ -65,6 +66,17 @@ export type WrappedDriverCard = {
   rivalry: { round: number; code: string; me: number | null; them: number | null }[];
   /** Field plot behind the archetype: everyone's value, the driver's own marked. */
   field: { label: string; values: number[]; mine: number; higherIsBetter: boolean };
+  /** Easter eggs earned this season (rendered as extra slides). */
+  easterEggs: EasterEgg[];
+};
+
+/** Jaguar G3 (ACC model 14): arguably the slowest car on the S19 grid. */
+export type EasterEgg = {
+  kind: 'jag';
+  races: number;
+  best: number;
+  /** Different drivers who finished behind them at least once. */
+  beaten: number;
 };
 
 // Three-letter circuit codes for the season strip, F1-graphics style.
@@ -205,6 +217,7 @@ async function load() {
   // The number on the car in S19 (most-used race number), not today's
   // profile number — the S19 champion has since moved to #1.
   const raceNumbers = new Map<string, Map<number, number>>();
+  const carModels = new Map<string, Map<number, number>>();
   for (const r of rows)
     for (const c of r.results) {
       const id = steamOf(c);
@@ -214,6 +227,10 @@ async function load() {
         if (c.raceNumber != null && c.raceNumber > 0) {
           const m = raceNumbers.get(id) ?? raceNumbers.set(id, new Map()).get(id)!;
           m.set(c.raceNumber, (m.get(c.raceNumber) ?? 0) + 1);
+        }
+        if (c.carModel != null) {
+          const m = carModels.get(id) ?? carModels.set(id, new Map()).get(id)!;
+          m.set(c.carModel, (m.get(c.carModel) ?? 0) + 1);
         }
       }
       const d = c.drivers?.find((x) => x.steamId === id) ?? c.drivers?.[0];
@@ -243,10 +260,15 @@ async function load() {
     practice: [...practice.entries()],
     consistency: [...consistencySum.entries()].map(([k, v]) => [k, v.sum / v.n] as const),
     people: [...people.entries()],
+    // Each driver's main car (most races in it), as [steamId, model, races].
+    cars: [...carModels.entries()].map(([id, m]) => {
+      const [model, races] = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+      return [id, model, races] as const;
+    }),
   };
 }
 
-const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v4'], { revalidate: 3600 });
+const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v5'], { revalidate: 3600 });
 
 export type WrappedRosterEntry = { steamId: string; name: string; division: number };
 
@@ -372,6 +394,20 @@ export async function getS19Wrapped(steamId: string | null): Promise<{
     mine: traitData[fieldKey].mine ?? 0,
     higherIsBetter: TRAITS[fieldKey].more === 1,
   };
+  // Easter egg: a season mostly in the Jaguar G3 (ACC model 14).
+  const JAGUAR_G3 = 14;
+  const car = data.cars.find(([id]) => id === steamId);
+  const easterEggs: EasterEgg[] = [];
+  if (car && car[1] === JAGUAR_G3 && car[2] >= Math.ceil(roundsStarted / 2)) {
+    const beaten = new Set<string>();
+    for (const race of div.races) {
+      const me = race.entries.find((e) => e.steamId === steamId);
+      if (me) for (const e of race.entries) if (e.position > me.position) beaten.add(e.steamId);
+    }
+    const fin = finishesOf(steamId);
+    easterEggs.push({ kind: 'jag', races: car[2], best: Math.min(...fin), beaten: beaten.size });
+  }
+
   return {
     roster,
     card: {
@@ -399,6 +435,7 @@ export async function getS19Wrapped(steamId: string | null): Promise<{
       rounds,
       rivalry,
       field,
+      easterEggs,
     },
   };
 }

@@ -145,6 +145,38 @@ function SeasonTrace({ rounds }: { rounds: WrappedDriverCard['rounds'] }) {
   );
 }
 
+// Easter egg: "Jag" stretched out the way a certain motoring presenter says
+// it. Starts huge, gains an "a" at a time and shrinks to keep fitting the
+// canvas, so the word looks like it's being dragged out.
+function Jaaag({ run }: { run: boolean }) {
+  const MAX_A = 14;
+  const [a, setA] = useState(run ? 1 : MAX_A);
+  useEffect(() => {
+    if (!run) return setA(MAX_A);
+    let raf = 0;
+    let t0: number | null = null;
+    const tick = (t: number) => {
+      t0 ??= t;
+      const p = Math.min(Math.max((t - t0 - 300) / 1900, 0), 1);
+      setA(1 + Math.round((MAX_A - 1) * (1 - Math.pow(1 - p, 2))));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [run]);
+  const word = `J${'a'.repeat(a)}g`;
+  const size = Math.floor(Math.min(150, (CANVAS_W - 52) / (word.length * 0.46)));
+  return (
+    <p
+      className="font-display font-black leading-[.9] tracking-[-1px] whitespace-nowrap"
+      style={{ fontSize: size }}
+     
+    >
+      {word}
+    </p>
+  );
+}
+
 function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
   const n = card.numbers;
   const finishes = card.rounds.filter((r) => r.position != null);
@@ -254,6 +286,29 @@ function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
       ),
     },
   ];
+
+  const jag = card.easterEggs.find((e) => e.kind === 'jag');
+  if (jag) {
+    slides.push({
+      bg: '#0B4D35', // British racing green
+      fg: C.white,
+      ms: 8000,
+      render: () => (
+        <>
+          <div className="my-auto">
+            <Jaaag run={motion} />
+            <p className="wx-body mt-8 wx-in" style={d(2300)}>
+              The Jaguar G3. Arguably the slowest car on the grid, and you raced it {jag.races}{' '}
+              times.
+            </p>
+            <p className="wx-body mt-3 font-bold wx-in" style={d(2500)}>
+              Best finish P{jag.best}. {jag.beaten} different drivers finished behind it.
+            </p>
+          </div>
+        </>
+      ),
+    });
+  }
 
   if (nm) {
     slides.push(
@@ -470,7 +525,7 @@ export function WrappedPrototype({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest('select, input')) return;
+      if (e.target instanceof Element && e.target.closest('select, input')) return;
       if (e.key === 'ArrowRight') go(1);
       else if (e.key === 'ArrowLeft') go(-1);
       else if (e.key === ' ') {
