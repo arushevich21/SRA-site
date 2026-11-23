@@ -71,13 +71,24 @@ export type WrappedDriverCard = {
 };
 
 /** Jaguar G3 (ACC model 14): arguably the slowest car on the S19 grid. */
-export type EasterEgg = {
-  kind: 'jag';
-  races: number;
-  best: number;
-  /** Different drivers who finished behind them at least once. */
-  beaten: number;
-};
+export type EasterEgg =
+  | {
+      kind: 'jag';
+      races: number;
+      best: number;
+      /** Different drivers who finished behind them at least once. */
+      beaten: number;
+    }
+  | {
+      /** #1 on the season's Sweatshop board (laps on the hot-lap servers). */
+      kind: 'sweat';
+      laps: number;
+      margin: number;
+      runnerUp: string;
+      /** Days with a practice session on SRA servers, of the season's days. */
+      days: number;
+      seasonDays: number;
+    };
 
 // Three-letter circuit codes for the season strip, F1-graphics style.
 const TRACK_CODES: Record<string, string> = {
@@ -153,17 +164,52 @@ async function load() {
   const from = new Date(Date.parse(raceDates[0]) - 7 * 86_400_000).toISOString();
   const to = new Date(Date.parse(raceDates[raceDates.length - 1]) + 86_400_000).toISOString();
 
-  const ledger = await pageAll<{ steam_id: string; laps: number }>((a, b) =>
+  type FileRef = { session_at: string };
+  const ledger = await pageAll<{ steam_id: string; laps: number; acc_lap_ledger_files: FileRef | FileRef[] }>((a, b) =>
     supabase
       .from('acc_lap_ledger')
       .select('steam_id, laps, acc_lap_ledger_files!inner(session_type, session_at)')
       .eq('acc_lap_ledger_files.session_type', 'FP')
       .gte('acc_lap_ledger_files.session_at', from)
       .lte('acc_lap_ledger_files.session_at', to)
+      // A stable order over the key, or pages can overlap/skip rows.
+      .order('file_id')
+      .order('steam_id')
+      .order('car_model_id')
       .range(a, b),
   );
   const practice = new Map<string, number>();
-  for (const l of ledger) practice.set(bare(l.steam_id), (practice.get(bare(l.steam_id)) ?? 0) + l.laps);
+  const practiceDays = new Map<string, Set<string>>();
+  for (const l of ledger) {
+    const id = bare(l.steam_id);
+    practice.set(id, (practice.get(id) ?? 0) + l.laps);
+    // Many-to-one join: an object at runtime, typed as maybe-array by the untyped client.
+    const f = Array.isArray(l.acc_lap_ledger_files) ? l.acc_lap_ledger_files[0] : l.acc_lap_ledger_files;
+    if (f) (practiceDays.get(id) ?? practiceDays.set(id, new Set()).get(id)!).add(f.session_at.slice(0, 10));
+  }
+  const seasonDays = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
+
+  // Sweatshop: the season's laps on the hot-lap servers (seasonal board),
+  // same source and sum as the Sweatshop leaderboard.
+  const sweatRows = await pageAll<{ steam_id: string; driver_name: string; total_laps: number }>((a, b) =>
+    supabase
+      .from('acc_hotlap_leaderboard')
+      .select('steam_id, driver_name, total_laps')
+      .eq('board_scope', 'seasonal')
+      .eq('season', `S${SEASON}`)
+      .order('track_key')
+      .order('car_model_id')
+      .order('steam_id')
+      .order('is_wet')
+      .range(a, b),
+  );
+  const sweat = new Map<string, { laps: number; name: string }>();
+  for (const r of sweatRows) {
+    const id = bare(r.steam_id);
+    const cur = sweat.get(id) ?? { laps: 0, name: r.driver_name };
+    cur.laps += r.total_laps;
+    sweat.set(id, cur);
+  }
 
   const history = await pageAll<{ player_id: string; consistency: number | null }>((a, b) =>
     supabase
@@ -260,6 +306,9 @@ async function load() {
     practice: [...practice.entries()],
     consistency: [...consistencySum.entries()].map(([k, v]) => [k, v.sum / v.n] as const),
     people: [...people.entries()],
+    practiceDays: [...practiceDays.entries()].map(([id, d]) => [id, d.size] as const),
+    seasonDays,
+    sweatTop: [...sweat.entries()].sort((a, b) => b[1].laps - a[1].laps).slice(0, 2),
     // Each driver's main car (most races in it), as [steamId, model, races].
     cars: [...carModels.entries()].map(([id, m]) => {
       const [model, races] = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -268,7 +317,7 @@ async function load() {
   };
 }
 
-const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v5'], { revalidate: 3600 });
+const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v6'], { revalidate: 3600 });
 
 export type WrappedRosterEntry = { steamId: string; name: string; division: number };
 
@@ -406,6 +455,18 @@ export async function getS19Wrapped(steamId: string | null): Promise<{
     }
     const fin = finishesOf(steamId);
     easterEggs.push({ kind: 'jag', races: car[2], best: Math.min(...fin), beaten: beaten.size });
+  }
+  // Easter egg: the sweatiest driver in SRA — #1 on the Sweatshop board.
+  const [top, second] = data.sweatTop;
+  if (top && top[0] === steamId) {
+    easterEggs.push({
+      kind: 'sweat',
+      laps: top[1].laps,
+      margin: second ? top[1].laps - second[1].laps : top[1].laps,
+      runnerUp: second ? (people.get(second[0])?.name ?? second[1].name) : '',
+      days: new Map(data.practiceDays).get(steamId) ?? 0,
+      seasonDays: data.seasonDays,
+    });
   }
 
   return {

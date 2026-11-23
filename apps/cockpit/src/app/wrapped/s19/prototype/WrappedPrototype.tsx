@@ -170,7 +170,6 @@ function Jaaag({ run }: { run: boolean }) {
     <p
       className="font-display font-black leading-[.9] tracking-[-1px] whitespace-nowrap"
       style={{ fontSize: size }}
-     
     >
       {word}
     </p>
@@ -286,6 +285,55 @@ function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
       ),
     },
   ];
+
+  // Easter egg: the sweatiest driver in SRA (#1 on the Sweatshop board).
+  // Sits right after the distance slide — it's the same story, turned up.
+  const sweat = card.easterEggs.find((e) => e.kind === 'sweat');
+  if (sweat) {
+    slides.splice(3, 0, {
+      bg: C.red,
+      fg: C.white,
+      ms: 8000,
+      render: () => (
+        <>
+          <div aria-hidden="true">
+            {[6, 17, 29, 40, 52, 63, 74, 85, 95, 34].map((left, k) => (
+              <span
+                key={k}
+                className="wx-sweat"
+                style={
+                  {
+                    left: `${left}%`,
+                    '--d': `${(k * 370) % 1700}ms`,
+                    '--s': `${0.8 + ((k * 3) % 5) * 0.15}`,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </div>
+          <p className="wx-say relative">
+            <Line>The sweatiest</Line>
+            <Line delay={100}>driver in SRA.</Line>
+          </p>
+          <div className="relative mt-auto">
+            <div className="wx-big">
+              <Line delay={250}>
+                <CountUp to={sweat.laps} run={motion} />
+              </Line>
+            </div>
+            <div className="wx-say mt-1">
+              <Line delay={350}>laps in the Sweatshop</Line>
+            </div>
+            <p className="wx-body mt-5 wx-in" style={d(900)}>
+              {fmt(sweat.margin)} more than anyone else in the league
+              {sweat.runnerUp ? ` (${sweat.runnerUp} was next)` : ''}. You practiced on {sweat.days}{' '}
+              of the season&apos;s {sweat.seasonDays} days.
+            </p>
+          </div>
+        </>
+      ),
+    });
+  }
 
   const jag = card.easterEggs.find((e) => e.kind === 'jag');
   if (jag) {

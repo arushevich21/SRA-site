@@ -246,3 +246,25 @@
 .wx-poster-sum b { font: 800 1.35em/1 var(--font-display); color: #fff; margin-right: .15em; }
 .wx-trace-label { font: 800 17px var(--font-display); fill: #fff; }
 .wx-trace-low { fill: rgba(255, 255, 255, .55); }
+
+/* Sweat drops for the sweatiest-driver slide: teardrops falling down the
+   card at staggered times and sizes. Reduced motion: a few still drops. */
+.wx-sweat {
+  position: absolute;
+  top: -40px;
+  width: calc(26px * var(--s, 1));
+  height: calc(26px * var(--s, 1));
+  background: rgba(255, 255, 255, .55);
+  border-radius: 50% 0 50% 50%;
+  rotate: -45deg;
+  animation: wx-fall 2.2s cubic-bezier(.5, 0, .9, .6) infinite;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes wx-fall {
+  0% { transform: translateY(0); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(880px); opacity: .9; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wx-sweat { animation: none; top: calc(10% + var(--s) * 120px); opacity: .5; }
+}
