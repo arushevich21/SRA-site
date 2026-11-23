@@ -4,6 +4,8 @@ import { getSnapshotStatus, WRAPPED_UNTIL } from '@/lib/wrapped/snapshot';
 import { GenerateButton } from './GenerateButton';
 
 export const dynamic = 'force-dynamic';
+// Generating the snapshot builds ~175 cards and reads the race servers' standings.
+export const maxDuration = 300;
 
 // Season 19 Wrapped: build the snapshot drivers' pages read from, and check
 // its state. Drivers see nothing until a snapshot exists.

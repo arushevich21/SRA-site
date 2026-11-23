@@ -146,37 +146,46 @@ async function load() {
   const from = new Date(Date.parse(raceDates[0]) - 7 * 86_400_000).toISOString();
   const to = new Date(Date.parse(raceDates[raceDates.length - 1]) + 86_400_000).toISOString();
 
-  type FileRef = { session_at: string };
-  const ledger = await pageAll<{
-    steam_id: string;
-    laps: number;
-    acc_lap_ledger_files: FileRef | FileRef[];
-  }>((a, b) =>
+  // Practice laps, in two plain steps: the season's practice files, then the
+  // ledger rows for those files. Not an embedded `!inner` filter — PostgREST
+  // turns that into a per-row lateral over the whole 400k-row ledger, which
+  // ran into the 8s statement timeout on a cold cache.
+  const files = await pageAll<{ id: number; session_at: string }>((a, b) =>
     supabase
-      .from('acc_lap_ledger')
-      .select('steam_id, laps, acc_lap_ledger_files!inner(session_type, session_at)')
-      .eq('acc_lap_ledger_files.session_type', 'FP')
-      .gte('acc_lap_ledger_files.session_at', from)
-      .lte('acc_lap_ledger_files.session_at', to)
-      // A stable order over the key, or pages can overlap/skip rows.
-      .order('file_id')
-      .order('steam_id')
-      .order('car_model_id')
+      .from('acc_lap_ledger_files')
+      .select('id, session_at')
+      .eq('session_type', 'FP')
+      .gte('session_at', from)
+      .lte('session_at', to)
+      .order('id')
       .range(a, b)
   );
+  const fileDay = new Map(files.map((f) => [f.id, f.session_at.slice(0, 10)]));
+  const fileIds = [...fileDay.keys()];
+  const ledger: { file_id: number; steam_id: string; laps: number }[] = [];
+  for (let i = 0; i < fileIds.length; i += 300) {
+    const chunk = fileIds.slice(i, i + 300);
+    ledger.push(
+      ...(await pageAll<{ file_id: number; steam_id: string; laps: number }>((a, b) =>
+        supabase
+          .from('acc_lap_ledger')
+          .select('file_id, steam_id, laps')
+          .in('file_id', chunk)
+          // A stable order over the key, or pages can overlap/skip rows.
+          .order('file_id')
+          .order('steam_id')
+          .order('car_model_id')
+          .range(a, b)
+      ))
+    );
+  }
   const practice = new Map<string, number>();
   const practiceDays = new Map<string, Set<string>>();
   for (const l of ledger) {
     const id = bare(l.steam_id);
     practice.set(id, (practice.get(id) ?? 0) + l.laps);
-    // Many-to-one join: an object at runtime, typed as maybe-array by the untyped client.
-    const f = Array.isArray(l.acc_lap_ledger_files)
-      ? l.acc_lap_ledger_files[0]
-      : l.acc_lap_ledger_files;
-    if (f)
-      (practiceDays.get(id) ?? practiceDays.set(id, new Set()).get(id)!).add(
-        f.session_at.slice(0, 10)
-      );
+    const day = fileDay.get(l.file_id);
+    if (day) (practiceDays.get(id) ?? practiceDays.set(id, new Set()).get(id)!).add(day);
   }
   const seasonDays = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
 
@@ -424,7 +433,7 @@ async function load() {
   };
 }
 
-const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v8'], { revalidate: 3600 });
+const loadCached = unstable_cache(load, ['wrapped-s19-prototype-v9'], { revalidate: 3600 });
 
 export async function getS19Wrapped(steamId: string | null): Promise<{
   roster: WrappedRosterEntry[];
