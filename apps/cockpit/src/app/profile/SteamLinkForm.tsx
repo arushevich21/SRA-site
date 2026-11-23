@@ -26,12 +26,12 @@ export default function SteamLinkForm({
         className="bg-panel-2 border border-line px-4 py-3 font-mono text-[13px] text-txt placeholder:text-txt-3 focus:outline-none focus:border-gold w-full"
       />
       {state?.error && (
-        <p className="font-mono text-[11px] tracking-[.15em] uppercase text-red-400">
+        <p role="alert" className="font-mono text-[11px] tracking-[.15em] uppercase text-red-400">
           {state.error}
         </p>
       )}
       {state?.success && (
-        <p className="font-mono text-[11px] tracking-[.15em] uppercase text-green-400">
+        <p role="status" className="font-mono text-[11px] tracking-[.15em] uppercase text-green-400">
           Steam ID saved.
         </p>
       )}

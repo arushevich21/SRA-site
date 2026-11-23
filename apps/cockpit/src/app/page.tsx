@@ -65,7 +65,7 @@ export default async function HomePage() {
           <div className="mt-8">
             <Link
               href="/about/league-info"
-              className="inline-block font-sans font-bold text-[13.5px] tracking-[.09em] uppercase bg-gold text-carbon px-7 py-4 hover:bg-gold-soft hover:shadow-[0_0_30px_rgba(230,181,61,.45)] transition-all"
+              className="inline-block font-sans font-bold text-[13.5px] tracking-[.09em] uppercase bg-gold text-carbon px-7 py-4 hover:bg-gold-soft hover:shadow-[0_0_30px_rgba(230,181,61,.45)] transition-[background-color,box-shadow]"
               style={{ transform: 'skewX(-9deg)' }}
             >
               <span style={{ display: 'inline-block', transform: 'skewX(9deg)' }}>
@@ -109,7 +109,7 @@ export default async function HomePage() {
               <Link
                 key={sim.slug}
                 href={`/${sim.slug}`}
-                className="group relative border border-line bg-panel hover:bg-panel-2 transition-all overflow-hidden"
+                className="group relative border border-line bg-panel hover:bg-panel-2 transition-colors overflow-hidden"
               >
                 <div
                   className="absolute left-0 top-0 bottom-0 w-[3px]"

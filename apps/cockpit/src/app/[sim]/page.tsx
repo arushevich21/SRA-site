@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getSimBySlug } from '@/content/sims';
 import { getChampionships } from '@/lib/championships-store';
 import { getChampionshipStatus, CHAMPIONSHIP_STATUS_LABELS } from '@/lib/championship-status';
+import { SimHeroVideo } from '@/components/SimHeroVideo';
 import { GameLabel } from '@/components/GameLabel';
 
 const STATUS_DOT_CLASS: Record<string, string> = {
@@ -69,16 +70,7 @@ export default async function SimOverviewPage({
       {/* ── HERO VIDEO ─────────────────────────────────────────────── */}
       <section className="relative w-full h-[70vh] min-h-[400px] max-h-[700px] overflow-hidden">
         {sim.heroVideo && (
-          <video
-            className="absolute inset-0 w-full h-full object-cover"
-            src={sim.heroVideo.src}
-            poster={sim.heroVideo.poster}
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-          />
+          <SimHeroVideo src={sim.heroVideo.src} poster={sim.heroVideo.poster} />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-carbon via-carbon/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-carbon/60 to-transparent" />
@@ -123,11 +115,11 @@ export default async function SimOverviewPage({
                   <Link
                     key={champ.slug}
                     href={`/${slug}/championships/${champ.slug}`}
-                    className="group relative flex flex-col overflow-hidden border border-line bg-panel transition-all hover:border-gold/60 hover:bg-panel-2"
+                    className="group relative flex flex-col overflow-hidden border border-line bg-panel transition-colors hover:border-gold/60 hover:bg-panel-2"
                     style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 14px 100%, 0 calc(100% - 14px))' }}
                   >
                     <div
-                      className="absolute left-0 top-0 bottom-0 w-[3px] transition-all group-hover:w-[5px]"
+                      className="absolute left-0 top-0 bottom-0 w-[3px] transition-[width] group-hover:w-[5px]"
                       style={{ backgroundColor: simAccent }}
                     />
                     <div className="px-5 sm:px-7 py-6 flex gap-4 sm:gap-6 items-center flex-1">
