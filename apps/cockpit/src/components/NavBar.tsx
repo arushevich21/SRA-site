@@ -12,6 +12,7 @@ import {
 } from '@/content/championships';
 import { GameLabel } from '@/components/GameLabel';
 import { isWithdrawWindow } from '@/lib/championship-status';
+import { wrappedLive } from '@/lib/wrapped/card';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 
 export type NavUser = {
@@ -61,6 +62,8 @@ const ABOUT_NAV: NavItem = {
     { label: 'Discord', href: '/about/discord' },
   ],
 };
+
+const WRAPPED_NAV: NavItem = { label: 'Wrapped', href: '/wrapped/s19' };
 
 const MAIN_NAV: NavItem[] = [
   ABOUT_NAV,
@@ -266,7 +269,8 @@ export default function NavBar({
   const [user, setUser] = useState<NavUser | null>(null);
   const pathname = usePathname();
   const { sim } = useSimContext();
-  const nav = sim ? buildSimNav(sim, championships) : MAIN_NAV;
+  // Season Wrapped gets a nav link for its launch window (lib/wrapped/card.ts).
+  const nav = sim ? buildSimNav(sim, championships) : wrappedLive() ? [...MAIN_NAV, WRAPPED_NAV] : MAIN_NAV;
 
   // Close mobile menu on navigation
   useEffect(() => { setMenuOpen(false); }, [pathname]);

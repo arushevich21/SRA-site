@@ -146,3 +146,19 @@ export {
   type DriverRounds,
   type TeamRoundCell,
 } from './acc/round-standings.js';
+
+export {
+  seasonNumbers,
+  findNemesis,
+  percentileOf,
+  pickArchetype,
+  finishTrend,
+  finishSpread,
+  type ArchetypeTraits,
+  type WrappedRace,
+  type WrappedEntry,
+  type SeasonNumbers,
+  type Nemesis,
+  type Archetype,
+  type ArchetypeKey,
+} from './wrapped/wrapped.js';

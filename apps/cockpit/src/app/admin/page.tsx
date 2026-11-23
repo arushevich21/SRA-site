@@ -38,6 +38,12 @@ const ADMIN_SECTIONS: {
         description:
           'Drivers’, Silver and teams’ champion for each division of a finished season, square (Discord/Instagram) and 16:9 (stream). Standings as SRA scores them; uses broadcast photos where drivers uploaded one.',
       },
+      {
+        label: 'Season 19 Wrapped',
+        href: '/admin/wrapped',
+        description:
+          'Generate the Wrapped snapshot drivers watch at /wrapped/s19, check its status, and preview any driver’s story.',
+      },
     ],
   },
   {

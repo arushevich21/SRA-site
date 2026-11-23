@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SIMS } from '@/content/sims';
 import { GameLabel } from '@/components/GameLabel';
 import { CountUpStats } from '@/components/CountUpStats';
+import { WrappedHomeCard } from '@/components/wrapped/WrappedHomeCard';
 import { getSiteTotals } from '@/lib/site-stats';
 
 // Sessions/Laps come from the nightly rollup (refreshed 09:15 UTC), so an
@@ -78,6 +79,8 @@ export default async function HomePage() {
           <CountUpStats stats={STATS} />
         </div>
       </section>
+
+      <WrappedHomeCard />
 
       {/* ── WHO WE ARE ────────────────────────────────────────────────── */}
       <section className="border-t border-line">

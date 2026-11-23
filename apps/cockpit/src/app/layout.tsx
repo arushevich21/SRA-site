@@ -4,6 +4,7 @@ import './globals.css';
 import NavBar from '@/components/NavBar';
 import { SponsorsCarousel } from '@/components/SponsorsCarousel';
 import { Footer } from '@/components/Footer';
+import { WrappedPrompt } from '@/components/wrapped/WrappedPrompt';
 import { getChampionships } from '@/lib/championships-store';
 
 const hanken = Hanken_Grotesk({
@@ -69,6 +70,7 @@ export default async function RootLayout({
         </main>
         <SponsorsCarousel />
         <Footer />
+        <WrappedPrompt />
       </body>
     </html>
   );
