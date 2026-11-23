@@ -25,16 +25,8 @@ alter table drivers drop column if exists display_number;
 -- ── 1. reserved_number: the champion's own number, held while they run #1 ────
 alter table drivers add column if not exists reserved_number integer;
 
--- ── 2. Move the current champion onto #1 ─────────────────────────────────────
--- Expected: UPDATE 1 (Mr Sir, 747 → reserved). display_name is already "┊1".
-update drivers
-set    reserved_number = driver_number,
-       driver_number   = 1
-where  is_champion
-  and  driver_number is distinct from 1;
-
--- ── 3. Rules ─────────────────────────────────────────────────────────────────
--- #1 belongs to the champion and only the champion; everyone else 2..999.
+-- ── 2. Admit #1 — for the champion only; everyone else 2..999 ────────────────
+-- Must come before step 3: the old constraint (2..999) rejects the move to 1.
 alter table drivers drop constraint if exists drivers_number_range;
 alter table drivers
   add constraint drivers_number_range
@@ -42,6 +34,15 @@ alter table drivers
          or driver_number between 2 and 999
          or (driver_number = 1 and is_champion));
 
+-- ── 3. Move the current champion onto #1 ─────────────────────────────────────
+-- Expected: UPDATE 1 (Mr Sir, 747 → reserved). display_name is already "┊1".
+update drivers
+set    reserved_number = driver_number,
+       driver_number   = 1
+where  is_champion
+  and  driver_number is distinct from 1;
+
+-- ── 3b. Rules that hold once the champion is on #1 ───────────────────────────
 alter table drivers drop constraint if exists drivers_champion_runs_one;
 alter table drivers
   add constraint drivers_champion_runs_one
