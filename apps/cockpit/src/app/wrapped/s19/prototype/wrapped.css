@@ -17,8 +17,17 @@
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
-  container-type: inline-size;
   transition: background-color 380ms ease;
+}
+
+/* Fixed 440×782 design canvas, scaled to the stage (see CANVAS_W). cqw
+   units inside are therefore constant: the layout is identical at any size. */
+.wx-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  container-type: inline-size;
 }
 
 .wx-slide {

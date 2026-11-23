@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { WrappedDriverCard, WrappedRosterEntry } from '@/lib/wrapped/s19-prototype';
 import './wrapped.css';
@@ -24,6 +31,20 @@ type SlideDef = { bg: string; fg: string; ms: number | null; render: () => React
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-US');
 const d = (ms: number): CSSProperties => ({ '--d': `${ms}ms` }) as CSSProperties;
+
+// Every slide is laid out on one fixed canvas and scaled to the space it
+// gets (like a phone screen), so the layout never reflows or overflows.
+const CANVAS_W = 440;
+const CANVAS_H = 782; // 9:16
+
+// Display names sized so their longest word fits the canvas on one line, and
+// hyphenated words never break at the hyphen ("Front-Runner" wrapped to 3
+// lines). Saira Condensed Black runs ~0.46em per glyph.
+const nb = (w: string) => w.replace(/-/g, '‑');
+function fitName(text: string, max = 104): CSSProperties {
+  const longest = Math.max(...text.split(' ').map((w) => w.length));
+  return { fontSize: Math.floor(Math.min(max, (CANVAS_W - 52) / (longest * 0.46))) };
+}
 
 // A line of display type revealed out of its own line box.
 function Line({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
@@ -76,11 +97,19 @@ function SeasonTrace({ rounds }: { rounds: WrappedDriverCard['rounds'] }) {
   const bestQ = pts.find((q) => q.p === best)!;
   const worstQ = pts.find((q) => q.p === worst)!;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full block overflow-visible" role="img" aria-label={`Finishes by round: ${rounds.map((r) => (r.position != null ? `P${r.position}` : 'did not start')).join(', ')}`}>
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="w-full block overflow-visible"
+      role="img"
+      aria-label={`Finishes by round: ${rounds.map((r) => (r.position != null ? `P${r.position}` : 'did not start')).join(', ')}`}
+    >
       {segs.map((sg, k) => (
         <line
           key={k}
-          x1={x(sg.a.i)} y1={y(sg.a.p)} x2={x(sg.b.i)} y2={y(sg.b.p)}
+          x1={x(sg.a.i)}
+          y1={y(sg.a.p)}
+          x2={x(sg.b.i)}
+          y2={y(sg.b.p)}
           stroke="#E6B53D"
           strokeWidth={sg.gap ? 2 : 4}
           strokeLinecap="round"
@@ -89,11 +118,28 @@ function SeasonTrace({ rounds }: { rounds: WrappedDriverCard['rounds'] }) {
         />
       ))}
       {pts.map((q) => (
-        <circle key={q.i} cx={x(q.i)} cy={y(q.p)} r={q === bestQ ? 7 : 4} fill={q === bestQ ? '#E6B53D' : '#0A0B0E'} stroke="#E6B53D" strokeWidth="2.5" />
+        <circle
+          key={q.i}
+          cx={x(q.i)}
+          cy={y(q.p)}
+          r={q === bestQ ? 7 : 4}
+          fill={q === bestQ ? '#E6B53D' : '#0A0B0E'}
+          stroke="#E6B53D"
+          strokeWidth="2.5"
+        />
       ))}
-      <text x={x(bestQ.i)} y={y(best) - 13} textAnchor="middle" className="wx-trace-label">P{best}</text>
+      <text x={x(bestQ.i)} y={y(best) - 13} textAnchor="middle" className="wx-trace-label">
+        P{best}
+      </text>
       {worst !== best && (
-        <text x={x(worstQ.i)} y={y(worst) + 24} textAnchor="middle" className="wx-trace-label wx-trace-low">P{worst}</text>
+        <text
+          x={x(worstQ.i)}
+          y={y(worst) + 24}
+          textAnchor="middle"
+          className="wx-trace-label wx-trace-low"
+        >
+          P{worst}
+        </text>
       )}
     </svg>
   );
@@ -158,8 +204,8 @@ function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
               <Line delay={120}>kilometers</Line>
             </div>
             <p className="wx-body mt-6 wx-in" style={d(500)}>
-              {card.distanceCompare} {fmt(n.laps)} race laps in {Math.floor(minutes / 60)} hours {minutes % 60}{' '}
-              minutes.
+              {card.distanceCompare} {fmt(n.laps)} race laps in {Math.floor(minutes / 60)} hours{' '}
+              {minutes % 60} minutes.
             </p>
           </div>
         </>
@@ -233,21 +279,22 @@ function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
               <div className="wx-mirror">{nm.number != null ? nm.number : '?'}</div>
             </div>
             <div className="mt-auto">
-              <div className="wx-name">
+              <div className="wx-name" style={fitName(nm.name)}>
                 {nm.name.split(' ').map((w, i) => (
                   <Line key={i} delay={250 + i * 100}>
-                    {w}
+                    {nb(w)}
                   </Line>
                 ))}
               </div>
               <p className="wx-body mt-5 wx-in" style={d(650)}>
-                Side by side at the flag {nm.sideBySide} {nm.sideBySide === 1 ? 'time' : 'times'}. Head to head, you
-                finished ahead {nm.ahead} {nm.ahead === 1 ? 'time' : 'times'}, they did {nm.behind}.
+                Side by side at the flag {nm.sideBySide} {nm.sideBySide === 1 ? 'time' : 'times'}.
+                Head to head, you finished ahead {nm.ahead} {nm.ahead === 1 ? 'time' : 'times'},
+                they did {nm.behind}.
               </p>
             </div>
           </>
         ),
-      },
+      }
     );
   }
 
@@ -271,10 +318,10 @@ function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
         <>
           <div className="wx-kerb wx-sweep" style={{ ...d(0), bottom: '6%' }} aria-hidden="true" />
           <div className="mt-[22%]">
-            <div className="wx-name">
+            <div className="wx-name" style={fitName(card.archetype.title)}>
               {card.archetype.title.split(' ').map((w, i) => (
                 <Line key={i} delay={120 + i * 110}>
-                  {w}
+                  {nb(w)}
                 </Line>
               ))}
             </div>
@@ -311,10 +358,10 @@ function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
                 )}
                 <span className="wx-poster-name">{card.name}</span>
               </div>
-              <div className="wx-name mt-auto">
+              <div className="wx-name mt-auto" style={fitName(card.archetype.title, 96)}>
                 {card.archetype.title.split(' ').map((w, k) => (
                   <Line key={k} delay={120 + k * 90}>
-                    {w}
+                    {nb(w)}
                   </Line>
                 ))}
               </div>
@@ -352,25 +399,37 @@ function buildSlides(card: WrappedDriverCard, motion: boolean): SlideDef[] {
               <div className="mt-auto wx-in" style={d(420)}>
                 <SeasonTrace rounds={card.rounds} />
                 <p className="wx-poster-sum mt-3">
-                  <b>{fmt(n.km)} km</b> across {n.races} {n.races === 1 ? 'round' : 'rounds'} in Division {card.division}
+                  <b>{fmt(n.km)} km</b> across {n.races} {n.races === 1 ? 'round' : 'rounds'} in
+                  Division {card.division}
                 </p>
               </div>
 
               <div className="flex items-center justify-between mt-5 wx-in" style={d(500)}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- static brand lockup */}
-                <img src="/badges/sra-lockup.webp" alt="Sim Racing Alliance" width={112} height={32} />
+                <img
+                  src="/badges/sra-lockup.webp"
+                  alt="Sim Racing Alliance"
+                  width={112}
+                  height={32}
+                />
                 <span className="text-[12px] text-white/55">Season 19 Wrapped</span>
               </div>
             </div>
           </div>
         );
       },
-    },
+    }
   );
   return slides;
 }
 
-export function WrappedPrototype({ card, roster }: { card: WrappedDriverCard; roster: WrappedRosterEntry[] }) {
+export function WrappedPrototype({
+  card,
+  roster,
+}: {
+  card: WrappedDriverCard;
+  roster: WrappedRosterEntry[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -380,6 +439,15 @@ export function WrappedPrototype({ card, roster }: { card: WrappedDriverCard; ro
   const [paused, setPaused] = useState(false);
   const [run, setRun] = useState(0); // remount key: replay / driver change
   const press = useRef<{ t: number; x: number } | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setScale(e.contentRect.width / CANVAS_W));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const m = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -390,7 +458,10 @@ export function WrappedPrototype({ card, roster }: { card: WrappedDriverCard; ro
   const slide = slides[i];
   const last = slides.length - 1;
 
-  const go = useCallback((delta: number) => setI((s) => Math.min(last, Math.max(0, s + delta))), [last]);
+  const go = useCallback(
+    (delta: number) => setI((s) => Math.min(last, Math.max(0, s + delta))),
+    [last]
+  );
 
   useEffect(() => {
     setI(0);
@@ -438,7 +509,10 @@ export function WrappedPrototype({ card, roster }: { card: WrappedDriverCard; ro
     <div className="flex flex-col lg:flex-row gap-10 items-start">
       <aside className="w-full lg:w-[280px] shrink-0 flex flex-col gap-5">
         <div>
-          <label htmlFor="wr-driver" className="block font-sans text-[13px] font-semibold text-txt-2 mb-2">
+          <label
+            htmlFor="wr-driver"
+            className="block font-sans text-[13px] font-semibold text-txt-2 mb-2"
+          >
             Preview as
           </label>
           <select
@@ -461,8 +535,8 @@ export function WrappedPrototype({ card, roster }: { card: WrappedDriverCard; ro
           </select>
         </div>
         <p className="font-sans text-[13px] text-txt-3 leading-relaxed">
-          Tap the right of the story to skip ahead, the left to go back. Hold to pause, or press space. Admins only;
-          live Season 19 data.
+          Tap the right of the story to skip ahead, the left to go back. Hold to pause, or press
+          space. Admins only; live Season 19 data.
         </p>
         <button
           type="button"
@@ -479,6 +553,7 @@ export function WrappedPrototype({ card, roster }: { card: WrappedDriverCard; ro
 
       <div className="w-full flex justify-center">
         <div
+          ref={stageRef}
           className={`wx-stage ${frozen ? 'wx-held' : ''}`}
           style={{ background: slide.bg, color: slide.fg }}
           onPointerDown={onDown}
@@ -490,30 +565,40 @@ export function WrappedPrototype({ card, roster }: { card: WrappedDriverCard; ro
           onContextMenu={(e) => e.preventDefault()}
           aria-roledescription="story"
         >
-          <div className="wx-progress" aria-hidden="true">
-            {slides.map((s, k) => (
-              <span key={`${run}-${k}`} data-state={k < i ? 'done' : k === i ? 'now' : 'next'}>
-                <i
-                  style={{ '--dur': `${s.ms ?? 1}ms` } as CSSProperties}
-                  onAnimationEnd={() => k === i && s.ms != null && go(1)}
-                />
-              </span>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="wx-pause"
-            onClick={() => setPaused((p) => !p)}
-            aria-label={paused ? 'Play story' : 'Pause story'}
+          <div
+            className="wx-canvas"
+            style={{ width: CANVAS_W, height: CANVAS_H, transform: `scale(${scale})` }}
           >
-            {paused ? (
-              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor" /></svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="1.5" width="3" height="11" fill="currentColor" /><rect x="8.5" y="1.5" width="3" height="11" fill="currentColor" /></svg>
-            )}
-          </button>
-          <div key={`${run}-${i}`} className="wx-slide" aria-live="polite">
-            {slide.render()}
+            <div className="wx-progress" aria-hidden="true">
+              {slides.map((s, k) => (
+                <span key={`${run}-${k}`} data-state={k < i ? 'done' : k === i ? 'now' : 'next'}>
+                  <i
+                    style={{ '--dur': `${s.ms ?? 1}ms` } as CSSProperties}
+                    onAnimationEnd={() => k === i && s.ms != null && go(1)}
+                  />
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="wx-pause"
+              onClick={() => setPaused((p) => !p)}
+              aria-label={paused ? 'Play story' : 'Pause story'}
+            >
+              {paused ? (
+                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                  <path d="M3 1.5v11l9-5.5z" fill="currentColor" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                  <rect x="2.5" y="1.5" width="3" height="11" fill="currentColor" />
+                  <rect x="8.5" y="1.5" width="3" height="11" fill="currentColor" />
+                </svg>
+              )}
+            </button>
+            <div key={`${run}-${i}`} className="wx-slide" aria-live="polite">
+              {slide.render()}
+            </div>
           </div>
         </div>
       </div>
