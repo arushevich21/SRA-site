@@ -32,6 +32,12 @@ const ADMIN_SECTIONS: {
         description:
           'YouTube/Twitch thumbnail for every round × division of the series on air — division badge, circuit map, weather, partner strip. Preview and download; nothing is uploaded automatically.',
       },
+      {
+        label: 'Season 19 Wrapped',
+        href: '/admin/wrapped',
+        description:
+          'Generate the Wrapped snapshot drivers watch at /wrapped/s19, check its status, and preview any driver’s story.',
+      },
     ],
   },
   {

@@ -268,3 +268,21 @@
 @media (prefers-reduced-motion: reduce) {
   .wx-sweat { animation: none; top: calc(10% + var(--s) * 120px); opacity: .5; }
 }
+
+/* Controls under the card on the last slide. */
+.wx-action {
+  font: 600 15px/1 var(--font-sans);
+  padding: 13px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--color-line-2);
+  color: var(--color-txt);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.wx-action:hover { border-color: var(--color-txt-3); }
+.wx-action-primary { background: var(--color-gold); border-color: var(--color-gold); color: var(--color-carbon); }
+.wx-action-primary:hover { background: var(--color-gold-soft); border-color: var(--color-gold-soft); }
+
+/* Launch prompt: rises in once. */
+.wx-prompt { animation: wx-prompt-in 420ms cubic-bezier(.2, .9, .1, 1) both; }
+@keyframes wx-prompt-in { from { opacity: 0; transform: translate(-50%, 24px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .wx-prompt { animation: none; } }
